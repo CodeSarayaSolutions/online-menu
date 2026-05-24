@@ -12,8 +12,6 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useParams } from "next/navigation";
-import { useOrders } from "@/hooks/useOrders";
 import type { Order, OrderStatus } from "@/types/order";
 import type { CartItem } from "@/types/cart";
 import {
@@ -25,6 +23,12 @@ import {
 import clsx from "clsx";
 
 type StationMode = "kitchen" | "bar";
+
+type StationOrdersBoardProps = {
+  mode: StationMode;
+  orders: Order[];
+  updateStatus: (orderId: string, status: OrderStatus) => Promise<void>;
+};
 
 const STATUS_FLOW: OrderStatus[] = ["pending", "preparing", "ready", "served"];
 
@@ -253,11 +257,11 @@ function OrderCard({
   );
 }
 
-export default function StationOrdersBoard({ mode }: { mode: StationMode }) {
-  const params = useParams();
-  const venueSlug = typeof params.venue === "string" ? params.venue : "";
-  const { orders, updateStatus } = useOrders(venueSlug);
-
+export default function StationOrdersBoard({
+  mode,
+  orders,
+  updateStatus,
+}: StationOrdersBoardProps) {
   const active = orders.filter(
     (o) => o.status !== "served" && o.status !== "cancelled"
   );

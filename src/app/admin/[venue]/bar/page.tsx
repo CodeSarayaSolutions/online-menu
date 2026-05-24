@@ -16,7 +16,7 @@ import {
 export default function BarStationPage() {
   const params = useParams();
   const venueSlug = typeof params.venue === "string" ? params.venue : "";
-  const { orders } = useOrders(venueSlug);
+  const { orders, updateStatus } = useOrders(venueSlug);
 
   const [muted, setMuted] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
@@ -148,7 +148,7 @@ export default function BarStationPage() {
         </button>
       </div>
 
-      <StationOrdersBoard mode="bar" />
+      <StationOrdersBoard mode="bar" orders={orders} updateStatus={updateStatus} />
       {venueSlug ? <BarActiveTabs restaurantId={venueSlug} /> : null}
 
       <button
