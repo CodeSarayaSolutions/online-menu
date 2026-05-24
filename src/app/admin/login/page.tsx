@@ -62,7 +62,11 @@ export default function AdminLoginPage() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className={clsx("min-h-screen adm-bg flex items-center justify-center p-6", darkMode && "admin-dark")}
+      className={clsx(
+        "fixed inset-0 adm-bg flex items-center justify-center p-6 overflow-y-auto",
+        darkMode && "admin-dark"
+      )}
+      style={{ background: darkMode ? "#0f0f0f" : undefined }}
     >
       <motion.div
         initial={{ opacity: 0, y: 12 }}
