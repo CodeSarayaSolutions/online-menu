@@ -2,9 +2,10 @@ module.exports = {
   apps: [
     {
       name: 'online-menu',
-      script: 'node_modules/.bin/next',
+      script: 'node_modules/next/dist/bin/next',
       args: 'start -p 3017',
       cwd: '/www/wwwroot/online-menu',
+      interpreter: 'node',
       env: {
         NODE_ENV: 'production',
         PORT: '3017',
