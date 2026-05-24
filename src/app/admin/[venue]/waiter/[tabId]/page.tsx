@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Minus, Plus, Search, X, CreditCard, Banknote } from "lucide-react";
+import { Minus, Plus, Search, X, CreditCard, Banknote } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCmsStore } from "@/store/cmsStore";
 import { useAuthStore } from "@/store/authStore";
@@ -30,7 +30,6 @@ export default function WaiterTabPage() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [showPay, setShowPay] = useState(false);
-  const [confirmFinish, setConfirmFinish] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -117,15 +116,16 @@ export default function WaiterTabPage() {
     }
   };
 
-  const finishAndLogout = async () => {
-    try {
-      await authService.signOut();
-    } catch {
-      /* ignore */
-    }
-    logout();
-    setConfirmFinish(false);
-    router.replace("/admin/login");
+  const handleGotovo = () => {
+    void (async () => {
+      try {
+        await authService.signOut();
+      } catch {
+        /* ignore */
+      }
+      logout();
+      router.replace("/admin/login");
+    })();
   };
 
   const closeWithPayment = async (method: "cash" | "card") => {
@@ -178,67 +178,18 @@ export default function WaiterTabPage() {
   const tableLabel = tab.table_label;
   const items = tab.tab_items ?? [];
 
+  const actionBarHeight = canEdit ? 88 : 0;
+
   return (
-    <div className="flex flex-col min-h-[calc(100vh-64px)] pb-28">
-      <header className="sticky top-0 z-20 adm-surface adm-border border border-b px-4 py-3 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => router.push(`/admin/${venueSlug}/waiter`)}
-          className="p-2 rounded-xl hover:bg-[var(--adm-surface-2)]"
-        >
-          <ArrowLeft size={20} />
-        </button>
-        <div className="flex-1 min-w-0">
-          <h1 className="font-extrabold text-dark adm-text truncate">{tableLabel}</h1>
-          <p className="text-[11px] text-muted adm-text-muted">
-            {tab.waiter_name} · {readonly ? "Pregled" : "Aktivna kartica"}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {canEdit && (
-            <>
-              {confirmFinish ? (
-                <div className="flex flex-col items-end gap-1">
-                  <span className="text-[10px] font-semibold adm-text whitespace-nowrap">
-                    Završiti i odjaviti se?
-                  </span>
-                  <div className="flex gap-1">
-                    <button
-                      type="button"
-                      onClick={() => void finishAndLogout()}
-                      className="px-2 py-1 text-[11px] font-bold text-red-600"
-                    >
-                      Da
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmFinish(false)}
-                      className="px-2 py-1 text-[11px] font-bold adm-text-muted"
-                    >
-                      Ne
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setConfirmFinish(true)}
-                  className="px-3 py-2 rounded-xl adm-border border text-[11px] font-semibold text-muted adm-text-muted whitespace-nowrap"
-                >
-                  Završi narudžbu
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setShowPay(true)}
-                disabled={items.length === 0 || busy}
-                className="px-4 py-2 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-40"
-              >
-                Naplati
-              </button>
-            </>
-          )}
-        </div>
+    <div
+      className="flex flex-col min-h-[calc(100vh-64px)]"
+      style={{ paddingBottom: `calc(40vh + ${actionBarHeight}px)` }}
+    >
+      <header className="sticky top-0 z-20 adm-surface adm-border border border-b px-4 py-3">
+        <h1 className="font-extrabold text-dark adm-text truncate">{tableLabel}</h1>
+        <p className="text-[11px] text-muted adm-text-muted">
+          {tab.waiter_name} · {readonly ? "Pregled" : "Aktivna kartica"}
+        </p>
       </header>
 
       {error && (
@@ -289,7 +240,12 @@ export default function WaiterTabPage() {
         ))}
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 lg:left-[272px] adm-surface adm-border border border-t shadow-elevated z-30 max-h-[40vh] flex flex-col">
+      <div
+        className={clsx(
+          "fixed left-0 right-0 lg:left-[272px] adm-surface adm-border border border-t shadow-elevated z-30 max-h-[40vh] flex flex-col",
+          canEdit ? "bottom-[88px]" : "bottom-0"
+        )}
+      >
         <div className="px-4 py-2 border-b flex justify-between items-center">
           <span className="text-xs font-bold text-muted adm-text-muted uppercase">Stavke na kartici</span>
           <span className="text-lg font-extrabold text-dark adm-text">{Number(tab.total).toFixed(2)} KM</span>
@@ -321,6 +277,26 @@ export default function WaiterTabPage() {
           )}
         </div>
       </div>
+
+      {canEdit && (
+        <div className="fixed bottom-0 left-0 right-0 lg:left-[272px] z-40 p-4 adm-bg border-t adm-border flex gap-3">
+          <button
+            type="button"
+            onClick={handleGotovo}
+            className="flex-1 min-h-[56px] rounded-xl border-2 border-primary text-primary bg-transparent text-base font-bold"
+          >
+            GOTOVO
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowPay(true)}
+            disabled={items.length === 0 || busy}
+            className="flex-1 min-h-[56px] rounded-xl bg-gradient-to-r from-primary to-amber-500 text-white text-base font-bold disabled:opacity-40"
+          >
+            Naplati
+          </button>
+        </div>
+      )}
 
       <AnimatePresence>
         {showPay && (
