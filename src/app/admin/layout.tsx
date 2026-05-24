@@ -150,6 +150,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return null;
   }, [pathname, urlSegments]);
 
+  const effectiveVenueId = activeRestaurantId || venueSlug;
+
   // Build a full href from a nav item's path suffix and the current venue slug
   const getHref = (item: NavItem) => {
     if (item.path === "/admin") return "/admin";
@@ -185,7 +187,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       return;
     }
 
-    if (!isOnVenuePage && (!activeRestaurantId || !currentUserId)) {
+    if (!isOnVenuePage && (!effectiveVenueId || !currentUserId)) {
       router.replace(currentUser?.platformRole === "admin" ? "/admin" : "/admin/login");
       return;
     }
@@ -193,7 +195,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }, [
     pathname,
     isOnVenuePage,
+    effectiveVenueId,
     activeRestaurantId,
+    venueSlug,
     currentUserId,
     currentUser,
     router,
@@ -204,36 +208,36 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   ]);
 
   const currentRestaurantRole = useMemo(() => {
-    if (!currentUser || !activeRestaurantId) return null;
-    return getUserRestaurantRole(currentUser.id, activeRestaurantId);
-  }, [currentUser, activeRestaurantId, getUserRestaurantRole]);
+    if (!currentUser || !effectiveVenueId) return null;
+    return getUserRestaurantRole(currentUser.id, effectiveVenueId);
+  }, [currentUser, effectiveVenueId, getUserRestaurantRole]);
 
   const visibleNavItems = useMemo(() => {
-    if (!currentUser || !activeRestaurantId) return [];
+    if (!currentUser || !effectiveVenueId) return [];
     return navItems.filter((item) => {
       if (item.path === "/admin") return isPlatformAdmin(currentUser);
       if (item.path === "restaurant" || item.path === "products" || item.path === "page-content") {
-        return canManageVenueCms(currentUser, activeRestaurantId);
+        return canManageVenueCms(currentUser, effectiveVenueId);
       }
-      if (item.path === "orders") return canViewOrdersList(currentUser, activeRestaurantId);
-      if (item.path === "tables") return canManageTables(currentUser, activeRestaurantId);
-      if (item.path === "inventory") return canManageInventory(currentUser, activeRestaurantId);
-      if (item.path === "waiter") return canViewWaiterMode(currentUser, activeRestaurantId);
-      if (item.path === "kitchen") return canViewKitchenStation(currentUser, activeRestaurantId);
-      if (item.path === "bar") return canViewBarStation(currentUser, activeRestaurantId);
+      if (item.path === "orders") return canViewOrdersList(currentUser, effectiveVenueId);
+      if (item.path === "tables") return canManageTables(currentUser, effectiveVenueId);
+      if (item.path === "inventory") return canManageInventory(currentUser, effectiveVenueId);
+      if (item.path === "waiter") return canViewWaiterMode(currentUser, effectiveVenueId);
+      if (item.path === "kitchen") return canViewKitchenStation(currentUser, effectiveVenueId);
+      if (item.path === "bar") return canViewBarStation(currentUser, effectiveVenueId);
       return false;
     });
-  }, [currentUser, activeRestaurantId]);
+  }, [currentUser, effectiveVenueId]);
 
   const visiblePlatformNav = useMemo(() => {
-    if (!currentUser || !activeRestaurantId) return [];
+    if (!currentUser || !effectiveVenueId) return [];
     return platformNavItems.filter((item) => {
       if (item.adminOnly) {
-        return isPlatformAdmin(currentUser) || canManageVenueStaff(currentUser, activeRestaurantId);
+        return isPlatformAdmin(currentUser) || canManageVenueStaff(currentUser, effectiveVenueId);
       }
       return true;
     });
-  }, [currentUser, activeRestaurantId]);
+  }, [currentUser, effectiveVenueId]);
 
   const allNavItems = [...navItems, ...platformNavItems];
   const currentPage = allNavItems.find((item) => isItemActive(item));
@@ -495,7 +499,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   // ─── Gate: if not on venue page and missing context, show nothing (redirect happens via useEffect) ──
-  if (!activeRestaurantId || !allRestaurants[activeRestaurantId] || !currentUserId || !currentUser) {
+  const venueReady = effectiveVenueId && (allRestaurants[effectiveVenueId] || !venuesReady);
+  if (!venueReady || !currentUserId || !currentUser || !effectiveVenueId) {
     return null;
   }
 
@@ -537,8 +542,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-[var(--adm-surface-2)] border border-primary/10 hover:border-primary/20 transition text-left"
           >
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-amber-500/10 flex items-center justify-center overflow-hidden shrink-0">
-              {allRestaurants[activeRestaurantId]?.restaurant.image ? (
-                <img src={allRestaurants[activeRestaurantId].restaurant.image} alt="" className="w-full h-full object-cover" />
+              {allRestaurants[effectiveVenueId]?.restaurant.image ? (
+                <img src={allRestaurants[effectiveVenueId].restaurant.image} alt="" className="w-full h-full object-cover" />
               ) : (
                 <Store size={14} className="text-primary" />
               )}
@@ -561,7 +566,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 {accessibleRestaurants.map((rId) => {
                   const rData = allRestaurants[rId];
                   if (!rData) return null;
-                  const isSelected = rId === activeRestaurantId;
+                  const isSelected = rId === effectiveVenueId;
                   return (
                     <button key={rId} onClick={() => handleSwitchRestaurant(rId)} className={clsx("w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition hover:bg-[var(--adm-surface-2)]", isSelected && "bg-primary/5")}>
                       <div className="w-7 h-7 rounded-lg adm-bg overflow-hidden shrink-0">
@@ -639,7 +644,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <Download size={15} /> Instaliraj aplikaciju
             </button>
           )}
-          <Link href={`/${activeRestaurantId}`} className="flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)] transition"><ArrowLeft size={15} />Back to Menu</Link>
+          <Link href={`/${effectiveVenueId}`} className="flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)] transition"><ArrowLeft size={15} />Back to Menu</Link>
         </div>
       </aside>
 
@@ -669,7 +674,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               {currentUser.platformRole === "admin" ? <ShieldCheck size={11} className="text-primary" /> : <Shield size={11} className="text-accent-blue" />}
               <span className="text-[11px] font-semibold text-dark adm-text">{currentRestaurantRole ? restaurantRoleLabel(currentRestaurantRole) : "Viewer"}</span>
             </div>
-            <Link href={`/${activeRestaurantId}`} target="_blank" className="hidden md:flex items-center gap-1.5 bg-gradient-to-r from-primary to-amber-500 text-white px-3.5 py-1.5 rounded-full text-[11px] font-bold shadow-glow hover:brightness-105 transition">View Menu</Link>
+            <Link href={`/${effectiveVenueId}`} target="_blank" className="hidden md:flex items-center gap-1.5 bg-gradient-to-r from-primary to-amber-500 text-white px-3.5 py-1.5 rounded-full text-[11px] font-bold shadow-glow hover:brightness-105 transition">View Menu</Link>
           </div>
         </header>
         <main className="flex-1 overflow-y-auto">

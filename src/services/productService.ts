@@ -2,17 +2,21 @@
 // Replaces: cmsStore's products/categories arrays + CRUD methods
 // Handles: Categories, Products, Addons, Variations
 
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-import type { Tables, InsertDto, UpdateDto } from '@/types/supabase';
-import type { ProductItem, CategoryInfo, Addon, Variation, VariationOption } from '@/types/cms';
+import type { Database, Tables, InsertDto, UpdateDto } from '@/types/supabase';
+import type { ProductItem, CategoryInfo, Addon, Variation } from '@/types/cms';
+
+type DbClient = SupabaseClient<Database, 'sarayamenu'>;
 
 export type ProductRow = Tables<'products'>;
 export type CategoryRow = Tables<'categories'>;
 
 // ─── Categories ──────────────────────────────────────────
 
-export async function getCategories(restaurantId: string): Promise<CategoryRow[]> {
-  const { data, error } = await supabase
+export async function getCategories(restaurantId: string, client?: DbClient): Promise<CategoryRow[]> {
+  const db = client ?? supabase;
+  const { data, error } = await db
     .from('categories')
     .select('*')
     .eq('restaurant_id', restaurantId)
@@ -22,8 +26,9 @@ export async function getCategories(restaurantId: string): Promise<CategoryRow[]
   return data ?? [];
 }
 
-export async function upsertCategory(category: InsertDto<'categories'>) {
-  const { data, error } = await supabase
+export async function upsertCategory(category: InsertDto<'categories'>, client?: DbClient) {
+  const db = client ?? supabase;
+  const { data, error } = await db
     .from('categories')
     .upsert(category, { onConflict: 'restaurant_id,id' })
     .select()
@@ -33,8 +38,9 @@ export async function upsertCategory(category: InsertDto<'categories'>) {
   return data;
 }
 
-export async function deleteCategory(restaurantId: string, categoryId: string) {
-  const { error } = await supabase
+export async function deleteCategory(restaurantId: string, categoryId: string, client?: DbClient) {
+  const db = client ?? supabase;
+  const { error } = await db
     .from('categories')
     .delete()
     .eq('restaurant_id', restaurantId)
@@ -43,10 +49,14 @@ export async function deleteCategory(restaurantId: string, categoryId: string) {
   if (error) throw error;
 }
 
-export async function reorderCategories(restaurantId: string, orderedIds: string[]) {
-  // Update sort_order for each category in a batch
+export async function reorderCategories(
+  restaurantId: string,
+  orderedIds: string[],
+  client?: DbClient
+) {
+  const db = client ?? supabase;
   const updates = orderedIds.map((id, index) =>
-    supabase
+    db
       .from('categories')
       .update({ sort_order: index })
       .eq('restaurant_id', restaurantId)
@@ -58,8 +68,9 @@ export async function reorderCategories(restaurantId: string, orderedIds: string
 
 // ─── Products ────────────────────────────────────────────
 
-export async function getProducts(restaurantId: string): Promise<ProductRow[]> {
-  const { data, error } = await supabase
+export async function getProducts(restaurantId: string, client?: DbClient): Promise<ProductRow[]> {
+  const db = client ?? supabase;
+  const { data, error } = await db
     .from('products')
     .select('*')
     .eq('restaurant_id', restaurantId)
@@ -69,8 +80,9 @@ export async function getProducts(restaurantId: string): Promise<ProductRow[]> {
   return data ?? [];
 }
 
-export async function getProductById(productId: string): Promise<ProductRow | null> {
-  const { data, error } = await supabase
+export async function getProductById(productId: string, client?: DbClient): Promise<ProductRow | null> {
+  const db = client ?? supabase;
+  const { data, error } = await db
     .from('products')
     .select('*')
     .eq('id', productId)
@@ -80,8 +92,9 @@ export async function getProductById(productId: string): Promise<ProductRow | nu
   return data;
 }
 
-export async function createProduct(product: InsertDto<'products'>): Promise<ProductRow> {
-  const { data, error } = await supabase
+export async function createProduct(product: InsertDto<'products'>, client?: DbClient): Promise<ProductRow> {
+  const db = client ?? supabase;
+  const { data, error } = await db
     .from('products')
     .insert(product)
     .select()
@@ -91,8 +104,13 @@ export async function createProduct(product: InsertDto<'products'>): Promise<Pro
   return data;
 }
 
-export async function updateProduct(productId: string, updates: UpdateDto<'products'>): Promise<ProductRow> {
-  const { data, error } = await supabase
+export async function updateProduct(
+  productId: string,
+  updates: UpdateDto<'products'>,
+  client?: DbClient
+): Promise<ProductRow> {
+  const db = client ?? supabase;
+  const { data, error } = await db
     .from('products')
     .update(updates)
     .eq('id', productId)
@@ -103,16 +121,17 @@ export async function updateProduct(productId: string, updates: UpdateDto<'produ
   return data;
 }
 
-export async function deleteProduct(productId: string) {
-  // Cascade deletes handle addons, variations, and variation_options
-  const { error } = await supabase.from('products').delete().eq('id', productId);
+export async function deleteProduct(productId: string, client?: DbClient) {
+  const db = client ?? supabase;
+  const { error } = await db.from('products').delete().eq('id', productId);
   if (error) throw error;
 }
 
 // ─── Addons ──────────────────────────────────────────────
 
-export async function getAddons(productId: string) {
-  const { data, error } = await supabase
+export async function getAddons(productId: string, client?: DbClient) {
+  const db = client ?? supabase;
+  const { data, error } = await db
     .from('addons')
     .select('*')
     .eq('product_id', productId);
@@ -121,13 +140,12 @@ export async function getAddons(productId: string) {
   return data ?? [];
 }
 
-export async function syncAddons(productId: string, addons: Addon[]) {
-  // Delete all existing addons for this product
-  await supabase.from('addons').delete().eq('product_id', productId);
+export async function syncAddons(productId: string, addons: Addon[], client?: DbClient) {
+  const db = client ?? supabase;
+  await db.from('addons').delete().eq('product_id', productId);
 
   if (addons.length === 0) return;
 
-  // Insert new ones
   const rows = addons.map((a) => ({
     id: a.id,
     product_id: productId,
@@ -136,14 +154,15 @@ export async function syncAddons(productId: string, addons: Addon[]) {
     price: a.price,
   }));
 
-  const { error } = await supabase.from('addons').insert(rows);
+  const { error } = await db.from('addons').insert(rows);
   if (error) throw error;
 }
 
 // ─── Variations & Options ────────────────────────────────
 
-export async function getVariationsWithOptions(productId: string): Promise<Variation[]> {
-  const { data: variations, error: vErr } = await supabase
+export async function getVariationsWithOptions(productId: string, client?: DbClient): Promise<Variation[]> {
+  const db = client ?? supabase;
+  const { data: variations, error: vErr } = await db
     .from('variations')
     .select('*')
     .eq('product_id', productId);
@@ -152,7 +171,7 @@ export async function getVariationsWithOptions(productId: string): Promise<Varia
   if (!variations?.length) return [];
 
   const variationIds = variations.map((v) => v.id);
-  const { data: options, error: oErr } = await supabase
+  const { data: options, error: oErr } = await db
     .from('variation_options')
     .select('*')
     .in('variation_id', variationIds);
@@ -175,24 +194,22 @@ export async function getVariationsWithOptions(productId: string): Promise<Varia
   }));
 }
 
-export async function syncVariations(productId: string, variations: Variation[]) {
-  // Get existing variation IDs to clean up options
-  const { data: existingVars } = await supabase
+export async function syncVariations(productId: string, variations: Variation[], client?: DbClient) {
+  const db = client ?? supabase;
+  const { data: existingVars } = await db
     .from('variations')
     .select('id')
     .eq('product_id', productId);
 
   if (existingVars?.length) {
     const ids = existingVars.map((v) => v.id);
-    await supabase.from('variation_options').delete().in('variation_id', ids);
+    await db.from('variation_options').delete().in('variation_id', ids);
   }
 
-  // Delete existing variations
-  await supabase.from('variations').delete().eq('product_id', productId);
+  await db.from('variations').delete().eq('product_id', productId);
 
   if (variations.length === 0) return;
 
-  // Insert new variations
   const varRows = variations.map((v) => ({
     id: v.id,
     product_id: productId,
@@ -201,10 +218,9 @@ export async function syncVariations(productId: string, variations: Variation[])
     required: v.required,
   }));
 
-  const { error: vErr } = await supabase.from('variations').insert(varRows);
+  const { error: vErr } = await db.from('variations').insert(varRows);
   if (vErr) throw vErr;
 
-  // Insert all options
   const optionRows = variations.flatMap((v) =>
     v.options.map((o) => ({
       id: o.id,
@@ -216,22 +232,20 @@ export async function syncVariations(productId: string, variations: Variation[])
   );
 
   if (optionRows.length > 0) {
-    const { error: oErr } = await supabase.from('variation_options').insert(optionRows);
+    const { error: oErr } = await db.from('variation_options').insert(optionRows);
     if (oErr) throw oErr;
   }
 }
 
 // ─── Full Product with Relations ─────────────────────────
-// Loads a product with all its addons and variations+options.
-// Returns data in the same shape as the existing ProductItem type.
 
-export async function getFullProduct(productId: string): Promise<ProductItem | null> {
-  const product = await getProductById(productId);
+export async function getFullProduct(productId: string, client?: DbClient): Promise<ProductItem | null> {
+  const product = await getProductById(productId, client);
   if (!product) return null;
 
   const [addons, variations] = await Promise.all([
-    getAddons(productId),
-    getVariationsWithOptions(productId),
+    getAddons(productId, client),
+    getVariationsWithOptions(productId, client),
   ]);
 
   return {
@@ -258,33 +272,30 @@ export async function getFullProduct(productId: string): Promise<ProductItem | n
 
 // ─── Full Menu (all products + categories for a venue) ───
 
-export async function getFullMenu(restaurantId: string) {
+export async function getFullMenu(restaurantId: string, client?: DbClient) {
+  const db = client ?? supabase;
   const [categories, products] = await Promise.all([
-    getCategories(restaurantId),
-    getProducts(restaurantId),
+    getCategories(restaurantId, client),
+    getProducts(restaurantId, client),
   ]);
 
-  // For each product, load addons & variations
   const productIds = products.map((p) => p.id);
 
-  // Batch-load all addons
-  const { data: allAddons } = await supabase
+  const { data: allAddons } = await db
     .from('addons')
     .select('*')
     .in('product_id', productIds);
 
-  // Batch-load all variations
-  const { data: allVariations } = await supabase
+  const { data: allVariations } = await db
     .from('variations')
     .select('*')
     .in('product_id', productIds);
 
   const variationIds = (allVariations ?? []).map((v) => v.id);
   const { data: allOptions } = variationIds.length
-    ? await supabase.from('variation_options').select('*').in('variation_id', variationIds)
+    ? await db.from('variation_options').select('*').in('variation_id', variationIds)
     : { data: [] };
 
-  // Assemble ProductItem[]
   const fullProducts: ProductItem[] = products.map((p) => ({
     id: p.id,
     restaurantId: p.restaurant_id,

@@ -1,7 +1,9 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import * as restaurantService from '@/services/restaurantService';
 import * as productService from '@/services/productService';
 import type { RestaurantData } from '@/store/cmsStore';
 import { useCmsStore } from '@/store/cmsStore';
+import type { Database } from '@/types/supabase';
 import {
   buildRestaurantData,
   dbCategoriesForSave,
@@ -9,6 +11,8 @@ import {
   restaurantInfoToRow,
 } from '@/lib/venue-cloud/mappers';
 import type { ThemeCustomization } from '@/store/cmsStore';
+
+type DbClient = SupabaseClient<Database, 'sarayamenu'>;
 
 const saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -42,68 +46,100 @@ export async function loadVenueBundle(slug: string): Promise<RestaurantData | nu
   });
 }
 
-export async function saveVenueToCloud(slug: string, data: RestaurantData): Promise<void> {
+export async function saveVenueToCloud(
+  slug: string,
+  data: RestaurantData,
+  client?: DbClient
+): Promise<void> {
   const row = restaurantInfoToRow(slug, data.restaurant, data.venueType);
-  const existing = await restaurantService.getRestaurant(slug);
+  const existing = await restaurantService.getRestaurant(slug, client);
   if (existing) {
-    await restaurantService.updateRestaurant(slug, row);
+    await restaurantService.updateRestaurant(slug, row, client);
   } else {
-    await restaurantService.createRestaurant(row);
+    await restaurantService.createRestaurant(row, client);
   }
 
   await Promise.all([
-    restaurantService.savePageContent(slug, data.pageContent),
-    restaurantService.saveComponentStyles(slug, data.componentStyles),
-    restaurantService.saveLayoutConfig(slug, data.layoutConfig),
+    restaurantService.savePageContent(slug, data.pageContent, client),
+    restaurantService.saveComponentStyles(slug, data.componentStyles, client),
+    restaurantService.saveLayoutConfig(slug, data.layoutConfig, client),
   ]);
 
   for (const [themeId, customization] of Object.entries(data.themeCustomizations ?? {})) {
-    await restaurantService.saveThemeCustomization(slug, themeId, {
-      componentStyles: customization.componentStyles,
-      layoutConfig: customization.layoutConfig,
-      pageContent: customization.pageContent,
-    });
+    await restaurantService.saveThemeCustomization(
+      slug,
+      themeId,
+      {
+        componentStyles: customization.componentStyles,
+        layoutConfig: customization.layoutConfig,
+        pageContent: customization.pageContent,
+      },
+      client
+    );
   }
 
   const categories = dbCategoriesForSave(data.categories);
-  const existingCats = await productService.getCategories(slug);
+  const existingCats = await productService.getCategories(slug, client);
   const keepCatIds = new Set(categories.map((c) => c.id));
   for (const c of existingCats) {
     if (!keepCatIds.has(c.id)) {
-      await productService.deleteCategory(slug, c.id);
+      await productService.deleteCategory(slug, c.id, client);
     }
   }
   for (let i = 0; i < categories.length; i++) {
     const c = categories[i];
-    await productService.upsertCategory({
-      id: c.id,
-      restaurant_id: slug,
-      label: c.label,
-      label_bs: c.label_bs ?? null,
-      icon: c.icon,
-      color: c.color,
-      sort_order: i,
-    });
+    await productService.upsertCategory(
+      {
+        id: c.id,
+        restaurant_id: slug,
+        label: c.label,
+        label_bs: c.label_bs ?? null,
+        icon: c.icon,
+        color: c.color,
+        sort_order: i,
+      },
+      client
+    );
   }
 
-  const existingProducts = await productService.getProducts(slug);
+  const existingProducts = await productService.getProducts(slug, client);
   const keepProductIds = new Set(data.products.map((p) => p.id));
   for (const p of existingProducts) {
     if (!keepProductIds.has(p.id)) {
-      await productService.deleteProduct(p.id);
+      await productService.deleteProduct(p.id, client);
     }
   }
 
   for (const product of data.products) {
-    const row = productToRow(product, slug);
-    const existing = await productService.getProductById(product.id);
-    if (existing) {
-      await productService.updateProduct(product.id, row);
+    const productRow = productToRow(product, slug);
+    const existingProduct = await productService.getProductById(product.id, client);
+    if (existingProduct) {
+      await productService.updateProduct(product.id, productRow, client);
     } else {
-      await productService.createProduct(row);
+      await productService.createProduct(productRow, client);
     }
-    await productService.syncAddons(product.id, product.addons ?? []);
-    await productService.syncVariations(product.id, product.variations ?? []);
+    await productService.syncAddons(product.id, product.addons ?? [], client);
+    await productService.syncVariations(product.id, product.variations ?? [], client);
+  }
+}
+
+async function postSaveVenueToCloud(slug: string, data: RestaurantData): Promise<void> {
+  const res = await fetch('/api/venue/save', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slug, data }),
+  });
+
+  if (!res.ok) {
+    let message = res.statusText;
+    try {
+      const body = (await res.json()) as { error?: string };
+      if (body.error) message = body.error;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(message);
   }
 }
 
@@ -114,7 +150,7 @@ export function queueSaveVenueToCloud(slug: string, data: RestaurantData, delayM
     slug,
     setTimeout(() => {
       saveTimers.delete(slug);
-      void saveVenueToCloud(slug, data).catch((err) => {
+      void postSaveVenueToCloud(slug, data).catch((err) => {
         console.error(`[venue-cloud] Failed to save ${slug}:`, err);
       });
     }, delayMs)
@@ -136,7 +172,7 @@ export async function loadAllVenuesIntoStore(): Promise<{ count: number; migrate
     const local = readLegacyLocalCms();
     if (local && Object.keys(local.allRestaurants).length > 0) {
       for (const [id, bundle] of Object.entries(local.allRestaurants)) {
-        await saveVenueToCloud(id, bundle);
+        await postSaveVenueToCloud(id, bundle);
       }
       useCmsStore.setState({ allRestaurants: local.allRestaurants });
       migrated = true;

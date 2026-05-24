@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import { useCmsStore } from "@/store/cmsStore";
 import { useAuthStore } from "@/store/authStore";
+import { useAdminSession } from "@/hooks/useAdminSession";
 
 /**
  * [venue] layout — syncs the URL venue slug to the active restaurant in the store.
@@ -11,6 +12,7 @@ import { useAuthStore } from "@/store/authStore";
  */
 export default function VenueLayout({ children }: { children: React.ReactNode }) {
   const params = useParams();
+  const pathname = usePathname();
   const router = useRouter();
   const venueSlug = typeof params.venue === "string" ? params.venue : "";
   const [hydrated, setHydrated] = useState(false);
@@ -21,7 +23,7 @@ export default function VenueLayout({ children }: { children: React.ReactNode })
   const activeRestaurantId = useAuthStore((s) => s.activeRestaurantId);
   const setActiveRestaurant = useAuthStore((s) => s.setActiveRestaurant);
   const currentUserId = useAuthStore((s) => s.currentUserId);
-  const pathname = typeof window !== "undefined" ? window.location.pathname : "";
+  const { ready: sessionReady } = useAdminSession();
 
   // Check if we're on the venue's role picker page (no sub-route)
   // e.g. /admin/my-venue (exactly 2 segments after splitting)
@@ -33,41 +35,51 @@ export default function VenueLayout({ children }: { children: React.ReactNode })
   useEffect(() => { setHydrated(true); }, []);
 
   useEffect(() => {
-    // Wait for store hydration before checking values
     if (!hydrated) return;
 
-    // Check if the venue slug matches a known restaurant
+    const storeIsEmpty = Object.keys(allRestaurants).length === 0;
     const matchedId = Object.keys(allRestaurants).find((id) => id === venueSlug);
 
-    if (!matchedId) {
-      // Unknown venue slug → go back to venue picker
+    if (!matchedId && !storeIsEmpty) {
       router.replace("/admin");
       return;
     }
 
-    // If on role picker page, no auth needed — user hasn't logged in yet
+    if (!matchedId) {
+      return;
+    }
+
     if (isRolePickerPage) return;
 
-    // For sub-pages, require a logged-in user
-    if (!currentUserId) {
+    if (!currentUserId && sessionReady) {
       router.replace("/admin");
       return;
     }
 
-    // If the URL venue differs from the active restaurant, switch to it
+    if (!currentUserId) return;
+
     if (matchedId !== activeRestaurantId) {
       if (activeRestaurantId) {
         switchRestaurant(activeRestaurantId, matchedId);
       } else {
-        // No previous active restaurant — just load the venue data into flat fields
         loadVenuePublic(matchedId);
       }
       setActiveRestaurant(matchedId);
     }
-  }, [hydrated, venueSlug, allRestaurants, activeRestaurantId, currentUserId, router, switchRestaurant, loadVenuePublic, setActiveRestaurant, isRolePickerPage]);
+  }, [
+    hydrated,
+    venueSlug,
+    allRestaurants,
+    activeRestaurantId,
+    currentUserId,
+    sessionReady,
+    router,
+    switchRestaurant,
+    loadVenuePublic,
+    setActiveRestaurant,
+    isRolePickerPage,
+  ]);
 
-  // While resolving, don't render nothing — just pass through
-  // The parent layout's gate handles the loading state
   if (!hydrated) return null;
   return <>{children}</>;
 }
