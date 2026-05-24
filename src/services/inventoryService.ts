@@ -1,5 +1,8 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-import type { InsertDto, Tables, UpdateDto } from '@/types/supabase';
+import type { Database, InsertDto, Tables, UpdateDto } from '@/types/supabase';
+
+type DbClient = SupabaseClient<Database, 'sarayamenu'>;
 
 export type InventoryRow = Tables<'inventory'>;
 export type InventoryMovementRow = Tables<'inventory_movements'>;
@@ -21,8 +24,10 @@ export async function upsertInventoryItem(
   productName: string,
   quantity: number,
   unit: string,
-  lowStockThreshold?: number | null
+  lowStockThreshold?: number | null,
+  client?: DbClient
 ): Promise<InventoryRow> {
+  const db = client ?? supabase;
   const row: InsertDto<'inventory'> = {
     restaurant_id: restaurantId,
     product_id: productId,
@@ -32,7 +37,7 @@ export async function upsertInventoryItem(
     low_stock_threshold: lowStockThreshold ?? null,
     updated_at: new Date().toISOString(),
   };
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('inventory')
     .upsert(row, { onConflict: 'restaurant_id,product_id' })
     .select()
@@ -48,9 +53,11 @@ export async function adjustInventory(
   delta: number,
   reason: string,
   tabId?: string | null,
-  waiterId?: string | null
+  waiterId?: string | null,
+  client?: DbClient
 ): Promise<InventoryRow | null> {
-  const { data: existing } = await supabase
+  const db = client ?? supabase;
+  const { data: existing } = await db
     .from('inventory')
     .select('*')
     .eq('restaurant_id', restaurantId)
@@ -59,9 +66,9 @@ export async function adjustInventory(
 
   if (!existing) {
     if (delta > 0) {
-      return upsertInventoryItem(restaurantId, productId, productName, delta, 'kom');
+      return upsertInventoryItem(restaurantId, productId, productName, delta, 'kom', null, client);
     }
-    await supabase.from('inventory_movements').insert({
+    await db.from('inventory_movements').insert({
       restaurant_id: restaurantId,
       product_id: productId,
       product_name: productName,
@@ -74,7 +81,7 @@ export async function adjustInventory(
   }
 
   const nextQty = Number(existing.quantity) + delta;
-  const { data: updated, error: upErr } = await supabase
+  const { data: updated, error: upErr } = await db
     .from('inventory')
     .update({ quantity: nextQty, updated_at: new Date().toISOString() })
     .eq('id', existing.id)
@@ -83,7 +90,7 @@ export async function adjustInventory(
 
   if (upErr) throw upErr;
 
-  const { error: movErr } = await supabase.from('inventory_movements').insert({
+  const { error: movErr } = await db.from('inventory_movements').insert({
     restaurant_id: restaurantId,
     product_id: productId,
     product_name: productName,
@@ -99,10 +106,12 @@ export async function adjustInventory(
 
 export async function deductTabFromInventory(
   tab: { id: string; restaurant_id: string; waiter_id: string },
-  items: { product_id: string; product_name: string; quantity: number }[]
+  items: { product_id: string; product_name: string; quantity: number }[],
+  client?: DbClient
 ): Promise<void> {
+  const db = client ?? supabase;
   for (const item of items) {
-    const { data: row } = await supabase
+    const { data: row } = await db
       .from('inventory')
       .select('id')
       .eq('restaurant_id', tab.restaurant_id)
@@ -118,7 +127,8 @@ export async function deductTabFromInventory(
       -item.quantity,
       'order',
       tab.id,
-      tab.waiter_id
+      tab.waiter_id,
+      client
     );
   }
 }

@@ -1,6 +1,9 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { supabasePostgrestSchema } from '@/lib/supabase-schema';
-import type { InsertDto, Tables } from '@/types/supabase';
+import type { Database, InsertDto, Tables } from '@/types/supabase';
+
+type DbClient = SupabaseClient<Database, 'sarayamenu'>;
 import { deductTabFromInventory } from '@/services/inventoryService';
 
 const realtimeSchema = supabasePostgrestSchema;
@@ -20,15 +23,16 @@ export type TabWithItems = TableTabRow & {
   waiter_name: string;
 };
 
-async function enrichTabs(tabs: TableTabRow[]): Promise<OpenTabRow[]> {
+async function enrichTabs(tabs: TableTabRow[], client?: DbClient): Promise<OpenTabRow[]> {
   if (tabs.length === 0) return [];
 
+  const db = client ?? supabase;
   const tableIds = Array.from(new Set(tabs.map((t) => t.table_id)));
   const waiterIds = Array.from(new Set(tabs.map((t) => t.waiter_id)));
 
   const [{ data: tables }, { data: waiters }] = await Promise.all([
-    supabase.from('restaurant_tables').select('id, label, capacity').in('id', tableIds),
-    supabase.from('users').select('id, name').in('id', waiterIds),
+    db.from('restaurant_tables').select('id, label, capacity').in('id', tableIds),
+    db.from('users').select('id, name').in('id', waiterIds),
   ]);
 
   const tableMap = new Map((tables ?? []).map((t) => [t.id, t]));
@@ -161,14 +165,16 @@ export async function removeItemFromTab(tabItemId: string, tabId: string): Promi
 
 export async function closeTab(
   tabId: string,
-  paymentMethod: 'cash' | 'card'
+  paymentMethod: 'cash' | 'card',
+  client?: DbClient
 ): Promise<TableTabRow> {
-  const tab = await getTabWithItems(tabId);
+  const db = client ?? supabase;
+  const tab = await getTabWithItems(tabId, client);
   if (!tab || tab.status !== 'open') {
     throw new Error('Kartica nije otvorena.');
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('table_tabs')
     .update({
       status: 'closed',
@@ -187,14 +193,16 @@ export async function closeTab(
       product_id: i.product_id,
       product_name: i.product_name,
       quantity: i.quantity,
-    }))
+    })),
+    client
   );
 
   return data;
 }
 
-export async function getTabWithItems(tabId: string): Promise<TabWithItems | null> {
-  const { data: tab, error } = await supabase
+export async function getTabWithItems(tabId: string, client?: DbClient): Promise<TabWithItems | null> {
+  const db = client ?? supabase;
+  const { data: tab, error } = await db
     .from('table_tabs')
     .select('*')
     .eq('id', tabId)
@@ -204,8 +212,8 @@ export async function getTabWithItems(tabId: string): Promise<TabWithItems | nul
   if (!tab) return null;
 
   const [{ data: items }, enriched] = await Promise.all([
-    supabase.from('tab_items').select('*').eq('tab_id', tabId).order('created_at'),
-    enrichTabs([tab]),
+    db.from('tab_items').select('*').eq('tab_id', tabId).order('created_at'),
+    enrichTabs([tab], client),
   ]);
 
   const meta = enriched[0];

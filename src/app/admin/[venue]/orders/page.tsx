@@ -32,6 +32,18 @@ import clsx from "clsx";
 
 type DateRangeKey = "today" | "week" | "custom";
 
+function tabPaymentLabel(method: string | null | undefined): string {
+  const m = (method ?? "").toLowerCase();
+  if (m === "card" || m === "kartica") return "Kartica";
+  if (m === "cash" || m === "gotovina") return "Gotovina";
+  return "—";
+}
+
+function isTabCardPayment(method: string | null | undefined): boolean {
+  const m = (method ?? "").toLowerCase();
+  return m === "card" || m === "kartica";
+}
+
 function rangeBounds(
   key: DateRangeKey,
   customFrom: string,
@@ -442,7 +454,7 @@ export default function AdminOrdersPage() {
               >
                 <div className="flex-1 min-w-0">
                   <span className="text-[10px] font-bold uppercase text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
-                    Kartica
+                    Konobar
                   </span>
                   <p className="font-extrabold text-dark adm-text mt-1">
                     {tab.table_label} · {Number(tab.total).toFixed(2)} KM
@@ -452,12 +464,12 @@ export default function AdminOrdersPage() {
                       <User size={10} /> {tab.waiter_name}
                     </span>
                     <span className="flex items-center gap-1">
-                      {tab.payment_method === "card" ? (
+                      {isTabCardPayment(tab.payment_method) ? (
                         <CreditCard size={10} />
                       ) : (
                         <Banknote size={10} />
                       )}
-                      {tab.payment_method === "card" ? "Kartica" : "Gotovina"}
+                      {tabPaymentLabel(tab.payment_method)}
                     </span>
                     <span>
                       {formatDate(tab.closed_at ?? tab.created_at)}{" "}

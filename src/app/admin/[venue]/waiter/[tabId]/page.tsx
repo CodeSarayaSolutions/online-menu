@@ -114,7 +114,17 @@ export default function WaiterTabPage() {
     if (!tab || !canEdit) return;
     setBusy(true);
     try {
-      await tabService.closeTab(tab.id, method);
+      const res = await fetch("/api/tabs/close", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tabId: tab.id, paymentMethod: method }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setError(data.error ?? "Naplata nije uspjela");
+        return;
+      }
       router.replace(`/admin/${venueSlug}/waiter`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Naplata nije uspjela");
