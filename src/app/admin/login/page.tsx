@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import clsx from "clsx";
 import AdminLoginForm from "@/components/admin/AdminLoginForm";
+import AdminQuickLogin from "@/components/admin/AdminQuickLogin";
 import { useAuthStore } from "@/store/authStore";
 import { useAdminStore } from "@/store/adminStore";
 import { mapApiUserToAppUser } from "@/lib/auth/map-user";
 import { getDefaultPlatformPath } from "@/lib/permissions";
+import { saveLoginToHistory, getLoginHistoryEntries } from "@/lib/waiter-session";
 import type { SessionPayload } from "@/services/authService";
 import {
   ADMIN_PANEL_TITLE,
@@ -21,6 +23,17 @@ export default function AdminLoginPage() {
   const setSessionUser = useAuthStore((s) => s.setSessionUser);
   const currentUser = useAuthStore((s) => s.getCurrentUser());
   const darkMode = useAdminStore((s) => s.darkMode);
+
+  const [hasHistory, setHasHistory] = useState(false);
+  const [showEmailForm, setShowEmailForm] = useState(true);
+  const [highlightEmail, setHighlightEmail] = useState(false);
+
+  useEffect(() => {
+    const entries = getLoginHistoryEntries();
+    const exists = entries.length > 0;
+    setHasHistory(exists);
+    setShowEmailForm(!exists);
+  }, []);
 
   useEffect(() => {
     if (currentUser) {
@@ -35,6 +48,12 @@ export default function AdminLoginPage() {
         "Račun nema dodijeljen restoran. Pitajte administratora da vas ponovo pozove (Invite user) i dodijeli ulogu."
       );
     }
+    saveLoginToHistory({
+      userId: appUser.id,
+      name: appUser.name,
+      avatar: appUser.avatar ?? null,
+      email: session.user.email,
+    });
     setSessionUser(appUser);
     router.replace(getDefaultPlatformPath(appUser));
   };
@@ -53,11 +72,44 @@ export default function AdminLoginPage() {
         <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-amber-500 flex items-center justify-center mx-auto mb-6 shadow-glow">
           <span className="text-white font-black text-lg">S</span>
         </div>
-        <AdminLoginForm
+
+        <AdminQuickLogin
           onSuccess={onSuccess}
-          title={BRAND_NAME}
-          subtitle={`${ADMIN_PANEL_TITLE} · ${LOGIN_EMAIL_SUBTITLE}`}
+          onShowEmail={() => {
+            setShowEmailForm(true);
+            setHighlightEmail(true);
+          }}
+          highlightEmail={highlightEmail}
         />
+
+        {(showEmailForm || !hasHistory) && (
+          <div
+            className={clsx(
+              hasHistory && !showEmailForm && "hidden",
+              highlightEmail && "ring-2 ring-primary/40 rounded-xl p-1 -m-1"
+            )}
+          >
+            <AdminLoginForm
+              onSuccess={onSuccess}
+              title={hasHistory ? undefined : BRAND_NAME}
+              subtitle={
+                hasHistory
+                  ? LOGIN_EMAIL_SUBTITLE
+                  : `${ADMIN_PANEL_TITLE} · ${LOGIN_EMAIL_SUBTITLE}`
+              }
+            />
+          </div>
+        )}
+
+        {hasHistory && !showEmailForm && (
+          <button
+            type="button"
+            onClick={() => setShowEmailForm(true)}
+            className="w-full mt-4 text-sm font-semibold text-primary min-h-[44px]"
+          >
+            Prijava emailom
+          </button>
+        )}
       </motion.div>
     </motion.div>
   );

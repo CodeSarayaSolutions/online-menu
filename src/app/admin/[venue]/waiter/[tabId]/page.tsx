@@ -5,12 +5,12 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Minus, Plus, Search, X, CreditCard, Banknote } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCmsStore } from "@/store/cmsStore";
+import { useAuthStore } from "@/store/authStore";
 import * as tabService from "@/services/tabService";
+import * as authService from "@/services/authService";
 import type { TabWithItems } from "@/services/tabService";
 import type { ProductItem } from "@/types/cms";
 import type { ProductStation } from "@/types/auth";
-import { clearWaiterSession, getWaiterSession } from "@/lib/waiter-session";
-import { useWaiterIdleTimeout } from "@/hooks/useWaiterIdleTimeout";
 import clsx from "clsx";
 
 export default function WaiterTabPage() {
@@ -23,29 +23,22 @@ export default function WaiterTabPage() {
 
   const products = useCmsStore((s) => s.products);
   const categories = useCmsStore((s) => s.categories);
+  const currentUser = useAuthStore((s) => s.getCurrentUser());
+  const logout = useAuthStore((s) => s.logout);
 
-  const [waiterId, setWaiterId] = useState<string | null>(null);
   const [tab, setTab] = useState<TabWithItems | null>(null);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [showPay, setShowPay] = useState(false);
+  const [confirmFinish, setConfirmFinish] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    const session = getWaiterSession(venueSlug);
-    setWaiterId(session?.waiterId ?? null);
-  }, [venueSlug]);
-
-  const handleIdleTimeout = useCallback(() => {
-    clearWaiterSession(venueSlug);
-    router.replace(`/admin/${venueSlug}/waiter`);
-  }, [venueSlug, router]);
-
-  const { showIdleWarning, resetActivity } = useWaiterIdleTimeout(handleIdleTimeout);
-
   const canEdit =
-    !readonly && !!waiterId && tab?.waiter_id === waiterId && tab?.status === "open";
+    !readonly &&
+    !!currentUser &&
+    tab?.waiter_id === currentUser.id &&
+    tab?.status === "open";
 
   const menuCategories = useMemo(() => {
     const labels = categories
@@ -124,6 +117,17 @@ export default function WaiterTabPage() {
     }
   };
 
+  const finishAndLogout = async () => {
+    try {
+      await authService.signOut();
+    } catch {
+      /* ignore */
+    }
+    logout();
+    setConfirmFinish(false);
+    router.replace("/admin/login");
+  };
+
   const closeWithPayment = async (method: "cash" | "card") => {
     if (!tab || !canEdit) return;
     setBusy(true);
@@ -176,18 +180,6 @@ export default function WaiterTabPage() {
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-64px)] pb-28">
-      {showIdleWarning && (
-        <div className="fixed top-0 left-0 right-0 z-[200] bg-amber-500 text-amber-950 px-4 py-3 flex flex-wrap items-center justify-between gap-2 shadow-md">
-          <span className="text-sm font-semibold">Automatska odjava za 60 sekundi</span>
-          <button
-            type="button"
-            onClick={resetActivity}
-            className="px-4 py-2 min-h-[44px] rounded-xl bg-amber-950/20 font-bold text-sm"
-          >
-            Ostani
-          </button>
-        </div>
-      )}
       <header className="sticky top-0 z-20 adm-surface adm-border border border-b px-4 py-3 flex items-center gap-3">
         <button
           type="button"
@@ -202,16 +194,51 @@ export default function WaiterTabPage() {
             {tab.waiter_name} · {readonly ? "Pregled" : "Aktivna kartica"}
           </p>
         </div>
-        {canEdit && (
-          <button
-            type="button"
-            onClick={() => setShowPay(true)}
-            disabled={items.length === 0 || busy}
-            className="px-4 py-2 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-40"
-          >
-            Naplati
-          </button>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {canEdit && (
+            <>
+              {confirmFinish ? (
+                <div className="flex flex-col items-end gap-1">
+                  <span className="text-[10px] font-semibold adm-text whitespace-nowrap">
+                    Završiti i odjaviti se?
+                  </span>
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => void finishAndLogout()}
+                      className="px-2 py-1 text-[11px] font-bold text-red-600"
+                    >
+                      Da
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmFinish(false)}
+                      className="px-2 py-1 text-[11px] font-bold adm-text-muted"
+                    >
+                      Ne
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmFinish(true)}
+                  className="px-3 py-2 rounded-xl adm-border border text-[11px] font-semibold text-muted adm-text-muted whitespace-nowrap"
+                >
+                  Završi narudžbu
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowPay(true)}
+                disabled={items.length === 0 || busy}
+                className="px-4 py-2 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-40"
+              >
+                Naplati
+              </button>
+            </>
+          )}
+        </div>
       </header>
 
       {error && (

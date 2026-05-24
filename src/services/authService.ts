@@ -109,6 +109,36 @@ export async function signOut() {
   setAppSessionToken(null);
 }
 
+export type PinSignInResult =
+  | SessionPayload
+  | { ok: false; reason: 'no_pin' | 'wrong_pin' | string };
+
+export async function pinSignIn(userId: string, pin: string): Promise<PinSignInResult> {
+  const res = await fetch('/api/waiter/pin-login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, pin }),
+    credentials: 'include',
+  });
+
+  const body = await res.json();
+
+  if (body.user && body.sessionToken) {
+    setAppSessionToken(body.sessionToken);
+    return body as SessionPayload;
+  }
+
+  if (body.reason === 'no_pin' || body.reason === 'wrong_pin') {
+    return { ok: false, reason: body.reason };
+  }
+
+  if (!res.ok) {
+    throw new Error(body.error ?? 'PIN login failed');
+  }
+
+  return { ok: false, reason: body.reason ?? 'unknown' };
+}
+
 /** Restore session from httpOnly cookie on page load. */
 export async function restoreSession(): Promise<SessionPayload | null> {
   const res = await fetchWithTimeout('/api/auth/session', { credentials: 'include' }, 12000);

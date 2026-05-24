@@ -6,16 +6,10 @@ import { motion } from "framer-motion";
 import { LayoutGrid, HandPlatter } from "lucide-react";
 import * as tableService from "@/services/tableService";
 import * as tabService from "@/services/tabService";
+import * as authService from "@/services/authService";
 import type { OpenTabRow } from "@/services/tabService";
 import type { Tables } from "@/types/supabase";
 import { useAuthStore } from "@/store/authStore";
-import WaiterPicker from "@/components/admin/WaiterPicker";
-import {
-  clearWaiterSession,
-  getWaiterSession,
-  type WaiterSession,
-} from "@/lib/waiter-session";
-import { useWaiterIdleTimeout } from "@/hooks/useWaiterIdleTimeout";
 import clsx from "clsx";
 
 type TableRow = Tables<"restaurant_tables">;
@@ -24,10 +18,9 @@ export default function WaiterFloorPage() {
   const params = useParams();
   const router = useRouter();
   const venueSlug = typeof params.venue === "string" ? params.venue : "";
-  const allUsers = useAuthStore((s) => s.users);
+  const currentUser = useAuthStore((s) => s.getCurrentUser());
+  const logout = useAuthStore((s) => s.logout);
 
-  const [waiterSession, setWaiterSessionState] = useState<WaiterSession | null>(null);
-  const [sessionChecked, setSessionChecked] = useState(false);
   const [tables, setTables] = useState<TableRow[]>([]);
   const [openTabs, setOpenTabs] = useState<OpenTabRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,19 +28,6 @@ export default function WaiterFloorPage() {
   const [confirmEndShift, setConfirmEndShift] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    const session = getWaiterSession(venueSlug);
-    setWaiterSessionState(session);
-    setSessionChecked(true);
-  }, [venueSlug]);
-
-  const handleIdleTimeout = useCallback(() => {
-    clearWaiterSession(venueSlug);
-    setWaiterSessionState(null);
-  }, [venueSlug]);
-
-  const { showIdleWarning, resetActivity } = useWaiterIdleTimeout(handleIdleTimeout);
 
   const refresh = useCallback(async () => {
     if (!venueSlug) return;
@@ -67,9 +47,8 @@ export default function WaiterFloorPage() {
   }, [venueSlug]);
 
   useEffect(() => {
-    if (!waiterSession) return;
     void refresh();
-  }, [refresh, waiterSession]);
+  }, [refresh]);
 
   useEffect(() => {
     let wakeLock: WakeLockSentinel | null = null;
@@ -98,21 +77,21 @@ export default function WaiterFloorPage() {
   }, []);
 
   useEffect(() => {
-    if (!venueSlug || !waiterSession) return;
+    if (!venueSlug) return;
     return tabService.subscribeToTabs(venueSlug, {
       onTabChange: () => void refresh(),
       onItemChange: () => void refresh(),
     });
-  }, [venueSlug, refresh, waiterSession]);
+  }, [venueSlug, refresh]);
 
   const tabForTable = (tableId: string) =>
     openTabs.find((tab) => tab.table_id === tableId);
 
   const handleTableTap = (table: TableRow) => {
-    if (!waiterSession) return;
+    if (!currentUser) return;
     const tab = tabForTable(table.id);
     if (tab) {
-      if (tab.waiter_id === waiterSession.waiterId) {
+      if (tab.waiter_id === currentUser.id) {
         router.push(`/admin/${venueSlug}/waiter/${tab.id}`);
         return;
       }
@@ -123,14 +102,10 @@ export default function WaiterFloorPage() {
   };
 
   const startTab = async () => {
-    if (!confirmTable || !waiterSession) return;
+    if (!confirmTable || !currentUser) return;
     setBusy(true);
     try {
-      const tab = await tabService.openTab(
-        venueSlug,
-        confirmTable.id,
-        waiterSession.waiterId
-      );
+      const tab = await tabService.openTab(venueSlug, confirmTable.id, currentUser.id);
       setConfirmTable(null);
       router.push(`/admin/${venueSlug}/waiter/${tab.id}`);
     } catch (e) {
@@ -140,23 +115,16 @@ export default function WaiterFloorPage() {
     }
   };
 
-  const endShift = () => {
-    clearWaiterSession(venueSlug);
-    setWaiterSessionState(null);
+  const endShift = async () => {
+    try {
+      await authService.signOut();
+    } catch {
+      /* ignore */
+    }
+    logout();
     setConfirmEndShift(false);
+    router.replace("/admin/login");
   };
-
-  if (!sessionChecked) return null;
-
-  if (!waiterSession) {
-    return (
-      <WaiterPicker
-        venueSlug={venueSlug}
-        users={allUsers}
-        onLogin={(s) => setWaiterSessionState(s)}
-      />
-    );
-  }
 
   if (loading) {
     return (
@@ -168,19 +136,6 @@ export default function WaiterFloorPage() {
 
   return (
     <div className="p-4 lg:p-6 max-w-3xl mx-auto pb-24 adm-bg min-h-[calc(100vh-64px)]">
-      {showIdleWarning && (
-        <div className="fixed top-0 left-0 right-0 z-[200] bg-amber-500 text-amber-950 px-4 py-3 flex flex-wrap items-center justify-between gap-2 shadow-md">
-          <span className="text-sm font-semibold">Automatska odjava za 60 sekundi</span>
-          <button
-            type="button"
-            onClick={resetActivity}
-            className="px-4 py-2 min-h-[44px] rounded-xl bg-amber-950/20 font-bold text-sm"
-          >
-            Ostani
-          </button>
-        </div>
-      )}
-
       <div className="flex items-start justify-between gap-3 mb-6">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-11 h-11 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
@@ -189,7 +144,7 @@ export default function WaiterFloorPage() {
           <div className="min-w-0">
             <h1 className="text-xl font-extrabold text-dark adm-text">Konobar</h1>
             <p className="text-xs text-muted adm-text-muted truncate">
-              {waiterSession.waiterName} · Odaberite stol
+              {currentUser?.name ?? "—"} · Odaberite stol
             </p>
           </div>
         </div>
@@ -200,7 +155,7 @@ export default function WaiterFloorPage() {
               <div className="flex gap-1">
                 <button
                   type="button"
-                  onClick={endShift}
+                  onClick={() => void endShift()}
                   className="px-2 py-1 text-[11px] font-bold text-red-600"
                 >
                   Da
@@ -239,7 +194,7 @@ export default function WaiterFloorPage() {
           {tables.map((table) => {
             const tab = tabForTable(table.id);
             const occupied = !!tab;
-            const mine = tab?.waiter_id === waiterSession.waiterId;
+            const mine = tab?.waiter_id === currentUser?.id;
             const label = tab?.table_label ?? table.label;
 
             return (

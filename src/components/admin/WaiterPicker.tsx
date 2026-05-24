@@ -1,14 +1,10 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import { motion } from "framer-motion";
-import { ArrowLeft, Delete } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ArrowLeft } from "lucide-react";
+import PinPad from "@/components/admin/PinPad";
 import type { AppUser } from "@/types/auth";
-import {
-  getWaiterHistory,
-  setWaiterSession,
-  type WaiterSession,
-} from "@/lib/waiter-session";
+import { getWaiterHistory, setWaiterSession, type WaiterSession } from "@/lib/waiter-session";
 import clsx from "clsx";
 
 const AVATAR_COLORS = [
@@ -35,13 +31,11 @@ function avatarColor(name: string) {
 export default function WaiterPicker({ venueSlug, users, onLogin }: Props) {
   const [selectedUser, setSelectedUser] = useState<AppUser | null>(null);
   const [pinMode, setPinMode] = useState<PinMode>("verify");
-  const [digits, setDigits] = useState<string[]>([]);
-  const [pinError, setPinError] = useState("");
+  const [pinError, setPinError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [shake, setShake] = useState(false);
 
   const sortedUsers = useMemo(() => {
-    const history = getWaiterHistory(venueSlug);
+    const history = getWaiterHistory();
     const historyIndex = new Map(history.map((id, i) => [id, i]));
     return [...users].sort((a, b) => {
       const ah = historyIndex.get(a.id) ?? 999;
@@ -49,17 +43,12 @@ export default function WaiterPicker({ venueSlug, users, onLogin }: Props) {
       if (ah !== bh) return ah - bh;
       return a.name.localeCompare(b.name, "bs");
     });
-  }, [users, venueSlug]);
-
-  const resetPin = useCallback(() => {
-    setDigits([]);
-    setPinError("");
-  }, []);
+  }, [users]);
 
   const goBack = () => {
     setSelectedUser(null);
     setPinMode("verify");
-    resetPin();
+    setPinError(null);
   };
 
   const completeLogin = (user: { id: string; name: string; avatar: string | null }) => {
@@ -77,7 +66,7 @@ export default function WaiterPicker({ venueSlug, users, onLogin }: Props) {
   const submitPin = async (pin: string) => {
     if (!selectedUser || busy) return;
     setBusy(true);
-    setPinError("");
+    setPinError(null);
 
     try {
       if (pinMode === "set") {
@@ -90,7 +79,6 @@ export default function WaiterPicker({ venueSlug, users, onLogin }: Props) {
         const setData = (await setRes.json()) as { error?: string };
         if (!setRes.ok) {
           setPinError(setData.error ?? "Postavljanje PIN-a nije uspjelo");
-          resetPin();
           return;
         }
       }
@@ -110,7 +98,6 @@ export default function WaiterPicker({ venueSlug, users, onLogin }: Props) {
 
       if (!verifyRes.ok) {
         setPinError(verifyData.error ?? "Provjera PIN-a nije uspjela");
-        resetPin();
         return;
       }
 
@@ -121,41 +108,21 @@ export default function WaiterPicker({ venueSlug, users, onLogin }: Props) {
 
       if (verifyData.reason === "no_pin") {
         setPinMode("set");
-        resetPin();
+        setPinError(null);
         return;
       }
 
       if (verifyData.reason === "wrong_pin") {
         setPinError("Pogrešan PIN");
-        setShake(true);
-        setTimeout(() => setShake(false), 500);
-        resetPin();
         return;
       }
 
       setPinError("Neuspjela prijava");
-      resetPin();
     } catch {
       setPinError("Greška mreže");
-      resetPin();
     } finally {
       setBusy(false);
     }
-  };
-
-  const appendDigit = (d: string) => {
-    if (busy || digits.length >= 3) return;
-    const next = [...digits, d];
-    setDigits(next);
-    if (next.length === 3) {
-      void submitPin(next.join(""));
-    }
-  };
-
-  const backspace = () => {
-    if (busy) return;
-    setDigits((prev) => prev.slice(0, -1));
-    setPinError("");
   };
 
   if (!selectedUser) {
@@ -171,7 +138,7 @@ export default function WaiterPicker({ venueSlug, users, onLogin }: Props) {
               onClick={() => {
                 setSelectedUser(user);
                 setPinMode("verify");
-                resetPin();
+                setPinError(null);
               }}
               className="adm-surface adm-border border rounded-2xl p-4 flex flex-col items-center justify-center min-h-[88px] min-w-0 active:scale-[0.98] transition"
             >
@@ -210,7 +177,7 @@ export default function WaiterPicker({ venueSlug, users, onLogin }: Props) {
         <ArrowLeft size={20} /> Nazad
       </button>
 
-      <div className="flex flex-col items-center mb-8">
+      <div className="flex flex-col items-center mb-6">
         {selectedUser.avatar ? (
           <span className="text-5xl mb-3">{selectedUser.avatar}</span>
         ) : (
@@ -229,59 +196,12 @@ export default function WaiterPicker({ venueSlug, users, onLogin }: Props) {
         </p>
       </div>
 
-      <motion.div
-        className="flex justify-center gap-4 mb-6"
-        animate={shake ? { x: [0, -12, 12, -8, 8, 0] } : { x: 0 }}
-        transition={{ duration: 0.45 }}
-      >
-        {[0, 1, 2].map((i) => (
-          <span
-            key={i}
-            className={clsx(
-              "w-4 h-4 rounded-full border-2",
-              digits.length > i
-                ? "bg-primary border-primary"
-                : "border-[var(--adm-border)] bg-transparent"
-            )}
-          />
-        ))}
-      </motion.div>
-
-      {pinError && (
-        <p className="text-center text-sm font-semibold text-red-600 mb-4">{pinError}</p>
-      )}
-
-      <div className="grid grid-cols-3 gap-3 mt-auto">
-        {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((n) => (
-          <button
-            key={n}
-            type="button"
-            disabled={busy}
-            onClick={() => appendDigit(n)}
-            className="min-h-[64px] min-w-[64px] rounded-2xl adm-surface adm-border border text-2xl font-bold text-dark adm-text active:bg-[var(--adm-surface-2)] disabled:opacity-50"
-          >
-            {n}
-          </button>
-        ))}
-        <span className="min-h-[64px]" aria-hidden />
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => appendDigit("0")}
-          className="min-h-[64px] rounded-2xl adm-surface adm-border border text-2xl font-bold text-dark adm-text active:bg-[var(--adm-surface-2)] disabled:opacity-50"
-        >
-          0
-        </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={backspace}
-          className="min-h-[64px] rounded-2xl adm-surface adm-border border flex items-center justify-center text-dark adm-text active:bg-[var(--adm-surface-2)] disabled:opacity-50"
-          aria-label="Obriši"
-        >
-          <Delete size={24} />
-        </button>
-      </div>
+      <PinPad
+        onComplete={(pin) => void submitPin(pin)}
+        onCancel={goBack}
+        error={pinError}
+        loading={busy}
+      />
     </div>
   );
 }
