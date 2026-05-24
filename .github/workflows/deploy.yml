@@ -18,7 +18,8 @@ jobs:
             export NVM_DIR=/root/.nvm
             source /root/.nvm/nvm.sh
             cd /www/wwwroot/online-menu
-            git pull origin production
+            git fetch origin
+            git reset --hard origin/production
             pnpm install --frozen-lockfile
             pnpm build
             pm2 startOrReload pm2.config.js --update-env
