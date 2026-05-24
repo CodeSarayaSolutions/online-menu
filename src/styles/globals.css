@@ -194,3 +194,79 @@ input:focus, textarea:focus {
 .admin-dark ::-webkit-scrollbar-thumb:hover {
   background: #555;
 }
+
+/* ─── Admin Design Tokens ─────────────────────────────── */
+:root {
+  --adm-bg: #F7F7F7;
+  --adm-surface: #FFFFFF;
+  --adm-surface-2: #F0F0F0;
+  --adm-border: rgba(0,0,0,0.07);
+  --adm-border-strong: rgba(0,0,0,0.12);
+  --adm-text: #1E1E1E;
+  --adm-text-muted: #777777;
+  --adm-text-faint: #AAAAAA;
+  --adm-primary: #F4B400;
+  --adm-primary-fg: #FFFFFF;
+  --adm-primary-muted: rgba(244,180,0,0.12);
+  --adm-sidebar-bg: #FFFFFF;
+  --adm-sidebar-border: rgba(0,0,0,0.06);
+  --adm-header-bg: rgba(255,255,255,0.95);
+  --adm-header-border: rgba(0,0,0,0.06);
+  --adm-input-bg: #F7F7F7;
+  --adm-success: #22C55E;
+  --adm-success-muted: rgba(34,197,94,0.1);
+  --adm-warning: #F59E0B;
+  --adm-warning-muted: rgba(245,158,11,0.1);
+  --adm-danger: #EF4444;
+  --adm-danger-muted: rgba(239,68,68,0.1);
+  --adm-info: #3B82F6;
+  --adm-info-muted: rgba(59,130,246,0.1);
+}
+
+.admin-dark {
+  --adm-bg: #0f0f14;
+  --adm-surface: #17171f;
+  --adm-surface-2: #1f1f2a;
+  --adm-border: rgba(255,255,255,0.07);
+  --adm-border-strong: rgba(255,255,255,0.12);
+  --adm-text: #ececf1;
+  --adm-text-muted: #8888a0;
+  --adm-text-faint: #55556a;
+  --adm-primary: #F4B400;
+  --adm-primary-fg: #0f0f14;
+  --adm-primary-muted: rgba(244,180,0,0.15);
+  --adm-sidebar-bg: #13131a;
+  --adm-sidebar-border: rgba(255,255,255,0.06);
+  --adm-header-bg: rgba(19,19,26,0.95);
+  --adm-header-border: rgba(255,255,255,0.06);
+  --adm-input-bg: #1f1f2a;
+  --adm-success: #22C55E;
+  --adm-success-muted: rgba(34,197,94,0.12);
+  --adm-warning: #F59E0B;
+  --adm-warning-muted: rgba(245,158,11,0.12);
+  --adm-danger: #EF4444;
+  --adm-danger-muted: rgba(239,68,68,0.12);
+  --adm-info: #3B82F6;
+  --adm-info-muted: rgba(59,130,246,0.12);
+}
+
+/* ─── Admin utility classes using tokens ──────────────── */
+.adm-bg        { background-color: var(--adm-bg); }
+.adm-surface   { background-color: var(--adm-surface); }
+.adm-surface-2 { background-color: var(--adm-surface-2); }
+.adm-text      { color: var(--adm-text); }
+.adm-text-muted{ color: var(--adm-text-muted); }
+.adm-text-faint{ color: var(--adm-text-faint); }
+.adm-border    { border-color: var(--adm-border); }
+.adm-sidebar   { background-color: var(--adm-sidebar-bg); border-color: var(--adm-sidebar-border); }
+.adm-header    { background-color: var(--adm-header-bg); border-color: var(--adm-header-border); }
+.adm-input     { background-color: var(--adm-input-bg); color: var(--adm-text); border-color: var(--adm-border); }
+.adm-input::placeholder { color: var(--adm-text-faint); }
+.adm-card      { background-color: var(--adm-surface); border-color: var(--adm-border); }
+.adm-divider   { background-color: var(--adm-border); }
+
+/* Hover/focus variants (Tailwind cannot variant custom classes from @layer) */
+.hover\:adm-text:hover { color: var(--adm-text); }
+.group:hover .group-hover\:adm-text { color: var(--adm-text); }
+.hover\:adm-surface:hover { background-color: var(--adm-surface); }
+.focus\:adm-surface:focus { background-color: var(--adm-surface); }

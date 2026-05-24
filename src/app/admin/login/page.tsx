@@ -3,8 +3,10 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import clsx from "clsx";
 import AdminLoginForm from "@/components/admin/AdminLoginForm";
 import { useAuthStore } from "@/store/authStore";
+import { useAdminStore } from "@/store/adminStore";
 import { mapApiUserToAppUser } from "@/lib/auth/map-user";
 import { getDefaultPlatformPath } from "@/lib/permissions";
 import type { SessionPayload } from "@/services/authService";
@@ -18,6 +20,7 @@ export default function AdminLoginPage() {
   const router = useRouter();
   const setSessionUser = useAuthStore((s) => s.setSessionUser);
   const currentUser = useAuthStore((s) => s.getCurrentUser());
+  const darkMode = useAdminStore((s) => s.darkMode);
 
   useEffect(() => {
     if (currentUser) {
@@ -37,11 +40,15 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-bg flex items-center justify-center p-6">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className={clsx("min-h-screen adm-bg flex items-center justify-center p-6", darkMode && "admin-dark")}
+    >
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-[420px] bg-white rounded-2xl shadow-card border border-gray-100/80 p-8"
+        className="w-full max-w-[420px] adm-surface adm-border border rounded-2xl shadow-card p-8"
       >
         <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-amber-500 flex items-center justify-center mx-auto mb-6 shadow-glow">
           <span className="text-white font-black text-lg">S</span>
@@ -52,6 +59,6 @@ export default function AdminLoginPage() {
           subtitle={`${ADMIN_PANEL_TITLE} · ${LOGIN_EMAIL_SUBTITLE}`}
         />
       </motion.div>
-    </div>
+    </motion.div>
   );
 }

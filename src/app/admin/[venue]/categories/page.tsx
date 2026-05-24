@@ -82,8 +82,8 @@ export default function CategoriesEditor() {
     <div className="max-w-3xl">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-extrabold text-dark tracking-tight">Categories</h1>
-          <p className="text-sm text-muted mt-1">{categories.length} categories total</p>
+          <h1 className="text-2xl font-extrabold text-dark adm-text tracking-tight">Categories</h1>
+          <p className="text-sm text-muted adm-text-muted mt-1">{categories.length} categories total</p>
         </div>
         <button
           onClick={() => setShowAdd(true)}
@@ -103,17 +103,17 @@ export default function CategoriesEditor() {
             exit={{ opacity: 0, y: -8, height: 0 }}
             className="overflow-hidden mb-6"
           >
-            <div className="bg-white rounded-2xl border-2 border-primary/30 p-6 shadow-card">
+            <div className="adm-surface adm-border border rounded-2xl border-2 border-primary/30 p-6 shadow-card">
               <div className="flex items-center justify-between mb-5">
-                <h3 className="text-[15px] font-extrabold text-dark">Create Category</h3>
-                <button onClick={() => setShowAdd(false)} className="p-1.5 rounded-xl hover:bg-bg text-muted transition"><X size={16} /></button>
+                <h3 className="text-[15px] font-extrabold text-dark adm-text">Create Category</h3>
+                <button onClick={() => setShowAdd(false)} className="p-1.5 rounded-xl hover:bg-[var(--adm-surface-2)] text-muted adm-text-muted transition"><X size={16} /></button>
               </div>
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <InputField label="ID (lowercase)" value={newCat.id} onChange={(v) => setNewCat((c) => ({ ...c, id: v.toLowerCase().replace(/\s/g, "-") }))} placeholder="e.g. seafood" />
                 <InputField label="Display Name" value={newCat.label} onChange={(v) => setNewCat((c) => ({ ...c, label: v }))} placeholder="e.g. Seafood" />
                 <InputField label="Emoji Icon" value={newCat.icon} onChange={(v) => setNewCat((c) => ({ ...c, icon: v }))} placeholder="🍽️" />
                 <div>
-                  <label className="block text-[10px] font-bold text-muted uppercase tracking-wider mb-2">Color</label>
+                  <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Color</label>
                   <div className="flex flex-wrap gap-1.5">
                     {colorPresets.map((color) => (
                       <button
@@ -126,7 +126,7 @@ export default function CategoriesEditor() {
                 </div>
               </div>
               <div className="flex gap-3">
-                <button onClick={() => setShowAdd(false)} className="flex-1 py-2.5 rounded-2xl border border-primary/10 text-sm font-semibold text-dark hover:bg-bg transition">Cancel</button>
+                <button onClick={() => setShowAdd(false)} className="flex-1 py-2.5 rounded-2xl border border-primary/10 text-sm font-semibold text-dark adm-text hover:bg-[var(--adm-surface-2)] transition">Cancel</button>
                 <button onClick={handleAdd} disabled={!newCat.id || !newCat.label} className="flex-1 py-2.5 rounded-2xl bg-gradient-to-r from-primary to-amber-500 text-white text-sm font-bold hover:brightness-105 transition disabled:opacity-40 shadow-glow">Create</button>
               </div>
             </div>
@@ -147,22 +147,22 @@ export default function CategoriesEditor() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.03, duration: 0.3 }}
               className={clsx(
-                "bg-white rounded-2xl border transition-all duration-200",
+                "adm-surface adm-border border rounded-2xl border transition-all duration-200",
                 isEditing ? "border-primary/40 shadow-card ring-1 ring-primary/20" : saved === cat.id ? "border-accent-green/40 bg-green-50/30" : "border-primary/5 hover:shadow-soft shadow-soft"
               )}
             >
               {isEditing && editForm ? (
                 <div className="p-5 space-y-4">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-extrabold text-dark">Editing: {cat.label}</h4>
-                    <button onClick={cancelEdit} className="p-1.5 rounded-xl hover:bg-bg text-muted transition"><X size={14} /></button>
+                    <h4 className="text-sm font-extrabold text-dark adm-text">Editing: {cat.label}</h4>
+                    <button onClick={cancelEdit} className="p-1.5 rounded-xl hover:bg-[var(--adm-surface-2)] text-muted adm-text-muted transition"><X size={14} /></button>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <InputField label="Display Name" value={editForm.label} onChange={(v) => setEditForm((f) => f ? { ...f, label: v } : f)} />
                     <InputField label="Emoji Icon" value={editForm.icon} onChange={(v) => setEditForm((f) => f ? { ...f, icon: v } : f)} />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-muted uppercase tracking-wider mb-2">Color</label>
+                    <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Color</label>
                     <div className="flex flex-wrap gap-1.5">
                       {colorPresets.map((color) => (
                         <button
@@ -174,7 +174,7 @@ export default function CategoriesEditor() {
                     </div>
                   </div>
                   <div className="flex gap-3 pt-1">
-                    <button onClick={cancelEdit} className="flex-1 py-2.5 rounded-2xl border border-primary/10 text-sm font-semibold text-dark hover:bg-bg transition">Cancel</button>
+                    <button onClick={cancelEdit} className="flex-1 py-2.5 rounded-2xl border border-primary/10 text-sm font-semibold text-dark adm-text hover:bg-[var(--adm-surface-2)] transition">Cancel</button>
                     <button onClick={saveEdit} className="flex-1 py-2.5 rounded-2xl bg-gradient-to-r from-primary to-amber-500 text-white text-sm font-bold hover:brightness-105 flex items-center justify-center gap-2 shadow-glow">
                       <Save size={14} /> Save
                     </button>
@@ -183,10 +183,10 @@ export default function CategoriesEditor() {
               ) : (
                 <div className="flex items-center gap-3 p-4">
                   <div className="flex flex-col gap-0.5 shrink-0">
-                    <button onClick={() => moveCategory(index, "up")} disabled={index === 0} className="p-0.5 rounded text-muted/30 hover:text-primary disabled:opacity-20 transition">
+                    <button onClick={() => moveCategory(index, "up")} disabled={index === 0} className="p-0.5 rounded adm-text-faint hover:text-primary disabled:opacity-20 transition">
                       <ChevronUp size={14} />
                     </button>
-                    <button onClick={() => moveCategory(index, "down")} disabled={index === categories.length - 1} className="p-0.5 rounded text-muted/30 hover:text-primary disabled:opacity-20 transition">
+                    <button onClick={() => moveCategory(index, "down")} disabled={index === categories.length - 1} className="p-0.5 rounded adm-text-faint hover:text-primary disabled:opacity-20 transition">
                       <ChevronDown size={14} />
                     </button>
                   </div>
@@ -196,8 +196,8 @@ export default function CategoriesEditor() {
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <p className="text-[14px] font-semibold text-dark">{cat.label}</p>
-                    <p className="text-[11px] text-muted">
+                    <p className="text-[14px] font-semibold text-dark adm-text">{cat.label}</p>
+                    <p className="text-[11px] text-muted adm-text-muted">
                       {isSpecial(cat.id) ? <span className="text-primary font-medium">System</span> : `${productCount} product${productCount !== 1 ? "s" : ""}`}
                     </p>
                   </div>
@@ -205,17 +205,17 @@ export default function CategoriesEditor() {
                   {saved === cat.id && <Check size={18} className="text-accent-green shrink-0" strokeWidth={3} />}
 
                   <div className="flex items-center gap-1.5 shrink-0">
-                    <button onClick={() => startEdit(cat)} className="p-2 rounded-xl text-muted hover:text-primary hover:bg-primary/10 transition">
+                    <button onClick={() => startEdit(cat)} className="p-2 rounded-xl text-muted adm-text-muted hover:text-primary hover:bg-primary/10 transition">
                       <Pencil size={14} />
                     </button>
                     {!isSpecial(cat.id) && (
                       confirmDelete === cat.id ? (
                         <div className="flex items-center gap-1">
                           <button onClick={() => handleDelete(cat.id)} className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-accent-red text-white hover:brightness-110 transition">Delete</button>
-                          <button onClick={() => setConfirmDelete(null)} className="px-2 py-1.5 rounded-xl text-[11px] text-muted hover:bg-bg transition">No</button>
+                          <button onClick={() => setConfirmDelete(null)} className="px-2 py-1.5 rounded-xl text-[11px] text-muted adm-text-muted hover:bg-[var(--adm-surface-2)] transition">No</button>
                         </div>
                       ) : (
-                        <button onClick={() => setConfirmDelete(cat.id)} className="p-2 rounded-xl text-muted/30 hover:text-accent-red hover:bg-red-50 transition">
+                        <button onClick={() => setConfirmDelete(cat.id)} className="p-2 rounded-xl adm-text-faint hover:text-accent-red hover:bg-red-50 transition">
                           <Trash2 size={14} />
                         </button>
                       )
@@ -234,12 +234,12 @@ export default function CategoriesEditor() {
 function InputField({ label, value, onChange, placeholder }: { label?: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
   return (
     <div>
-      {label && <label className="block text-[10px] font-bold text-muted uppercase tracking-wider mb-2">{label}</label>}
+      {label && <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">{label}</label>}
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full px-3.5 py-2.5 bg-bg rounded-2xl text-sm text-dark border border-primary/10 focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:text-muted/40"
+        className="w-full px-3.5 py-2.5 adm-bg rounded-2xl text-sm text-dark adm-text border border-primary/10 focus:border-primary focus:adm-surface adm-border border focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:adm-text-faint"
       />
     </div>
   );

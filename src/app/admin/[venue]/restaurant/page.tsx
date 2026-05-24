@@ -64,8 +64,8 @@ export default function RestaurantEditor() {
   return (
     <div className="max-w-3xl">
       <div className="mb-8">
-        <h1 className="text-2xl font-extrabold text-dark tracking-tight">Restaurant Info</h1>
-        <p className="text-sm text-muted mt-1">Customize how your restaurant appears on the menu</p>
+        <h1 className="text-2xl font-extrabold text-dark adm-text tracking-tight">Restaurant Info</h1>
+        <p className="text-sm text-muted adm-text-muted mt-1">Customize how your restaurant appears on the menu</p>
       </div>
 
       {/* Live preview card */}
@@ -73,23 +73,23 @@ export default function RestaurantEditor() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="bg-white rounded-2xl shadow-soft overflow-hidden mb-6 border border-primary/5"
+        className="adm-surface adm-border border rounded-2xl shadow-soft overflow-hidden mb-6 border border-primary/5"
       >
-        <div className="relative h-44 bg-bg overflow-hidden">
+        <div className="relative h-44 adm-bg overflow-hidden">
           {componentStyles.heroMediaType === 'video' && componentStyles.heroVideoUrl ? (
             <video src={componentStyles.heroVideoUrl} autoPlay loop muted playsInline className="w-full h-full object-cover" />
           ) : (componentStyles.heroImageUrl || form.image) ? (
             <img src={componentStyles.heroImageUrl || form.image} alt="Hero" className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-bg to-primary/5 flex items-center justify-center">
-              <Image size={40} className="text-muted/30" />
+              <Image size={40} className="adm-text-faint" />
             </div>
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
           <div className="absolute bottom-0 left-0 right-0 p-5">
             <div className="flex items-end gap-3">
               {form.logo && (
-                <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md overflow-hidden border-2 border-white/30 shrink-0">
+                <div className="w-12 h-12 rounded-2xl adm-surface adm-border border/20 backdrop-blur-md overflow-hidden border-2 border-white/30 shrink-0">
                   <img src={form.logo} alt="Logo" className="w-full h-full object-cover" />
                 </div>
               )}
@@ -101,7 +101,7 @@ export default function RestaurantEditor() {
               </div>
             </div>
           </div>
-          <div className="absolute top-3 right-3 glass px-2.5 py-1 rounded-full text-[10px] font-semibold text-dark">
+          <div className="absolute top-3 right-3 glass px-2.5 py-1 rounded-full text-[10px] font-semibold text-dark adm-text">
             Live Preview
           </div>
         </div>
@@ -112,7 +112,7 @@ export default function RestaurantEditor() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.15, duration: 0.4 }}
-        className="bg-white rounded-2xl shadow-soft overflow-hidden border border-primary/5"
+        className="adm-surface adm-border border rounded-2xl shadow-soft overflow-hidden border border-primary/5"
       >
         {/* Tabs */}
         <div className="flex border-b border-bg">
@@ -123,8 +123,8 @@ export default function RestaurantEditor() {
               className={clsx(
                 "flex-1 py-3.5 text-[13px] font-semibold transition-all relative",
                 activeTab === tab
-                  ? "text-dark"
-                  : "text-muted hover:text-dark"
+                  ? "text-dark adm-text"
+                  : "text-muted adm-text-muted hover:adm-text"
               )}
             >
               {tab === "general" ? "General" : "Contact & Hours"}
@@ -147,7 +147,7 @@ export default function RestaurantEditor() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: i * 0.05, duration: 0.3 }}
             >
-              <label className="flex items-center gap-2 text-xs font-bold text-muted uppercase tracking-wider mb-2">
+              <label className="flex items-center gap-2 text-xs font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">
                 <f.icon size={12} className="text-primary/50" />
                 {f.label}
               </label>
@@ -166,7 +166,7 @@ export default function RestaurantEditor() {
                     value={form[f.key]}
                     onChange={(e) => handleChange(f.key, e.target.value)}
                     placeholder={f.placeholder}
-                    className="w-full px-4 py-3 bg-bg rounded-2xl text-sm text-dark outline-none border border-primary/10 focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10 transition-all placeholder:text-muted/40"
+                    className="w-full px-4 py-3 adm-bg rounded-2xl text-sm text-dark adm-text outline-none border border-primary/10 focus:border-primary focus:adm-surface adm-border border focus:ring-4 focus:ring-primary/10 transition-all placeholder:adm-text-faint"
                   />
                   <BsCollapse hasValue={!!((form as any)[`${f.key}_bs`])}>
                     <input
@@ -174,7 +174,7 @@ export default function RestaurantEditor() {
                       value={(form as any)[`${f.key}_bs`] || ""}
                       onChange={(e) => handleChange(`${f.key}_bs` as keyof RestaurantInfo, e.target.value)}
                       placeholder={`${f.placeholder} (Bosnian)`}
-                      className="w-full px-4 py-3 bg-bg rounded-2xl text-sm text-dark outline-none border border-blue-200/30 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100 transition-all placeholder:text-muted/40"
+                      className="w-full px-4 py-3 adm-bg rounded-2xl text-sm text-dark adm-text outline-none border border-blue-200/30 focus:border-blue-400 focus:adm-surface adm-border border focus:ring-4 focus:ring-blue-100 transition-all placeholder:adm-text-faint"
                     />
                   </BsCollapse>
                 </div>
@@ -184,7 +184,7 @@ export default function RestaurantEditor() {
                   value={form[f.key]}
                   onChange={(e) => handleChange(f.key, e.target.value)}
                   placeholder={f.placeholder}
-                  className="w-full px-4 py-3 bg-bg rounded-2xl text-sm text-dark outline-none border border-primary/10 focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10 transition-all placeholder:text-muted/40"
+                  className="w-full px-4 py-3 adm-bg rounded-2xl text-sm text-dark adm-text outline-none border border-primary/10 focus:border-primary focus:adm-surface adm-border border focus:ring-4 focus:ring-primary/10 transition-all placeholder:adm-text-faint"
                 />
               )}
             </motion.div>

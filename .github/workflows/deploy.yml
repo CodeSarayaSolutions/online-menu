@@ -1,0 +1,25 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [production]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 46.62.200.141
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            export NVM_DIR=/root/.nvm
+            source /root/.nvm/nvm.sh
+            cd /www/wwwroot/online-menu
+            git pull origin production
+            pnpm install --frozen-lockfile
+            pnpm build
+            pm2 reload pm2.config.js --env production || pm2 start pm2.config.js --env production
+            pm2 save

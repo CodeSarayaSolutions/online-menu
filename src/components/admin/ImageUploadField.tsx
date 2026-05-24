@@ -54,13 +54,13 @@ export default function ImageUploadField({
 
   return (
     <div className={className}>
-      <label className="flex items-center gap-2 text-xs font-bold text-muted uppercase tracking-wider mb-2">
+      <label className="flex items-center gap-2 text-xs font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">
         <ImageIcon size={12} className="text-primary/50" />
         {label}
       </label>
 
       {value ? (
-        <div className="relative rounded-2xl overflow-hidden border border-primary/10 mb-2 h-32 bg-bg">
+        <div className="relative rounded-2xl overflow-hidden border border-primary/10 mb-2 h-32 adm-bg">
           <img src={value} alt="" className="w-full h-full object-cover" />
           <button
             type="button"
@@ -81,8 +81,8 @@ export default function ImageUploadField({
           className={clsx(
             "flex-1 py-3 rounded-2xl text-[13px] font-bold flex items-center justify-center gap-2 border transition",
             uploading
-              ? "border-gray-200 text-muted"
-              : "border-primary/20 text-dark hover:bg-primary/5"
+              ? "border adm-border text-muted adm-text-muted"
+              : "border-primary/20 text-dark adm-text hover:bg-primary/5"
           )}
         >
           {uploading ? (
@@ -102,7 +102,7 @@ export default function ImageUploadField({
         onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
       />
 
-      <p className="text-[10px] text-muted mt-1.5">
+      <p className="text-[10px] text-muted adm-text-muted mt-1.5">
         Saved to bucket <span className="font-mono">sarayamenu/{restaurantId}/{placement}-filename</span>
       </p>
 

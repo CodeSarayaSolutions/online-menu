@@ -29,7 +29,7 @@ export default function BsCollapse({ children, hasValue, className, defaultOpen 
             ? "text-blue-500"
             : hasValue
               ? "text-blue-400/80 hover:text-blue-500"
-              : "text-muted/40 hover:text-muted/70"
+              : "adm-text-faint hover:text-muted adm-text-muted/70"
         )}
       >
         <span>🇧🇦</span>

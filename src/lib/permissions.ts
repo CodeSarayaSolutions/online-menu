@@ -8,6 +8,9 @@ export type AdminNavId =
   | 'orders'
   | 'kitchen'
   | 'bar'
+  | 'tables'
+  | 'inventory'
+  | 'waiter'
   | 'users';
 
 /** Saraya platform admin — all venues */
@@ -85,12 +88,32 @@ export function canViewOrdersList(user: AppUser | null, restaurantId: string): b
   );
 }
 
+export function canManageTables(user: AppUser | null, restaurantId: string): boolean {
+  const role = getRestaurantRole(user, restaurantId);
+  return isPlatformAdmin(user) || role === 'owner' || role === 'manager';
+}
+
+export function canViewWaiterMode(user: AppUser | null, restaurantId: string): boolean {
+  const role = getRestaurantRole(user, restaurantId);
+  return (
+    isPlatformAdmin(user) ||
+    role === 'owner' ||
+    role === 'manager' ||
+    role === 'employee'
+  );
+}
+
+export function canManageInventory(user: AppUser | null, restaurantId: string): boolean {
+  const role = getRestaurantRole(user, restaurantId);
+  return isPlatformAdmin(user) || role === 'owner';
+}
+
 /** Default landing after venue login */
 export function getDefaultVenuePath(user: AppUser | null, venueSlug: string): string {
   const role = getRestaurantRole(user, venueSlug);
   if (role === 'kitchen') return `/admin/${venueSlug}/kitchen`;
   if (role === 'bar') return `/admin/${venueSlug}/bar`;
-  if (role === 'employee') return `/admin/${venueSlug}/orders`;
+  if (role === 'employee') return `/admin/${venueSlug}/waiter`;
   if (canManageVenueCms(user, venueSlug)) return `/admin/${venueSlug}/restaurant`;
   return `/admin/${venueSlug}/orders`;
 }
@@ -113,6 +136,9 @@ export function visibleVenueNavItems(
     items.push('restaurant', 'products', 'page-content');
   }
   if (canViewOrdersList(user, restaurantId)) items.push('orders');
+  if (canManageTables(user, restaurantId)) items.push('tables');
+  if (canManageInventory(user, restaurantId)) items.push('inventory');
+  if (canViewWaiterMode(user, restaurantId)) items.push('waiter');
   if (canViewKitchenStation(user, restaurantId)) items.push('kitchen');
   if (canViewBarStation(user, restaurantId)) items.push('bar');
   if (canManageVenueStaff(user, restaurantId) || isPlatformAdmin(user)) items.push('users');

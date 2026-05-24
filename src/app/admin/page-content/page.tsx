@@ -259,7 +259,7 @@ function ColorPicker({
 
   return (
     <div>
-      <label className="block text-xs font-semibold text-dark mb-2">{label}</label>
+      <label className="block text-xs font-semibold text-dark adm-text mb-2">{label}</label>
       <div className="flex flex-wrap gap-1.5">
         {palette.map((c) => (
           <button
@@ -271,7 +271,7 @@ function ColorPicker({
               "w-8 h-8 rounded-xl border-2 transition-all hover:scale-110",
               value.toUpperCase() === c.value.toUpperCase()
                 ? "border-primary ring-2 ring-primary/30 scale-110"
-                : "border-gray-200"
+                : "border adm-border"
             )}
             style={{ backgroundColor: c.value }}
           />
@@ -281,7 +281,7 @@ function ColorPicker({
           onClick={() => setShowCustom(!showCustom)}
           className={clsx(
             "w-8 h-8 rounded-xl border-2 border-dashed flex items-center justify-center text-xs font-bold transition-all",
-            isCustom || showCustom ? "border-primary text-primary" : "border-gray-300 text-muted"
+            isCustom || showCustom ? "border-primary text-primary" : "border-gray-300 text-muted adm-text-muted"
           )}
         >
           #
@@ -306,7 +306,7 @@ function ColorPicker({
                 type="text"
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
-                className="flex-1 px-3 py-1.5 bg-bg border border-primary/10 rounded-xl text-xs text-dark font-mono outline-none focus:border-primary"
+                className="flex-1 px-3 py-1.5 adm-bg border border-primary/10 rounded-xl text-xs text-dark adm-text font-mono outline-none focus:border-primary"
                 placeholder="#FFFFFF"
               />
             </div>
@@ -330,7 +330,7 @@ function OptionSelector<T extends string>({
 }) {
   return (
     <div>
-      <label className="block text-xs font-semibold text-dark mb-2">{label}</label>
+      <label className="block text-xs font-semibold text-dark adm-text mb-2">{label}</label>
       <div className="flex flex-wrap gap-1.5">
         {options.map((opt) => (
           <button
@@ -341,7 +341,7 @@ function OptionSelector<T extends string>({
               "px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all border",
               value === opt.value
                 ? "bg-primary/10 border-primary text-primary"
-                : "bg-bg border-transparent text-dark hover:bg-gray-100"
+                : "adm-bg border-transparent text-dark adm-text hover:bg-[var(--adm-surface-2)]"
             )}
           >
             {opt.icon}
@@ -367,8 +367,8 @@ function ToggleSwitch({
   return (
     <div className="flex items-center justify-between">
       <div>
-        <span className="text-xs font-semibold text-dark">{label}</span>
-        {hint && <p className="text-[10px] text-muted mt-0.5">{hint}</p>}
+        <span className="text-xs font-semibold text-dark adm-text">{label}</span>
+        {hint && <p className="text-[10px] text-muted adm-text-muted mt-0.5">{hint}</p>}
       </div>
       <button
         type="button"
@@ -381,7 +381,7 @@ function ToggleSwitch({
         <motion.div
           animate={{ x: value ? 20 : 2 }}
           transition={{ type: "spring", stiffness: 500, damping: 30 }}
-          className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm"
+          className="absolute top-1 w-4 h-4 adm-surface adm-border border rounded-full shadow-sm"
         />
       </button>
     </div>
@@ -391,7 +391,7 @@ function ToggleSwitch({
 function CardLayoutPreview({ layout, imagePos, active }: { layout: string; imagePos: string; active: boolean }) {
   if (layout === "vertical") {
     return (
-      <div className={clsx("w-16 h-20 rounded-lg border-2 overflow-hidden flex flex-col", active ? "border-primary" : "border-gray-200")}>
+      <div className={clsx("w-16 h-20 rounded-lg border-2 overflow-hidden flex flex-col", active ? "border-primary" : "border adm-border")}>
         <div className="h-8 bg-primary/20" />
         <div className="flex-1 p-1 space-y-0.5">
           <div className="h-1 w-8 bg-gray-400 rounded" />
@@ -403,7 +403,7 @@ function CardLayoutPreview({ layout, imagePos, active }: { layout: string; image
   }
   const imgFirst = imagePos === "left";
   return (
-    <div className={clsx("w-20 h-14 rounded-lg border-2 overflow-hidden flex", active ? "border-primary" : "border-gray-200", !imgFirst && "flex-row-reverse")}>
+    <div className={clsx("w-20 h-14 rounded-lg border-2 overflow-hidden flex", active ? "border-primary" : "border adm-border", !imgFirst && "flex-row-reverse")}>
       <div className="w-8 bg-primary/20 shrink-0" />
       <div className="flex-1 p-1 space-y-0.5 flex flex-col justify-center">
         <div className="h-1 w-full bg-gray-400 rounded" />
@@ -600,28 +600,28 @@ export default function PageContentEditor() {
             ]} />
             {(!styles.heroMediaType || styles.heroMediaType === 'image') && (
               <div>
-                <label className="block text-[12px] font-bold text-dark mb-1.5">Image URL</label>
+                <label className="block text-[12px] font-bold text-dark adm-text mb-1.5">Image URL</label>
                 <input
                   type="text"
                   value={styles.heroImageUrl || ''}
                   onChange={(e) => handleStyleChange("heroImageUrl", e.target.value)}
                   placeholder="https://images.unsplash.com/..."
-                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-[13px] text-dark placeholder:text-muted/40 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition bg-bg"
+                  className="w-full px-3 py-2.5 rounded-xl border border adm-border text-[13px] text-dark adm-text placeholder:adm-text-faint focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition adm-bg"
                 />
-                <p className="text-[10px] text-muted mt-1">Direct link to a hero banner image. Leave empty to use the image from Restaurant Info.</p>
+                <p className="text-[10px] text-muted adm-text-muted mt-1">Direct link to a hero banner image. Leave empty to use the image from Restaurant Info.</p>
               </div>
             )}
             {(styles.heroMediaType === 'video') && (
               <div>
-                <label className="block text-[12px] font-bold text-dark mb-1.5">Video URL</label>
+                <label className="block text-[12px] font-bold text-dark adm-text mb-1.5">Video URL</label>
                 <input
                   type="text"
                   value={styles.heroVideoUrl || ''}
                   onChange={(e) => handleStyleChange("heroVideoUrl", e.target.value)}
                   placeholder="https://example.com/video.mp4"
-                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-[13px] text-dark placeholder:text-muted/40 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition bg-bg"
+                  className="w-full px-3 py-2.5 rounded-xl border border adm-border text-[13px] text-dark adm-text placeholder:adm-text-faint focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition adm-bg"
                 />
-                <p className="text-[10px] text-muted mt-1">Direct link to .mp4, .webm, or .ogg video file. The video will autoplay, loop, and be muted.</p>
+                <p className="text-[10px] text-muted adm-text-muted mt-1">Direct link to .mp4, .webm, or .ogg video file. The video will autoplay, loop, and be muted.</p>
               </div>
             )}
           </div>
@@ -640,7 +640,7 @@ export default function PageContentEditor() {
         return (
           <div className="space-y-5">
             <div>
-              <label className="block text-xs font-semibold text-dark mb-2">Card Layout</label>
+              <label className="block text-xs font-semibold text-dark adm-text mb-2">Card Layout</label>
               <div className="flex gap-3">
                 {[
                   { layout: "horizontal" as const, imgPos: "left" as const, label: "Image Left" },
@@ -656,10 +656,10 @@ export default function PageContentEditor() {
                         handleStyleChange("cardLayout", opt.layout);
                         if (opt.layout === "horizontal") handleStyleChange("cardImagePosition", opt.imgPos);
                       }}
-                      className={clsx("flex flex-col items-center gap-1.5 p-2 rounded-xl border-2 transition-all", isActive ? "border-primary bg-primary/5" : "border-gray-200 hover:border-gray-300")}
+                      className={clsx("flex flex-col items-center gap-1.5 p-2 rounded-xl border-2 transition-all", isActive ? "border-primary bg-primary/5" : "border adm-border hover:border-[var(--adm-border-strong)]")}
                     >
                       <CardLayoutPreview layout={opt.layout} imagePos={opt.imgPos} active={isActive} />
-                      <span className={clsx("text-[10px] font-semibold", isActive ? "text-primary" : "text-muted")}>{opt.label}</span>
+                      <span className={clsx("text-[10px] font-semibold", isActive ? "text-primary" : "text-muted adm-text-muted")}>{opt.label}</span>
                     </button>
                   );
                 })}
@@ -771,8 +771,8 @@ export default function PageContentEditor() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-extrabold text-dark">Page Content</h2>
-          <p className="text-sm text-muted mt-1">
+          <h2 className="text-2xl font-extrabold text-dark adm-text">Page Content</h2>
+          <p className="text-sm text-muted adm-text-muted mt-1">
             Edit text content and visual design for every frontend component.
           </p>
         </div>
@@ -784,7 +784,7 @@ export default function PageContentEditor() {
               "hidden lg:flex px-3 py-2 rounded-2xl border text-sm font-semibold transition items-center gap-2",
               showPreview
                 ? "border-primary/20 bg-primary/5 text-primary"
-                : "border-primary/10 text-dark hover:bg-bg"
+                : "border-primary/10 text-dark adm-text hover:bg-[var(--adm-surface-2)]"
             )}
             title={showPreview ? "Hide Preview" : "Show Preview"}
           >
@@ -793,7 +793,7 @@ export default function PageContentEditor() {
           </button>
           <button
             onClick={handleResetAll}
-            className="px-4 py-2 rounded-2xl border border-primary/10 text-sm font-semibold text-dark hover:bg-bg transition flex items-center gap-2"
+            className="px-4 py-2 rounded-2xl border border-primary/10 text-sm font-semibold text-dark adm-text hover:bg-[var(--adm-surface-2)] transition flex items-center gap-2"
           >
             <RotateCcw size={14} />
             Reset {activeTab === "content" ? "Text" : activeTab === "design" ? "Design" : "Layout"}
@@ -807,7 +807,7 @@ export default function PageContentEditor() {
                 ? "bg-accent-green text-white shadow-lg shadow-green-200"
                 : hasChanges
                 ? "bg-gradient-to-r from-primary to-amber-500 text-white shadow-glow hover:brightness-105"
-                : "bg-bg text-muted cursor-not-allowed"
+                : "adm-bg text-muted adm-text-muted cursor-not-allowed"
             )}
           >
             {saved ? (<><Check size={15} />Saved!</>) : (<><Save size={15} />Save Changes</>)}
@@ -816,7 +816,7 @@ export default function PageContentEditor() {
       </div>
 
       {/* Tab Bar */}
-      <div className="flex gap-1 bg-bg rounded-2xl p-1">
+      <div className="flex gap-1 adm-bg rounded-2xl p-1">
         {[
           { id: "content" as const, label: "Text Content", icon: Type },
           { id: "design" as const, label: "Design & Layout", icon: Palette },
@@ -828,8 +828,8 @@ export default function PageContentEditor() {
             className={clsx(
               "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all",
               activeTab === tab.id
-                ? "bg-white text-dark shadow-soft"
-                : "text-muted hover:text-dark"
+                ? "adm-surface adm-border border text-dark adm-text shadow-soft"
+                : "text-muted adm-text-muted hover:adm-text"
             )}
           >
             <tab.icon size={16} />
@@ -848,7 +848,7 @@ export default function PageContentEditor() {
             className="bg-primary/5 border border-primary/20 rounded-2xl px-4 py-3 flex items-center gap-3"
           >
             <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            <span className="text-sm text-dark font-medium">You have unsaved changes</span>
+            <span className="text-sm text-dark adm-text font-medium">You have unsaved changes</span>
           </motion.div>
         )}
       </AnimatePresence>
@@ -867,28 +867,28 @@ export default function PageContentEditor() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: sIdx * 0.04, duration: 0.3 }}
-                className="bg-white rounded-2xl shadow-soft overflow-hidden border border-primary/5"
+                className="adm-surface adm-border border rounded-2xl shadow-soft overflow-hidden border border-primary/5"
               >
                 <button
                   onClick={() => toggleSection(section.id)}
-                  className="w-full flex items-center gap-4 p-5 hover:bg-bg/50 transition text-left"
+                  className="w-full flex items-center gap-4 p-5 hover:bg-[var(--adm-surface-2)]/50 transition text-left"
                 >
                   <div className={clsx(
                     "w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 transition-all",
-                    isExpanded ? "bg-gradient-to-br from-primary to-amber-500 text-white shadow-sm" : "bg-bg text-muted"
+                    isExpanded ? "bg-gradient-to-br from-primary to-amber-500 text-white shadow-sm" : "adm-bg text-muted adm-text-muted"
                   )}>
                     <Icon size={18} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-[15px] font-extrabold text-dark">{section.title}</h3>
-                    <p className="text-xs text-muted mt-0.5">{section.description}</p>
+                    <h3 className="text-[15px] font-extrabold text-dark adm-text">{section.title}</h3>
+                    <p className="text-xs text-muted adm-text-muted mt-0.5">{section.description}</p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[10px] font-bold text-muted/50 bg-bg px-2.5 py-0.5 rounded-full">
+                    <span className="text-[10px] font-bold adm-text-faint adm-bg px-2.5 py-0.5 rounded-full">
                       {section.fields.length} fields
                     </span>
                     <motion.div animate={{ rotate: isExpanded ? 90 : 0 }} transition={{ duration: 0.2 }}>
-                      <ChevronRight size={16} className={isExpanded ? "text-primary" : "text-muted/40"} />
+                      <ChevronRight size={16} className={isExpanded ? "text-primary" : "adm-text-faint"} />
                     </motion.div>
                   </div>
                 </button>
@@ -911,7 +911,7 @@ export default function PageContentEditor() {
                               animate={{ opacity: 1, x: 0 }}
                               transition={{ delay: fIdx * 0.03, duration: 0.25 }}
                             >
-                              <label className="block text-xs font-semibold text-dark mb-1.5">
+                              <label className="block text-xs font-semibold text-dark adm-text mb-1.5">
                                 {field.label}
                                 {field.key === "currencySymbol" && (
                                   <Coins size={10} className="inline ml-1 text-primary/50" />
@@ -922,7 +922,7 @@ export default function PageContentEditor() {
                                   value={String(form[field.key] ?? "")}
                                   onChange={(e) => handleChange(field.key, e.target.value)}
                                   rows={3}
-                                  className="w-full px-4 py-3 bg-bg border border-primary/10 rounded-2xl text-sm text-dark outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary focus:bg-white transition resize-none placeholder:text-muted/40"
+                                  className="w-full px-4 py-3 adm-bg border border-primary/10 rounded-2xl text-sm text-dark adm-text outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary focus:adm-surface adm-border border transition resize-none placeholder:adm-text-faint"
                                   placeholder={field.placeholder || String(defaultPageContent[field.key])}
                                 />
                               ) : field.type === "number" ? (
@@ -932,27 +932,27 @@ export default function PageContentEditor() {
                                   onChange={(e) => handleChange(field.key, parseInt(e.target.value) || 0)}
                                   min={1}
                                   max={100}
-                                  className="w-full px-4 py-2.5 bg-bg border border-primary/10 rounded-2xl text-sm text-dark outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary focus:bg-white transition placeholder:text-muted/40"
+                                  className="w-full px-4 py-2.5 adm-bg border border-primary/10 rounded-2xl text-sm text-dark adm-text outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary focus:adm-surface adm-border border transition placeholder:adm-text-faint"
                                 />
                               ) : (
                                 <input
                                   type="text"
                                   value={String(form[field.key] ?? "")}
                                   onChange={(e) => handleChange(field.key, e.target.value)}
-                                  className="w-full px-4 py-2.5 bg-bg border border-primary/10 rounded-2xl text-sm text-dark outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary focus:bg-white transition placeholder:text-muted/40"
+                                  className="w-full px-4 py-2.5 adm-bg border border-primary/10 rounded-2xl text-sm text-dark adm-text outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary focus:adm-surface adm-border border transition placeholder:adm-text-faint"
                                   placeholder={field.placeholder || String(defaultPageContent[field.key])}
                                 />
                               )}
                               {field.hint && (
-                                <p className="text-[11px] text-muted mt-1 ml-1">{field.hint}</p>
+                                <p className="text-[11px] text-muted adm-text-muted mt-1 ml-1">{field.hint}</p>
                               )}
                             </motion.div>
                           ))}
                         </div>
-                        <div className="px-5 py-3 bg-bg/50 border-t border-bg flex justify-end">
+                        <div className="px-5 py-3 adm-bg/50 border-t border-bg flex justify-end">
                           <button
                             onClick={() => handleResetSection(section)}
-                            className="text-xs text-muted hover:text-accent-red transition font-medium flex items-center gap-1"
+                            className="text-xs text-muted adm-text-muted hover:text-accent-red transition font-medium flex items-center gap-1"
                           >
                             <RotateCcw size={11} />
                             Reset this section
@@ -982,24 +982,24 @@ export default function PageContentEditor() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: sIdx * 0.04, duration: 0.3 }}
-                className="bg-white rounded-2xl shadow-soft overflow-hidden border border-primary/5"
+                className="adm-surface adm-border border rounded-2xl shadow-soft overflow-hidden border border-primary/5"
               >
                 <button
                   onClick={() => toggleDesign(section.id)}
-                  className="w-full flex items-center gap-4 p-5 hover:bg-bg/50 transition text-left"
+                  className="w-full flex items-center gap-4 p-5 hover:bg-[var(--adm-surface-2)]/50 transition text-left"
                 >
                   <div className={clsx(
                     "w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 transition-all",
-                    isExpanded ? "bg-gradient-to-br from-primary to-amber-500 text-white shadow-sm" : "bg-bg text-muted"
+                    isExpanded ? "bg-gradient-to-br from-primary to-amber-500 text-white shadow-sm" : "adm-bg text-muted adm-text-muted"
                   )}>
                     <Icon size={18} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-[15px] font-extrabold text-dark">{section.title}</h3>
-                    <p className="text-xs text-muted mt-0.5">{section.description}</p>
+                    <h3 className="text-[15px] font-extrabold text-dark adm-text">{section.title}</h3>
+                    <p className="text-xs text-muted adm-text-muted mt-0.5">{section.description}</p>
                   </div>
                   <motion.div animate={{ rotate: isExpanded ? 90 : 0 }} transition={{ duration: 0.2 }}>
-                    <ChevronRight size={16} className={isExpanded ? "text-primary" : "text-muted/40"} />
+                    <ChevronRight size={16} className={isExpanded ? "text-primary" : "adm-text-faint"} />
                   </motion.div>
                 </button>
 
@@ -1031,15 +1031,15 @@ export default function PageContentEditor() {
         <div className="space-y-6">
 
           {/* ─── Theme Presets ─────────────────── */}
-          <div className="bg-white rounded-2xl shadow-soft border border-primary/5 overflow-hidden">
+          <div className="adm-surface adm-border border rounded-2xl shadow-soft border border-primary/5 overflow-hidden">
             <div className="p-5 border-b border-bg">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-amber-500 flex items-center justify-center text-white shadow-sm">
                   <Sparkles size={18} />
                 </div>
                 <div>
-                  <h3 className="text-[15px] font-extrabold text-dark">Theme Presets</h3>
-                  <p className="text-xs text-muted mt-0.5">One-click complete visual redesign — colors, fonts, layout</p>
+                  <h3 className="text-[15px] font-extrabold text-dark adm-text">Theme Presets</h3>
+                  <p className="text-xs text-muted adm-text-muted mt-0.5">One-click complete visual redesign — colors, fonts, layout</p>
                 </div>
               </div>
             </div>
@@ -1091,7 +1091,7 @@ export default function PageContentEditor() {
                       "rounded-2xl border-2 p-3 text-left transition-all",
                       isActive
                         ? "border-primary shadow-glow ring-2 ring-primary/20"
-                        : "border-gray-200 hover:border-gray-300 hover:shadow-sm"
+                        : "border adm-border hover:border-[var(--adm-border-strong)] hover:shadow-sm"
                     )}
                   >
                     {/* Mini preview */}
@@ -1101,8 +1101,8 @@ export default function PageContentEditor() {
                       <div className="w-8 h-8 rounded-lg" style={{ backgroundColor: theme.preview.card, border: '1px solid #e5e7eb' }} />
                       <div className="w-8 h-8 rounded-lg" style={{ backgroundColor: theme.preview.text }} />
                     </div>
-                    <p className={clsx("text-xs font-bold", isActive ? "text-primary" : "text-dark")}>{theme.name}</p>
-                    <p className="text-[10px] text-muted mt-0.5 line-clamp-2">{theme.description}</p>
+                    <p className={clsx("text-xs font-bold", isActive ? "text-primary" : "text-dark adm-text")}>{theme.name}</p>
+                    <p className="text-[10px] text-muted adm-text-muted mt-0.5 line-clamp-2">{theme.description}</p>
                     {isActive && (
                       <div className="mt-2 flex items-center gap-1">
                         <Check size={10} className="text-primary" />
@@ -1116,15 +1116,15 @@ export default function PageContentEditor() {
           </div>
 
           {/* ─── Section Order & Visibility ───── */}
-          <div className="bg-white rounded-2xl shadow-soft border border-primary/5 overflow-hidden">
+          <div className="adm-surface adm-border border rounded-2xl shadow-soft border border-primary/5 overflow-hidden">
             <div className="p-5 border-b border-bg">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-amber-500 flex items-center justify-center text-white shadow-sm">
                   <Layers size={18} />
                 </div>
                 <div>
-                  <h3 className="text-[15px] font-extrabold text-dark">Section Order & Visibility</h3>
-                  <p className="text-xs text-muted mt-0.5">Drag sections to reorder, toggle visibility on/off</p>
+                  <h3 className="text-[15px] font-extrabold text-dark adm-text">Section Order & Visibility</h3>
+                  <p className="text-xs text-muted adm-text-muted mt-0.5">Drag sections to reorder, toggle visibility on/off</p>
                 </div>
               </div>
             </div>
@@ -1150,8 +1150,8 @@ export default function PageContentEditor() {
                     className={clsx(
                       "flex items-center gap-3 p-3 rounded-xl border transition-all",
                       sec.visible
-                        ? "border-primary/10 bg-white"
-                        : "border-gray-100 bg-gray-50 opacity-60"
+                        ? "border-primary/10 adm-surface adm-border border"
+                        : "border adm-border adm-surface-2 opacity-60"
                     )}
                   >
                     {/* Reorder buttons */}
@@ -1164,7 +1164,7 @@ export default function PageContentEditor() {
                           setLayout((prev) => ({ ...prev, sections: secs }));
                         }}
                         disabled={idx === 0}
-                        className={clsx("p-1 rounded-lg transition", idx > 0 ? "hover:bg-primary/10 text-dark" : "text-muted/30 cursor-not-allowed")}
+                        className={clsx("p-1 rounded-lg transition", idx > 0 ? "hover:bg-primary/10 text-dark adm-text" : "adm-text-faint cursor-not-allowed")}
                       >
                         <ArrowUp size={12} />
                       </button>
@@ -1176,7 +1176,7 @@ export default function PageContentEditor() {
                           setLayout((prev) => ({ ...prev, sections: secs }));
                         }}
                         disabled={idx === layout.sections.length - 1}
-                        className={clsx("p-1 rounded-lg transition", idx < layout.sections.length - 1 ? "hover:bg-primary/10 text-dark" : "text-muted/30 cursor-not-allowed")}
+                        className={clsx("p-1 rounded-lg transition", idx < layout.sections.length - 1 ? "hover:bg-primary/10 text-dark adm-text" : "adm-text-faint cursor-not-allowed")}
                       >
                         <ArrowDown size={12} />
                       </button>
@@ -1184,12 +1184,12 @@ export default function PageContentEditor() {
 
                     {/* Section info */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-dark">{info.label}</p>
-                      <p className="text-[10px] text-muted">{info.desc}</p>
+                      <p className="text-sm font-bold text-dark adm-text">{info.label}</p>
+                      <p className="text-[10px] text-muted adm-text-muted">{info.desc}</p>
                     </div>
 
                     {/* Order badge */}
-                    <span className="text-[10px] font-bold text-muted/40 bg-bg px-2 py-0.5 rounded-full shrink-0">
+                    <span className="text-[10px] font-bold adm-text-faint adm-bg px-2 py-0.5 rounded-full shrink-0">
                       #{idx + 1}
                     </span>
 
@@ -1206,7 +1206,7 @@ export default function PageContentEditor() {
                         "w-9 h-9 rounded-xl flex items-center justify-center transition-all",
                         sec.visible
                           ? "bg-primary/10 text-primary hover:bg-primary/20"
-                          : "bg-gray-100 text-muted hover:bg-gray-200"
+                          : "adm-surface-2 text-muted adm-text-muted hover:bg-[var(--adm-surface-2)]"
                       )}
                     >
                       {sec.visible ? <Eye size={14} /> : <EyeOff size={14} />}
@@ -1218,15 +1218,15 @@ export default function PageContentEditor() {
           </div>
 
           {/* ─── Section Variants ─────────────── */}
-          <div className="bg-white rounded-2xl shadow-soft border border-primary/5 overflow-hidden">
+          <div className="adm-surface adm-border border rounded-2xl shadow-soft border border-primary/5 overflow-hidden">
             <div className="p-5 border-b border-bg">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-amber-500 flex items-center justify-center text-white shadow-sm">
                   <Grid3X3 size={18} />
                 </div>
                 <div>
-                  <h3 className="text-[15px] font-extrabold text-dark">Section Variants</h3>
-                  <p className="text-xs text-muted mt-0.5">Choose a visual style for each section</p>
+                  <h3 className="text-[15px] font-extrabold text-dark adm-text">Section Variants</h3>
+                  <p className="text-xs text-muted adm-text-muted mt-0.5">Choose a visual style for each section</p>
                 </div>
               </div>
             </div>
@@ -1296,15 +1296,15 @@ export default function PageContentEditor() {
           </div>
 
           {/* ─── Page Layout & Typography ─────── */}
-          <div className="bg-white rounded-2xl shadow-soft border border-primary/5 overflow-hidden">
+          <div className="adm-surface adm-border border rounded-2xl shadow-soft border border-primary/5 overflow-hidden">
             <div className="p-5 border-b border-bg">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-amber-500 flex items-center justify-center text-white shadow-sm">
                   <Monitor size={18} />
                 </div>
                 <div>
-                  <h3 className="text-[15px] font-extrabold text-dark">Page Layout & Typography</h3>
-                  <p className="text-xs text-muted mt-0.5">Overall page structure, fonts, and sizing</p>
+                  <h3 className="text-[15px] font-extrabold text-dark adm-text">Page Layout & Typography</h3>
+                  <p className="text-xs text-muted adm-text-muted mt-0.5">Overall page structure, fonts, and sizing</p>
                 </div>
               </div>
             </div>
@@ -1338,15 +1338,15 @@ export default function PageContentEditor() {
           </div>
 
           {/* ─── Animation & Spacing ─────────── */}
-          <div className="bg-white rounded-2xl shadow-soft border border-primary/5 overflow-hidden">
+          <div className="adm-surface adm-border border rounded-2xl shadow-soft border border-primary/5 overflow-hidden">
             <div className="p-5 border-b border-bg">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-amber-500 flex items-center justify-center text-white shadow-sm">
                   <Zap size={18} />
                 </div>
                 <div>
-                  <h3 className="text-[15px] font-extrabold text-dark">Animation & Spacing</h3>
-                  <p className="text-xs text-muted mt-0.5">Motion effects, content density, and gaps</p>
+                  <h3 className="text-[15px] font-extrabold text-dark adm-text">Animation & Spacing</h3>
+                  <p className="text-xs text-muted adm-text-muted mt-0.5">Motion effects, content density, and gaps</p>
                 </div>
               </div>
             </div>
@@ -1372,15 +1372,15 @@ export default function PageContentEditor() {
           </div>
 
           {/* ─── Extra Section Content ────────── */}
-          <div className="bg-white rounded-2xl shadow-soft border border-primary/5 overflow-hidden">
+          <div className="adm-surface adm-border border rounded-2xl shadow-soft border border-primary/5 overflow-hidden">
             <div className="p-5 border-b border-bg">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-amber-500 flex items-center justify-center text-white shadow-sm">
                   <TypeIcon size={18} />
                 </div>
                 <div>
-                  <h3 className="text-[15px] font-extrabold text-dark">Extra Section Content</h3>
-                  <p className="text-xs text-muted mt-0.5">Text for promo banner, featured section, social proof, footer</p>
+                  <h3 className="text-[15px] font-extrabold text-dark adm-text">Extra Section Content</h3>
+                  <p className="text-xs text-muted adm-text-muted mt-0.5">Text for promo banner, featured section, social proof, footer</p>
                 </div>
               </div>
             </div>
@@ -1397,12 +1397,12 @@ export default function PageContentEditor() {
                 { key: "footerSubtext" as keyof PageContent, label: "Footer Subtext" },
               ].map((field) => (
                 <div key={field.key}>
-                  <label className="block text-xs font-semibold text-dark mb-1.5">{field.label}</label>
+                  <label className="block text-xs font-semibold text-dark adm-text mb-1.5">{field.label}</label>
                   <input
                     type="text"
                     value={String(form[field.key] ?? "")}
                     onChange={(e) => handleChange(field.key, e.target.value)}
-                    className="w-full px-4 py-2.5 bg-bg border border-primary/10 rounded-2xl text-sm text-dark outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary focus:bg-white transition placeholder:text-muted/40"
+                    className="w-full px-4 py-2.5 adm-bg border border-primary/10 rounded-2xl text-sm text-dark adm-text outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary focus:adm-surface adm-border border transition placeholder:adm-text-faint"
                     placeholder={String(defaultPageContent[field.key])}
                   />
                 </div>
@@ -1425,7 +1425,7 @@ export default function PageContentEditor() {
       {/* ── Live Preview Panel ── */}
       {showPreview && (
         <div
-          className="hidden lg:flex flex-col shrink-0 border-l border-gray-100 bg-white sticky top-0 h-[calc(100vh-64px)] w-[340px] xl:w-[420px]"
+          className="hidden lg:flex flex-col shrink-0 border-l border adm-border adm-surface adm-border border sticky top-0 h-[calc(100vh-64px)] w-[340px] xl:w-[420px]"
         >
           <LivePreview
             pageContent={form}

@@ -46,22 +46,22 @@ function ItemLines({
   showPrices: boolean;
 }) {
   if (items.length === 0) {
-    return <p className="text-[12px] text-muted italic">No items for this station</p>;
+    return <p className="text-[12px] text-muted adm-text-muted italic">No items for this station</p>;
   }
   return (
     <ul className="space-y-2">
       {items.map((item) => (
         <li key={item.cartKey || item.id} className="flex justify-between gap-3 text-[13px]">
-          <span className="font-semibold text-dark">
+          <span className="font-semibold text-dark adm-text">
             <span className="text-primary font-bold">{item.quantity}×</span> {item.name}
             {item.selectedVariations?.length ? (
-              <span className="block text-[11px] font-normal text-muted mt-0.5">
+              <span className="block text-[11px] font-normal text-muted adm-text-muted mt-0.5">
                 {item.selectedVariations.map((v) => v.optionLabel).join(", ")}
               </span>
             ) : null}
           </span>
           {showPrices && (
-            <span className="font-bold text-dark shrink-0">
+            <span className="font-bold text-dark adm-text shrink-0">
               €{lineTotal(item).toFixed(2)}
             </span>
           )}
@@ -95,7 +95,7 @@ function OrderCard({
       layout
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white rounded-2xl border border-gray-100/80 shadow-soft overflow-hidden"
+      className="adm-surface adm-border border rounded-2xl adm-border shadow-soft overflow-hidden"
     >
       <div
         className={clsx(
@@ -117,8 +117,8 @@ function OrderCard({
             )}
           </div>
           <div>
-            <p className="text-lg font-extrabold text-dark">Table {order.tableNumber || "—"}</p>
-            <p className="text-[11px] text-muted flex items-center gap-1">
+            <p className="text-lg font-extrabold text-dark adm-text">Table {order.tableNumber || "—"}</p>
+            <p className="text-[11px] text-muted adm-text-muted flex items-center gap-1">
               <Clock size={11} />
               {formatTime(order.createdAt)} · {order.status}
             </p>
@@ -147,7 +147,7 @@ function OrderCard({
           <button
             type="button"
             onClick={() => setShowFull(true)}
-            className="text-[12px] font-semibold text-muted hover:text-dark flex items-center gap-1"
+            className="text-[12px] font-semibold text-muted adm-text-muted hover:adm-text flex items-center gap-1"
           >
             <ChevronDown size={14} />
             + {foodOnly.length} food item{foodOnly.length !== 1 ? "s" : ""} (kitchen) — show full order
@@ -160,23 +160,23 @@ function OrderCard({
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="border-t border-gray-100 pt-3"
+              className="border-t border adm-border pt-3"
             >
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-muted">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-muted adm-text-muted">
                   Full order
                 </span>
                 <button
                   type="button"
                   onClick={() => setShowFull(false)}
-                  className="text-muted hover:text-dark"
+                  className="text-muted adm-text-muted hover:adm-text"
                 >
                   <ChevronUp size={16} />
                 </button>
               </div>
               <ItemLines items={order.items} showPrices={mode === "bar"} />
               {mode === "bar" && (
-                <p className="text-[13px] font-bold text-dark mt-2 text-right">
+                <p className="text-[13px] font-bold text-dark adm-text mt-2 text-right">
                   Total €{order.total.toFixed(2)}
                 </p>
               )}
@@ -196,9 +196,9 @@ function OrderCard({
         )}
 
         {order.kitchenNote && (
-          <div className="flex items-start gap-2 p-2.5 rounded-xl bg-bg text-[12px]">
-            <MessageSquare size={14} className="text-muted shrink-0 mt-0.5" />
-            <span className="text-dark">{order.kitchenNote}</span>
+          <div className="flex items-start gap-2 p-2.5 rounded-xl adm-bg text-[12px]">
+            <MessageSquare size={14} className="text-muted adm-text-muted shrink-0 mt-0.5" />
+            <span className="text-dark adm-text">{order.kitchenNote}</span>
           </div>
         )}
       </div>
@@ -239,20 +239,20 @@ export default function StationOrdersBoard({ mode }: { mode: StationMode }) {
           <Icon size={24} className={mode === "kitchen" ? "text-amber-700" : "text-purple-700"} />
         </div>
         <div>
-          <h1 className="text-xl font-extrabold text-dark">{title} station</h1>
-          <p className="text-[13px] text-muted">{subtitle}</p>
+          <h1 className="text-xl font-extrabold text-dark adm-text">{title} station</h1>
+          <p className="text-[13px] text-muted adm-text-muted">{subtitle}</p>
         </div>
-        <div className="ml-auto flex items-center gap-2 text-[12px] font-bold text-muted">
+        <div className="ml-auto flex items-center gap-2 text-[12px] font-bold text-muted adm-text-muted">
           <MapPin size={14} />
           {visible.length} active
         </div>
       </div>
 
       {visible.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-gray-200">
-          <CheckCircle2 size={40} className="mx-auto text-muted/30 mb-3" />
-          <p className="text-sm font-semibold text-muted">No active orders for {title.toLowerCase()}</p>
-          <p className="text-[12px] text-muted/70 mt-1">
+        <div className="text-center py-16 adm-surface adm-border border rounded-2xl-dashed border adm-border">
+          <CheckCircle2 size={40} className="mx-auto adm-text-faint mb-3" />
+          <p className="text-sm font-semibold text-muted adm-text-muted">No active orders for {title.toLowerCase()}</p>
+          <p className="text-[12px] text-muted adm-text-muted/70 mt-1">
             Guest orders appear here when they include {mode === "kitchen" ? "food" : "bar"} items.
           </p>
         </div>

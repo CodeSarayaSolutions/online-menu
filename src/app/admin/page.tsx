@@ -230,8 +230,8 @@ export default function AdminDashboard() {
         className="flex items-center justify-between mb-6"
       >
         <div>
-          <h1 className="text-xl lg:text-2xl font-extrabold text-dark tracking-tight">All Venues</h1>
-          <p className="text-[13px] text-muted mt-1">
+          <h1 className="text-xl lg:text-2xl font-extrabold text-dark adm-text tracking-tight">All Venues</h1>
+          <p className="text-[13px] text-muted adm-text-muted mt-1">
             Manage your restaurants, cafés, and more
           </p>
         </div>
@@ -251,7 +251,7 @@ export default function AdminDashboard() {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.05 }}
-        className="bg-white rounded-2xl border border-gray-100/80 shadow-soft p-5 mb-6"
+        className="adm-surface adm-border border rounded-2xl adm-border shadow-soft p-5 mb-6"
       >
         {/* Top row: key numbers */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
@@ -260,8 +260,8 @@ export default function AdminDashboard() {
               <Globe size={18} className="text-primary" />
             </div>
             <div>
-              <p className="text-lg font-extrabold text-dark leading-none">{restaurantIds.length}</p>
-              <p className="text-[11px] text-muted mt-0.5">Total Venues</p>
+              <p className="text-lg font-extrabold text-dark adm-text leading-none">{restaurantIds.length}</p>
+              <p className="text-[11px] text-muted adm-text-muted mt-0.5">Total Venues</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -269,8 +269,8 @@ export default function AdminDashboard() {
               <Package size={18} className="text-accent-blue" />
             </div>
             <div>
-              <p className="text-lg font-extrabold text-dark leading-none">{globalStats.totalProducts}</p>
-              <p className="text-[11px] text-muted mt-0.5">Total Products</p>
+              <p className="text-lg font-extrabold text-dark adm-text leading-none">{globalStats.totalProducts}</p>
+              <p className="text-[11px] text-muted adm-text-muted mt-0.5">Total Products</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -278,8 +278,8 @@ export default function AdminDashboard() {
               <Users size={18} className="text-accent-green" />
             </div>
             <div>
-              <p className="text-lg font-extrabold text-dark leading-none">{globalStats.totalUsers}</p>
-              <p className="text-[11px] text-muted mt-0.5">Total Users</p>
+              <p className="text-lg font-extrabold text-dark adm-text leading-none">{globalStats.totalUsers}</p>
+              <p className="text-[11px] text-muted adm-text-muted mt-0.5">Total Users</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -287,20 +287,20 @@ export default function AdminDashboard() {
               <Star size={18} className="text-amber-500" />
             </div>
             <div>
-              <p className="text-lg font-extrabold text-dark leading-none">{globalStats.totalPopular}</p>
-              <p className="text-[11px] text-muted mt-0.5">Popular Items</p>
+              <p className="text-lg font-extrabold text-dark adm-text leading-none">{globalStats.totalPopular}</p>
+              <p className="text-[11px] text-muted adm-text-muted mt-0.5">Popular Items</p>
             </div>
           </div>
         </div>
 
         {/* Divider */}
-        <div className="border-t border-gray-100 my-3" />
+        <div className="border-t border adm-border my-3" />
 
         {/* Bottom row: venue type breakdown + user role breakdown */}
         <div className="flex flex-wrap gap-x-6 gap-y-2">
           {/* Venue type chips */}
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] font-bold text-muted uppercase tracking-wider">By Type:</span>
+            <span className="text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider">By Type:</span>
             {Object.entries(globalStats.venueTypeCounts).map(([type, count]) => {
               const vConf = VENUE_TYPES.find((v) => v.value === type);
               const vColor = VENUE_COLORS[type as VenueType];
@@ -317,7 +317,7 @@ export default function AdminDashboard() {
 
           {/* User role chips */}
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] font-bold text-muted uppercase tracking-wider">Staff:</span>
+            <span className="text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider">Staff:</span>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-700">
               <Crown size={10} /> {globalStats.platformAdmins} Admin{globalStats.platformAdmins !== 1 ? "s" : ""}
             </span>
@@ -331,8 +331,8 @@ export default function AdminDashboard() {
 
           {/* Total categories */}
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold text-muted uppercase tracking-wider">Categories:</span>
-            <span className="text-[11px] font-bold text-dark">{globalStats.totalCategories}</span>
+            <span className="text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider">Categories:</span>
+            <span className="text-[11px] font-bold text-dark adm-text">{globalStats.totalCategories}</span>
           </div>
         </div>
       </motion.div>
@@ -359,8 +359,8 @@ export default function AdminDashboard() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05, duration: 0.35 }}
               className={clsx(
-                "bg-white rounded-2xl shadow-soft overflow-hidden border-2 transition-all duration-300 cursor-pointer group",
-                isActive ? "border-primary shadow-card" : "border-gray-100/80 hover:border-primary/20 hover:shadow-card"
+                "adm-surface adm-border border rounded-2xl shadow-soft overflow-hidden border-2 transition-all duration-300 cursor-pointer group",
+                isActive ? "border-primary shadow-card" : "border adm-border hover:border-primary/20 hover:shadow-card"
               )}
               onClick={() => handleClickVenue(id)}
             >
@@ -372,12 +372,12 @@ export default function AdminDashboard() {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
                 {isActive && isLoggedIn && (
                   <div className="absolute top-3 right-3 bg-primary text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm flex items-center gap-1">
-                    <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                    <div className="w-1.5 h-1.5 adm-surface adm-border border rounded-full animate-pulse" />
                     Active
                   </div>
                 )}
                 <div className="absolute top-3 left-3">
-                  <div className={clsx("flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border backdrop-blur-sm bg-white/90", vColor.text, vColor.border)}>
+                  <div className={clsx("flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border backdrop-blur-sm adm-surface adm-border border/90", vColor.text, vColor.border)}>
                     <vConf.icon size={11} />
                     {vConf.label}
                   </div>
@@ -393,68 +393,68 @@ export default function AdminDashboard() {
                 <div className="flex items-center gap-3 flex-wrap">
                   <div className="flex items-center gap-1.5 text-[11px]">
                     <Package size={12} className="text-primary" />
-                    <span className="font-bold text-dark">{productCount}</span>
-                    <span className="text-muted">products</span>
+                    <span className="font-bold text-dark adm-text">{productCount}</span>
+                    <span className="text-muted adm-text-muted">products</span>
                   </div>
                   <div className="flex items-center gap-1.5 text-[11px]">
                     <Tags size={12} className="text-accent-blue" />
-                    <span className="font-bold text-dark">{categoryCount}</span>
-                    <span className="text-muted">categories</span>
+                    <span className="font-bold text-dark adm-text">{categoryCount}</span>
+                    <span className="text-muted adm-text-muted">categories</span>
                   </div>
                   {popularCount > 0 && (
                     <div className="flex items-center gap-1.5 text-[11px]">
                       <Star size={12} className="text-amber-500" />
-                      <span className="font-bold text-dark">{popularCount}</span>
-                      <span className="text-muted">popular</span>
+                      <span className="font-bold text-dark adm-text">{popularCount}</span>
+                      <span className="text-muted adm-text-muted">popular</span>
                     </div>
                   )}
                   <div className="flex items-center gap-1.5 text-[11px]">
                     <UserCog size={12} className="text-accent-green" />
-                    <span className="font-bold text-dark">{venueBreakdown.all.length}</span>
-                    <span className="text-muted">users</span>
+                    <span className="font-bold text-dark adm-text">{venueBreakdown.all.length}</span>
+                    <span className="text-muted adm-text-muted">users</span>
                   </div>
                 </div>
 
                 {/* Row 2: Meta info (created, address, hours, theme) */}
-                <div className="flex items-center gap-3 flex-wrap text-[10px] text-muted">
+                <div className="flex items-center gap-3 flex-wrap text-[10px] text-muted adm-text-muted">
                   <div className="flex items-center gap-1" title={`Created ${formatDate(createdAt)}`}>
-                    <Calendar size={10} className="text-muted/60" />
+                    <Calendar size={10} className="adm-text-muted" />
                     <span>Created {formatTimeAgo(createdAt)}</span>
-                    <span className="text-muted/40">({formatDate(createdAt)})</span>
+                    <span className="adm-text-faint">({formatDate(createdAt)})</span>
                   </div>
                   {data.restaurant.address && (
                     <div className="flex items-center gap-1">
-                      <MapPin size={10} className="text-muted/60" />
+                      <MapPin size={10} className="adm-text-muted" />
                       <span className="truncate max-w-[140px]">{data.restaurant.address}</span>
                     </div>
                   )}
                   {data.restaurant.openHours && (
                     <div className="flex items-center gap-1">
-                      <Clock size={10} className="text-muted/60" />
+                      <Clock size={10} className="adm-text-muted" />
                       <span>{data.restaurant.openHours}</span>
                     </div>
                   )}
                   <div className="flex items-center gap-1">
-                    <Palette size={10} className="text-muted/60" />
+                    <Palette size={10} className="adm-text-muted" />
                     <span className="capitalize">{activeTheme === "custom" ? "Custom Theme" : activeTheme.replace(/-/g, " ")}</span>
                   </div>
                 </div>
 
                 {/* Row 3: Staff breakdown — users with emails */}
-                <div className="bg-gray-50/80 rounded-xl p-3 space-y-1.5">
-                  <p className="text-[10px] font-bold text-muted uppercase tracking-wider mb-1">Staff & Access</p>
+                <div className="adm-surface-2/80 rounded-xl p-3 space-y-1.5">
+                  <p className="text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-1">Staff & Access</p>
 
                   {venueBreakdown.admins.length > 0 && (
                     <div className="space-y-1">
                       {venueBreakdown.admins.map((u) => (
                         <div key={u.id} className="flex items-center gap-2 text-[11px]">
                           <span className="text-sm leading-none">{u.avatar || "👤"}</span>
-                          <span className="font-semibold text-dark">{u.name}</span>
+                          <span className="font-semibold text-dark adm-text">{u.name}</span>
                           <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-700 text-[9px] font-bold">
                             <Crown size={8} />
                             Admin
                           </span>
-                          <span className="flex items-center gap-1 text-muted ml-auto">
+                          <span className="flex items-center gap-1 text-muted adm-text-muted ml-auto">
                             <Mail size={9} />
                             {u.email}
                           </span>
@@ -468,12 +468,12 @@ export default function AdminDashboard() {
                       {venueBreakdown.managers.map((u) => (
                         <div key={u.id} className="flex items-center gap-2 text-[11px]">
                           <span className="text-sm leading-none">{u.avatar || "👤"}</span>
-                          <span className="font-semibold text-dark">{u.name}</span>
+                          <span className="font-semibold text-dark adm-text">{u.name}</span>
                           <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-700 text-[9px] font-bold">
                             <ShieldCheck size={8} />
                             Manager
                           </span>
-                          <span className="flex items-center gap-1 text-muted ml-auto">
+                          <span className="flex items-center gap-1 text-muted adm-text-muted ml-auto">
                             <Mail size={9} />
                             {u.email}
                           </span>
@@ -487,12 +487,12 @@ export default function AdminDashboard() {
                       {venueBreakdown.employees.map((u) => (
                         <div key={u.id} className="flex items-center gap-2 text-[11px]">
                           <span className="text-sm leading-none">{u.avatar || "👤"}</span>
-                          <span className="font-semibold text-dark">{u.name}</span>
+                          <span className="font-semibold text-dark adm-text">{u.name}</span>
                           <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-700 text-[9px] font-bold">
                             <Shield size={8} />
                             Employee
                           </span>
-                          <span className="flex items-center gap-1 text-muted ml-auto">
+                          <span className="flex items-center gap-1 text-muted adm-text-muted ml-auto">
                             <Mail size={9} />
                             {u.email}
                           </span>
@@ -502,13 +502,13 @@ export default function AdminDashboard() {
                   )}
 
                   {venueBreakdown.all.length === 0 && (
-                    <p className="text-[11px] text-muted/60 italic">No users assigned</p>
+                    <p className="text-[11px] adm-text-muted italic">No users assigned</p>
                   )}
                 </div>
 
                 {/* Row 4: Venue slug / ID */}
-                <div className="flex items-center gap-2 text-[10px] text-muted/60">
-                  <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded">/{id}</span>
+                <div className="flex items-center gap-2 text-[10px] adm-text-muted">
+                  <span className="font-mono adm-surface-2 px-1.5 py-0.5 rounded">/{id}</span>
                   <span>&middot;</span>
                   <span>{data.categories.length} total cat. (incl. All & Popular)</span>
                 </div>
@@ -530,7 +530,7 @@ export default function AdminDashboard() {
                   {restaurantIds.length > 1 && (
                     <button
                       onClick={() => setDeleteTarget(id)}
-                      className="w-10 h-10 rounded-xl border border-gray-200 flex items-center justify-center text-muted hover:text-accent-red hover:border-red-200 hover:bg-red-50 transition shrink-0"
+                      className="w-10 h-10 rounded-xl border border adm-border flex items-center justify-center text-muted adm-text-muted hover:text-accent-red hover:border-red-200 hover:bg-red-50 transition shrink-0"
                     >
                       <Trash2 size={15} />
                     </button>
@@ -546,13 +546,13 @@ export default function AdminDashboard() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="bg-white rounded-2xl border border-gray-100/80 shadow-soft p-16 text-center"
+          className="adm-surface adm-border border rounded-2xl adm-border shadow-soft p-16 text-center"
         >
           <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
             <Building2 size={28} className="text-primary/40" />
           </div>
-          <p className="text-[14px] font-semibold text-dark">No venues yet</p>
-          <p className="text-[12px] text-muted mt-1.5">Create your first restaurant, café, or bar to get started</p>
+          <p className="text-[14px] font-semibold text-dark adm-text">No venues yet</p>
+          <p className="text-[12px] text-muted adm-text-muted mt-1.5">Create your first restaurant, café, or bar to get started</p>
           <button
             onClick={() => setShowCreateModal(true)}
             className="mt-5 inline-flex items-center gap-2 bg-gradient-to-r from-primary to-amber-500 text-white px-5 py-2.5 rounded-2xl text-[13px] font-bold shadow-glow hover:brightness-105 transition"
@@ -578,24 +578,24 @@ export default function AdminDashboard() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.92, y: 24 }}
               transition={{ type: "spring", damping: 28, stiffness: 320 }}
-              className="bg-white rounded-3xl max-w-[520px] w-full shadow-elevated overflow-hidden"
+              className="adm-surface adm-border border rounded-3xl max-w-[520px] w-full shadow-elevated overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
-              <div className="px-6 pt-6 pb-4 border-b border-gray-100">
+              <div className="px-6 pt-6 pb-4 border-b border adm-border">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary/20 to-amber-500/10 flex items-center justify-center">
                       <Sparkles size={18} className="text-primary" />
                     </div>
                     <div>
-                      <h3 className="text-[16px] font-extrabold text-dark tracking-tight">Create New Venue</h3>
-                      <p className="text-[11px] text-muted mt-0.5">Choose a type and give it a name</p>
+                      <h3 className="text-[16px] font-extrabold text-dark adm-text tracking-tight">Create New Venue</h3>
+                      <p className="text-[11px] text-muted adm-text-muted mt-0.5">Choose a type and give it a name</p>
                     </div>
                   </div>
                   <button
                     onClick={() => setShowCreateModal(false)}
-                    className="w-8 h-8 rounded-xl hover:bg-gray-100 flex items-center justify-center text-muted hover:text-dark transition"
+                    className="w-8 h-8 rounded-xl hover:bg-[var(--adm-surface-2)] flex items-center justify-center text-muted adm-text-muted hover:adm-text transition"
                   >
                     <X size={16} />
                   </button>
@@ -606,7 +606,7 @@ export default function AdminDashboard() {
               <div className="px-6 py-5 space-y-5 max-h-[calc(100vh-220px)] overflow-y-auto">
                 {/* Venue type selector — 2x4 grid */}
                 <div>
-                  <label className="block text-[11px] font-bold text-muted uppercase tracking-wider mb-2.5">Venue Type</label>
+                  <label className="block text-[11px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2.5">Venue Type</label>
                   <div className="grid grid-cols-4 gap-2">
                     {VENUE_TYPES.map((vt) => {
                       const isSelected = newVenueType === vt.value;
@@ -620,7 +620,7 @@ export default function AdminDashboard() {
                             "relative flex flex-col items-center gap-1 p-3 rounded-2xl border-2 transition-all duration-200",
                             isSelected
                               ? `${vc.bg} ${vc.border} ${vc.text} shadow-sm`
-                              : "border-gray-100 hover:border-gray-200 text-muted hover:text-dark"
+                              : "border adm-border hover:border adm-border text-muted adm-text-muted hover:adm-text"
                           )}
                         >
                           {isSelected && (
@@ -644,7 +644,7 @@ export default function AdminDashboard() {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 4 }}
                       transition={{ duration: 0.15 }}
-                      className="text-[11px] text-muted mt-2 text-center"
+                      className="text-[11px] text-muted adm-text-muted mt-2 text-center"
                     >
                       {VENUE_TYPES.find((v) => v.value === newVenueType)?.desc}
                     </motion.p>
@@ -652,11 +652,11 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* Divider */}
-                <div className="border-t border-gray-100" />
+                <div className="border-t border adm-border" />
 
                 {/* Name */}
                 <div>
-                  <label className="block text-[11px] font-bold text-muted uppercase tracking-wider mb-1.5">Venue Name</label>
+                  <label className="block text-[11px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-1.5">Venue Name</label>
                   <input
                     type="text"
                     value={newName}
@@ -679,32 +679,32 @@ export default function AdminDashboard() {
                       newVenueType === "lounge" ? "e.g., Velvet Sky" :
                       "e.g., Pizza Palace"
                     }
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50/50 text-dark text-[13px] font-medium focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary focus:bg-white placeholder:text-muted/40 transition"
+                    className="w-full px-4 py-3 rounded-xl border border adm-border adm-surface-2/50 text-dark adm-text text-[13px] font-medium focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary focus:adm-surface adm-border border placeholder:adm-text-faint transition"
                   />
                 </div>
 
                 {/* Slug */}
                 <div>
-                  <label className="block text-[11px] font-bold text-muted uppercase tracking-wider mb-1.5">Venue ID (slug)</label>
+                  <label className="block text-[11px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-1.5">Venue ID (slug)</label>
                   <div className="relative">
-                    <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[11px] text-muted/50 font-mono">/</div>
+                    <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[11px] adm-text-faint font-mono">/</div>
                     <input
                       type="text"
                       value={newSlug}
                       onChange={(e) => setNewSlug(e.target.value)}
                       placeholder="auto-generated-from-name"
-                      className="w-full pl-7 pr-4 py-3 rounded-xl border border-gray-200 bg-gray-50/50 text-dark text-[13px] font-mono focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary focus:bg-white placeholder:text-muted/30 transition"
+                      className="w-full pl-7 pr-4 py-3 rounded-xl border border adm-border adm-surface-2/50 text-dark adm-text text-[13px] font-mono focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary focus:adm-surface adm-border border placeholder:adm-text-faint transition"
                     />
                   </div>
-                  <p className="text-[10px] text-muted/60 mt-1.5">Unique identifier — lowercase, no spaces</p>
+                  <p className="text-[10px] adm-text-muted mt-1.5">Unique identifier — lowercase, no spaces</p>
                 </div>
               </div>
 
               {/* Footer */}
-              <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex items-center gap-3">
+              <div className="px-6 py-4 border-t border adm-border adm-surface-2/50 flex items-center gap-3">
                 <button
                   onClick={() => setShowCreateModal(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-gray-200 text-[13px] font-bold text-dark hover:bg-white transition"
+                  className="flex-1 py-2.5 rounded-xl border border adm-border text-[13px] font-bold text-dark adm-text hover:adm-surface adm-border border transition"
                 >
                   Cancel
                 </button>
@@ -736,19 +736,19 @@ export default function AdminDashboard() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               transition={{ type: "spring", damping: 25 }}
-              className="bg-white rounded-3xl p-6 max-w-[380px] w-full shadow-elevated"
+              className="adm-surface adm-border border rounded-3xl p-6 max-w-[380px] w-full shadow-elevated"
             >
               <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
                 <AlertTriangle size={22} className="text-accent-red" />
               </div>
-              <h3 className="text-lg font-extrabold text-dark text-center">Delete Venue?</h3>
-              <p className="text-sm text-muted mt-2 text-center leading-relaxed">
+              <h3 className="text-lg font-extrabold text-dark adm-text text-center">Delete Venue?</h3>
+              <p className="text-sm text-muted adm-text-muted mt-2 text-center leading-relaxed">
                 This will permanently delete{" "}
-                <span className="font-bold text-dark">{allRestaurants[deleteTarget]?.restaurant.name}</span>
+                <span className="font-bold text-dark adm-text">{allRestaurants[deleteTarget]?.restaurant.name}</span>
                 {" "}and all its data. This cannot be undone.
               </p>
               <div className="flex gap-3 mt-6">
-                <button onClick={() => setDeleteTarget(null)} className="flex-1 py-3 rounded-2xl border border-gray-200 text-sm font-bold text-dark hover:bg-bg transition">Cancel</button>
+                <button onClick={() => setDeleteTarget(null)} className="flex-1 py-3 rounded-2xl border border adm-border text-sm font-bold text-dark adm-text hover:bg-[var(--adm-surface-2)] transition">Cancel</button>
                 <button onClick={() => handleDelete(deleteTarget)} className="flex-1 py-3 rounded-2xl bg-accent-red text-white text-sm font-bold hover:brightness-110 transition shadow-lg shadow-red-200">Delete</button>
               </div>
             </motion.div>

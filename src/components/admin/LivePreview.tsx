@@ -107,14 +107,14 @@ export default function LivePreview({ pageContent, componentStyles, layoutConfig
   return (
     <div className="flex flex-col h-full">
       {/* Preview Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-100">
+      <div className="flex items-center justify-between px-4 py-3 adm-surface adm-border border border-b border adm-border">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-amber-500 flex items-center justify-center">
             <Smartphone size={13} className="text-white" />
           </div>
           <div>
-            <p className="text-xs font-extrabold text-dark leading-tight">Live Preview</p>
-            <p className="text-[10px] text-muted">Changes appear instantly</p>
+            <p className="text-xs font-extrabold text-dark adm-text leading-tight">Live Preview</p>
+            <p className="text-[10px] text-muted adm-text-muted">Changes appear instantly</p>
           </div>
         </div>
 
@@ -126,7 +126,7 @@ export default function LivePreview({ pageContent, componentStyles, layoutConfig
               "p-1.5 rounded-lg transition-all",
               deviceMode === "phone"
                 ? "bg-primary/10 text-primary"
-                : "text-muted hover:text-dark hover:bg-bg"
+                : "text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)]"
             )}
             title="Phone view"
           >
@@ -138,7 +138,7 @@ export default function LivePreview({ pageContent, componentStyles, layoutConfig
               "p-1.5 rounded-lg transition-all",
               deviceMode === "tablet"
                 ? "bg-primary/10 text-primary"
-                : "text-muted hover:text-dark hover:bg-bg"
+                : "text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)]"
             )}
             title="Tablet view"
           >
@@ -153,7 +153,7 @@ export default function LivePreview({ pageContent, componentStyles, layoutConfig
                 iframeRef.current.src = iframeRef.current.src;
               }
             }}
-            className="p-1.5 rounded-lg text-muted hover:text-dark hover:bg-bg transition-all ml-1"
+            className="p-1.5 rounded-lg text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)] transition-all ml-1"
             title="Refresh preview"
           >
             <RotateCw size={14} />
@@ -177,13 +177,13 @@ export default function LivePreview({ pageContent, componentStyles, layoutConfig
             <motion.div
               initial={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-white/80 backdrop-blur-sm z-20 flex items-center justify-center"
+              className="absolute inset-0 adm-surface adm-border border/80 backdrop-blur-sm z-20 flex items-center justify-center"
             >
               <div className="flex flex-col items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center animate-pulse">
                   <Smartphone size={18} className="text-primary" />
                 </div>
-                <p className="text-xs font-semibold text-muted">Loading preview…</p>
+                <p className="text-xs font-semibold text-muted adm-text-muted">Loading preview…</p>
               </div>
             </motion.div>
           )}
@@ -218,7 +218,7 @@ export default function LivePreview({ pageContent, componentStyles, layoutConfig
             {/* Screen */}
             <div
               className={clsx(
-                "bg-white overflow-hidden relative",
+                "adm-surface adm-border border overflow-hidden relative",
                 deviceMode === "phone" ? "rounded-[2.4rem]" : "rounded-[1rem]"
               )}
               style={{

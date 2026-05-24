@@ -354,8 +354,8 @@ export default function ProductsEditor() {
       {/* ───────────── Header ───────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-extrabold text-dark tracking-tight">Products</h1>
-          <p className="text-sm text-muted mt-1">{products.length} items &middot; {categories.filter((c) => c.id !== "all" && c.id !== "popular").length} categories</p>
+          <h1 className="text-2xl font-extrabold text-dark adm-text tracking-tight">Products</h1>
+          <p className="text-sm text-muted adm-text-muted mt-1">{products.length} items &middot; {categories.filter((c) => c.id !== "all" && c.id !== "popular").length} categories</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -364,7 +364,7 @@ export default function ProductsEditor() {
               "hidden lg:flex px-3 py-2 rounded-2xl border text-sm font-semibold transition items-center gap-2",
               showPreview
                 ? "border-primary/20 bg-primary/5 text-primary"
-                : "border-primary/10 text-dark hover:bg-bg"
+                : "border-primary/10 text-dark adm-text hover:bg-[var(--adm-surface-2)]"
             )}
             title={showPreview ? "Hide Preview" : "Show Preview"}
           >
@@ -376,13 +376,13 @@ export default function ProductsEditor() {
             className={clsx(
               "flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-bold transition border shrink-0",
               showCatPanel
-                ? "bg-primary/10 border-primary/30 text-dark"
-                : "bg-white border-primary/10 text-muted hover:text-dark hover:border-primary/20"
+                ? "bg-primary/10 border-primary/30 text-dark adm-text"
+                : "adm-surface adm-border border border-primary/10 text-muted adm-text-muted hover:adm-text hover:border-primary/20"
             )}
           >
             <Tags size={15} />
             Categories
-            <span className="text-[10px] font-bold bg-bg rounded-full px-2 py-0.5 text-muted">{categories.filter((c) => c.id !== "all" && c.id !== "popular").length}</span>
+            <span className="text-[10px] font-bold adm-bg rounded-full px-2 py-0.5 text-muted adm-text-muted">{categories.filter((c) => c.id !== "all" && c.id !== "popular").length}</span>
           </button>
           <button onClick={() => startAdd()} className="flex items-center gap-2 bg-gradient-to-r from-primary to-amber-500 text-white px-5 py-2.5 rounded-2xl text-sm font-bold hover:brightness-105 transition shadow-glow shrink-0">
             <Plus size={16} /> Add Product
@@ -402,16 +402,16 @@ export default function ProductsEditor() {
             transition={{ duration: 0.25, ease: "easeOut" }}
             className="overflow-hidden mb-6"
           >
-            <div className="bg-white rounded-2xl border border-primary/10 shadow-soft overflow-hidden">
+            <div className="adm-surface adm-border border rounded-2xl-primary/10 shadow-soft overflow-hidden">
               {/* Panel header */}
-              <div className="flex items-center justify-between px-5 py-4 border-b border-primary/5 bg-bg/50">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-primary/5 adm-bg/50">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
                     <Tags size={14} className="text-primary" />
                   </div>
                   <div>
-                    <h2 className="text-sm font-extrabold text-dark">Manage Categories</h2>
-                    <p className="text-[10px] text-muted">{categories.length} total &middot; Reorder, edit, or add new</p>
+                    <h2 className="text-sm font-extrabold text-dark adm-text">Manage Categories</h2>
+                    <p className="text-[10px] text-muted adm-text-muted">{categories.length} total &middot; Reorder, edit, or add new</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -423,7 +423,7 @@ export default function ProductsEditor() {
                   </button>
                   <button
                     onClick={() => setShowCatPanel(false)}
-                    className="p-1.5 rounded-xl hover:bg-bg text-muted transition"
+                    className="p-1.5 rounded-xl hover:bg-[var(--adm-surface-2)] text-muted adm-text-muted transition"
                   >
                     <X size={16} />
                   </button>
@@ -441,23 +441,23 @@ export default function ProductsEditor() {
                   >
                     <div className="px-5 py-5 border-b border-primary/10 bg-primary/[0.02]">
                       <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-[13px] font-extrabold text-dark">Create Category</h3>
-                        <button onClick={() => setShowCatAdd(false)} className="p-1 rounded-lg hover:bg-bg text-muted transition"><X size={14} /></button>
+                        <h3 className="text-[13px] font-extrabold text-dark adm-text">Create Category</h3>
+                        <button onClick={() => setShowCatAdd(false)} className="p-1 rounded-lg hover:bg-[var(--adm-surface-2)] text-muted adm-text-muted transition"><X size={14} /></button>
                       </div>
                       <div className="grid grid-cols-2 gap-4 mb-4">
                         <CatField label="ID (lowercase)" value={newCat.id} onChange={(v) => setNewCat((c) => ({ ...c, id: v.toLowerCase().replace(/\s/g, "-") }))} placeholder="e.g. seafood" />
                         <div>
-                          <label className="block text-[10px] font-bold text-muted uppercase tracking-wider mb-2">Display Name</label>
+                          <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Display Name</label>
                           <div>
-                            <input value={newCat.label} onChange={(e) => setNewCat((c) => ({ ...c, label: e.target.value }))} placeholder="e.g. Seafood" className="w-full px-3 py-2 bg-bg rounded-xl text-sm text-dark border border-primary/10 focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:text-muted/40" />
+                            <input value={newCat.label} onChange={(e) => setNewCat((c) => ({ ...c, label: e.target.value }))} placeholder="e.g. Seafood" className="w-full px-3 py-2 adm-bg rounded-xl text-sm text-dark adm-text border border-primary/10 focus:border-primary focus:adm-surface adm-border border focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:adm-text-faint" />
                             <BsCollapse hasValue={!!((newCat as any).label_bs)}>
-                              <input value={(newCat as any).label_bs || ""} onChange={(e) => setNewCat((c) => ({ ...c, label_bs: e.target.value }))} placeholder="npr. Morski plodovi" className="w-full px-3 py-2 bg-bg rounded-xl text-sm text-dark border border-blue-200/30 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100 outline-none transition-all placeholder:text-muted/40" />
+                              <input value={(newCat as any).label_bs || ""} onChange={(e) => setNewCat((c) => ({ ...c, label_bs: e.target.value }))} placeholder="npr. Morski plodovi" className="w-full px-3 py-2 adm-bg rounded-xl text-sm text-dark adm-text border border-blue-200/30 focus:border-blue-400 focus:adm-surface adm-border border focus:ring-4 focus:ring-blue-100 outline-none transition-all placeholder:adm-text-faint" />
                             </BsCollapse>
                           </div>
                         </div>
                         <CatField label="Emoji Icon" value={newCat.icon} onChange={(v) => setNewCat((c) => ({ ...c, icon: v }))} placeholder="🍽️" />
                         <div>
-                          <label className="block text-[10px] font-bold text-muted uppercase tracking-wider mb-2">Color</label>
+                          <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Color</label>
                           <div className="flex flex-wrap gap-1.5">
                             {colorPresets.map((color) => (
                               <button
@@ -470,7 +470,7 @@ export default function ProductsEditor() {
                         </div>
                       </div>
                       <div className="flex gap-3">
-                        <button onClick={() => setShowCatAdd(false)} className="flex-1 py-2 rounded-xl border border-primary/10 text-xs font-semibold text-dark hover:bg-bg transition">Cancel</button>
+                        <button onClick={() => setShowCatAdd(false)} className="flex-1 py-2 rounded-xl border border-primary/10 text-xs font-semibold text-dark adm-text hover:bg-[var(--adm-surface-2)] transition">Cancel</button>
                         <button onClick={handleCatAdd} disabled={!newCat.id || !newCat.label} className="flex-1 py-2 rounded-xl bg-gradient-to-r from-primary to-amber-500 text-white text-xs font-bold hover:brightness-105 transition disabled:opacity-40 shadow-glow">Create</button>
                       </div>
                     </div>
@@ -485,27 +485,27 @@ export default function ProductsEditor() {
                   const productCount = products.filter((p) => p.category.toLowerCase() === cat.id).length;
 
                   return (
-                    <div key={cat.id} className={clsx("transition-colors", isEditing ? "bg-primary/[0.03]" : catSaved === cat.id ? "bg-green-50/40" : "hover:bg-bg/50")}>
+                    <div key={cat.id} className={clsx("transition-colors", isEditing ? "bg-primary/[0.03]" : catSaved === cat.id ? "bg-green-50/40" : "hover:bg-[var(--adm-surface-2)]/50")}>
                       {isEditing && catEditForm ? (
                         <div className="px-5 py-4 space-y-3">
                           <div className="flex items-center justify-between">
-                            <h4 className="text-xs font-extrabold text-dark">Editing: {cat.label}</h4>
-                            <button onClick={cancelCatEdit} className="p-1 rounded-lg hover:bg-bg text-muted transition"><X size={13} /></button>
+                            <h4 className="text-xs font-extrabold text-dark adm-text">Editing: {cat.label}</h4>
+                            <button onClick={cancelCatEdit} className="p-1 rounded-lg hover:bg-[var(--adm-surface-2)] text-muted adm-text-muted transition"><X size={13} /></button>
                           </div>
                           <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <label className="block text-[10px] font-bold text-muted uppercase tracking-wider mb-2">Display Name</label>
+                              <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Display Name</label>
                               <div>
-                                <input value={catEditForm.label} onChange={(e) => setCatEditForm((f) => f ? { ...f, label: e.target.value } : f)} placeholder="e.g. Seafood" className="w-full px-3 py-2 bg-bg rounded-xl text-sm text-dark border border-primary/10 focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:text-muted/40" />
+                                <input value={catEditForm.label} onChange={(e) => setCatEditForm((f) => f ? { ...f, label: e.target.value } : f)} placeholder="e.g. Seafood" className="w-full px-3 py-2 adm-bg rounded-xl text-sm text-dark adm-text border border-primary/10 focus:border-primary focus:adm-surface adm-border border focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:adm-text-faint" />
                                 <BsCollapse hasValue={!!(catEditForm.label_bs)}>
-                                  <input value={catEditForm.label_bs || ""} onChange={(e) => setCatEditForm((f) => f ? { ...f, label_bs: e.target.value } : f)} placeholder="npr. Morski plodovi" className="w-full px-3 py-2 bg-bg rounded-xl text-sm text-dark border border-blue-200/30 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100 outline-none transition-all placeholder:text-muted/40" />
+                                  <input value={catEditForm.label_bs || ""} onChange={(e) => setCatEditForm((f) => f ? { ...f, label_bs: e.target.value } : f)} placeholder="npr. Morski plodovi" className="w-full px-3 py-2 adm-bg rounded-xl text-sm text-dark adm-text border border-blue-200/30 focus:border-blue-400 focus:adm-surface adm-border border focus:ring-4 focus:ring-blue-100 outline-none transition-all placeholder:adm-text-faint" />
                                 </BsCollapse>
                               </div>
                             </div>
                             <CatField label="Emoji Icon" value={catEditForm.icon} onChange={(v) => setCatEditForm((f) => f ? { ...f, icon: v } : f)} />
                           </div>
                           <div>
-                            <label className="block text-[10px] font-bold text-muted uppercase tracking-wider mb-1.5">Color</label>
+                            <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-1.5">Color</label>
                             <div className="flex flex-wrap gap-1.5">
                               {colorPresets.map((color) => (
                                 <button
@@ -517,7 +517,7 @@ export default function ProductsEditor() {
                             </div>
                           </div>
                           <div className="flex gap-2 pt-1">
-                            <button onClick={cancelCatEdit} className="flex-1 py-2 rounded-xl border border-primary/10 text-xs font-semibold text-dark hover:bg-bg transition">Cancel</button>
+                            <button onClick={cancelCatEdit} className="flex-1 py-2 rounded-xl border border-primary/10 text-xs font-semibold text-dark adm-text hover:bg-[var(--adm-surface-2)] transition">Cancel</button>
                             <button onClick={saveCatEdit} className="flex-1 py-2 rounded-xl bg-gradient-to-r from-primary to-amber-500 text-white text-xs font-bold hover:brightness-105 flex items-center justify-center gap-1.5 shadow-glow">
                               <Save size={12} /> Save
                             </button>
@@ -526,29 +526,29 @@ export default function ProductsEditor() {
                       ) : (
                         <div className="flex items-center gap-2.5 px-5 py-3">
                           <div className="flex flex-col gap-0 shrink-0">
-                            <button onClick={() => moveCat(index, "up")} disabled={index === 0} className="p-0.5 rounded text-muted/30 hover:text-primary disabled:opacity-20 transition"><ChevronUp size={13} /></button>
-                            <button onClick={() => moveCat(index, "down")} disabled={index === categories.length - 1} className="p-0.5 rounded text-muted/30 hover:text-primary disabled:opacity-20 transition"><ChevronDown size={13} /></button>
+                            <button onClick={() => moveCat(index, "up")} disabled={index === 0} className="p-0.5 rounded adm-text-faint hover:text-primary disabled:opacity-20 transition"><ChevronUp size={13} /></button>
+                            <button onClick={() => moveCat(index, "down")} disabled={index === categories.length - 1} className="p-0.5 rounded adm-text-faint hover:text-primary disabled:opacity-20 transition"><ChevronDown size={13} /></button>
                           </div>
                           <div className={clsx("w-9 h-9 rounded-xl bg-gradient-to-br flex items-center justify-center text-white text-base shrink-0 shadow-sm", cat.color)}>
                             {cat.icon}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-[13px] font-semibold text-dark">{cat.label}</p>
-                            <p className="text-[10px] text-muted">
+                            <p className="text-[13px] font-semibold text-dark adm-text">{cat.label}</p>
+                            <p className="text-[10px] text-muted adm-text-muted">
                               {isSpecialCat(cat.id) ? <span className="text-primary font-medium">System</span> : `${productCount} product${productCount !== 1 ? "s" : ""}`}
                             </p>
                           </div>
                           {catSaved === cat.id && <Check size={15} className="text-accent-green shrink-0" strokeWidth={3} />}
                           <div className="flex items-center gap-1 shrink-0">
-                            <button onClick={() => startCatEdit(cat)} className="p-1.5 rounded-lg text-muted hover:text-primary hover:bg-primary/10 transition"><Pencil size={13} /></button>
+                            <button onClick={() => startCatEdit(cat)} className="p-1.5 rounded-lg text-muted adm-text-muted hover:text-primary hover:bg-primary/10 transition"><Pencil size={13} /></button>
                             {!isSpecialCat(cat.id) && (
                               catConfirmDelete === cat.id ? (
                                 <div className="flex items-center gap-1">
                                   <button onClick={() => handleCatDelete(cat.id)} className="px-2 py-1 rounded-lg text-[10px] font-bold bg-accent-red text-white hover:brightness-110 transition">Delete</button>
-                                  <button onClick={() => setCatConfirmDelete(null)} className="px-1.5 py-1 rounded-lg text-[10px] text-muted hover:bg-bg transition">No</button>
+                                  <button onClick={() => setCatConfirmDelete(null)} className="px-1.5 py-1 rounded-lg text-[10px] text-muted adm-text-muted hover:bg-[var(--adm-surface-2)] transition">No</button>
                                 </div>
                               ) : (
-                                <button onClick={() => setCatConfirmDelete(cat.id)} className="p-1.5 rounded-lg text-muted/30 hover:text-accent-red hover:bg-red-50 transition"><Trash2 size={13} /></button>
+                                <button onClick={() => setCatConfirmDelete(cat.id)} className="p-1.5 rounded-lg adm-text-faint hover:text-accent-red hover:bg-red-50 transition"><Trash2 size={13} /></button>
                               )
                             )}
                           </div>
@@ -566,15 +566,15 @@ export default function ProductsEditor() {
       {/* Search & filter */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
-          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted/50" />
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 adm-text-faint" />
           <input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search products..."
-            className="w-full pl-10 pr-9 py-2.5 bg-white rounded-2xl text-sm text-dark border border-primary/10 focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all shadow-soft"
+            className="w-full pl-10 pr-9 py-2.5 adm-surface adm-border border rounded-2xl text-sm text-dark adm-text border border-primary/10 focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all shadow-soft"
           />
           {searchQuery && (
-            <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted/40 hover:text-dark">
+            <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 adm-text-faint hover:adm-text">
               <X size={14} />
             </button>
           )}
@@ -588,7 +588,7 @@ export default function ProductsEditor() {
             }
             setFilterCategory(e.target.value);
           }}
-          className="px-4 py-2.5 bg-white rounded-2xl text-sm text-dark border border-primary/10 focus:border-primary outline-none min-w-[180px] shadow-soft"
+          className="px-4 py-2.5 adm-surface adm-border border rounded-2xl text-sm text-dark adm-text border border-primary/10 focus:border-primary outline-none min-w-[180px] shadow-soft"
         >
           <option value="all">All Categories (filter only)</option>
           {realCategories.map((c) => (
@@ -605,7 +605,7 @@ export default function ProductsEditor() {
             initial={{ opacity: 0, y: -12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
-            className="bg-white rounded-2xl border-2 border-primary/30 p-6 mb-6 shadow-card"
+            className="adm-surface adm-border border rounded-2xl border-2 border-primary/30 p-6 mb-6 shadow-card"
           >
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
@@ -613,22 +613,22 @@ export default function ProductsEditor() {
                   <Package size={16} className="text-primary" />
                 </div>
                 <div>
-                  <h3 className="text-[15px] font-extrabold text-dark">{isNew ? "New Product" : "Edit Product"}</h3>
-                  {!isNew && <p className="text-[11px] text-muted">{editingProduct.name}</p>}
+                  <h3 className="text-[15px] font-extrabold text-dark adm-text">{isNew ? "New Product" : "Edit Product"}</h3>
+                  {!isNew && <p className="text-[11px] text-muted adm-text-muted">{editingProduct.name}</p>}
                 </div>
               </div>
-              <button onClick={cancelEdit} className="p-2 rounded-xl hover:bg-bg text-muted transition"><X size={16} /></button>
+              <button onClick={cancelEdit} className="p-2 rounded-xl hover:bg-[var(--adm-surface-2)] text-muted adm-text-muted transition"><X size={16} /></button>
             </div>
 
             <div className="flex flex-col lg:flex-row gap-6">
               <div className="lg:w-52 shrink-0">
-                <div className="w-full aspect-square lg:aspect-auto lg:h-52 rounded-2xl bg-bg overflow-hidden flex items-center justify-center border-2 border-dashed border-primary/15">
+                <div className="w-full aspect-square lg:aspect-auto lg:h-52 rounded-2xl adm-bg overflow-hidden flex items-center justify-center border-2 border-dashed border-primary/15">
                   {editingProduct.image ? (
                     <img src={editingProduct.image} alt="Preview" className="w-full h-full object-cover" />
                   ) : (
                     <div className="text-center p-4">
-                      <ImageIcon size={28} className="text-muted/30 mx-auto mb-2" />
-                      <p className="text-[11px] text-muted">Add image URL below</p>
+                      <ImageIcon size={28} className="adm-text-faint mx-auto mb-2" />
+                      <p className="text-[11px] text-muted adm-text-muted">Add image URL below</p>
                     </div>
                   )}
                 </div>
@@ -637,25 +637,25 @@ export default function ProductsEditor() {
               <div className="flex-1 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[10px] font-bold text-muted uppercase tracking-wider mb-2">Name *</label>
+                    <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Name *</label>
                     <div>
-                      <input type="text" value={editingProduct.name} onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })} placeholder="e.g. Margherita Pizza" className="w-full px-3 py-2.5 bg-bg rounded-2xl text-sm text-dark border border-primary/10 focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:text-muted/40" />
+                      <input type="text" value={editingProduct.name} onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })} placeholder="e.g. Margherita Pizza" className="w-full px-3 py-2.5 adm-bg rounded-2xl text-sm text-dark adm-text border border-primary/10 focus:border-primary focus:adm-surface adm-border border focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:adm-text-faint" />
                       <BsCollapse hasValue={!!(editingProduct.name_bs)}>
-                        <input type="text" value={editingProduct.name_bs || ""} onChange={(e) => setEditingProduct({ ...editingProduct, name_bs: e.target.value })} placeholder="npr. Margherita Pizza" className="w-full px-3 py-2.5 bg-bg rounded-2xl text-sm text-dark border border-blue-200/30 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100 outline-none transition-all placeholder:text-muted/40" />
+                        <input type="text" value={editingProduct.name_bs || ""} onChange={(e) => setEditingProduct({ ...editingProduct, name_bs: e.target.value })} placeholder="npr. Margherita Pizza" className="w-full px-3 py-2.5 adm-bg rounded-2xl text-sm text-dark adm-text border border-blue-200/30 focus:border-blue-400 focus:adm-surface adm-border border focus:ring-4 focus:ring-blue-100 outline-none transition-all placeholder:adm-text-faint" />
                       </BsCollapse>
                     </div>
                   </div>
                   <Field label="Price (KM) *" type="number" value={editingProduct.price || ""} onChange={(v) => setEditingProduct({ ...editingProduct, price: parseFloat(v) || 0 })} placeholder="12.99" />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-muted uppercase tracking-wider mb-2">Description</label>
+                  <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Description</label>
                   <div>
                     <textarea
                       value={editingProduct.description}
                       onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })}
                       rows={2}
                       placeholder="Describe the dish..."
-                      className="w-full px-3.5 py-2.5 bg-bg rounded-2xl text-sm text-dark border border-primary/10 focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10 outline-none resize-none transition-all placeholder:text-muted/40"
+                      className="w-full px-3.5 py-2.5 adm-bg rounded-2xl text-sm text-dark adm-text border border-primary/10 focus:border-primary focus:adm-surface adm-border border focus:ring-4 focus:ring-primary/10 outline-none resize-none transition-all placeholder:adm-text-faint"
                     />
                     <BsCollapse hasValue={!!(editingProduct.description_bs)}>
                       <textarea
@@ -663,7 +663,7 @@ export default function ProductsEditor() {
                         onChange={(e) => setEditingProduct({ ...editingProduct, description_bs: e.target.value })}
                         rows={2}
                         placeholder="Opišite jelo..."
-                        className="w-full px-3.5 py-2.5 bg-bg rounded-2xl text-sm text-dark border border-blue-200/30 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100 outline-none resize-none transition-all placeholder:text-muted/40"
+                        className="w-full px-3.5 py-2.5 adm-bg rounded-2xl text-sm text-dark adm-text border border-blue-200/30 focus:border-blue-400 focus:adm-surface adm-border border focus:ring-4 focus:ring-blue-100 outline-none resize-none transition-all placeholder:adm-text-faint"
                       />
                     </BsCollapse>
                   </div>
@@ -677,7 +677,7 @@ export default function ProductsEditor() {
                     onChange={(url) => setEditingProduct({ ...editingProduct, image: url })}
                   />
                   <div>
-                    <label className="block text-[10px] font-bold text-muted uppercase tracking-wider mb-2">Category *</label>
+                    <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Category *</label>
                     <select
                       value={editingProduct.category || ""}
                       onChange={(e) => {
@@ -688,7 +688,7 @@ export default function ProductsEditor() {
                         }
                         setEditingProduct({ ...editingProduct, category: v });
                       }}
-                      className="w-full px-3.5 py-2.5 bg-bg rounded-2xl text-sm text-dark border border-primary/10 focus:border-primary outline-none transition-all"
+                      className="w-full px-3.5 py-2.5 adm-bg rounded-2xl text-sm text-dark adm-text border border-primary/10 focus:border-primary outline-none transition-all"
                     >
                       <option value="" disabled>
                         {realCategories.length === 0 ? "No categories yet — create one" : "Select category"}
@@ -707,7 +707,7 @@ export default function ProductsEditor() {
                         ))}
                       <option value="__create__">➕ Create new category…</option>
                     </select>
-                    <p className="text-[10px] text-muted mt-1.5">
+                    <p className="text-[10px] text-muted adm-text-muted mt-1.5">
                       “All Categories” above is only a list filter — each product needs its own menu category.
                     </p>
                   </div>
@@ -715,13 +715,13 @@ export default function ProductsEditor() {
 
                 <label className="flex items-center gap-3 py-2 cursor-pointer group">
                   <div
-                    className={clsx("w-11 h-6 rounded-full transition-all relative cursor-pointer", editingProduct.popular ? "bg-primary" : "bg-bg border border-primary/10")}
+                    className={clsx("w-11 h-6 rounded-full transition-all relative cursor-pointer", editingProduct.popular ? "bg-primary" : "adm-bg border border-primary/10")}
                     onClick={() => setEditingProduct({ ...editingProduct, popular: !editingProduct.popular })}
                   >
-                    <div className={clsx("absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all", editingProduct.popular ? "left-[22px]" : "left-0.5")} />
+                    <div className={clsx("absolute top-0.5 w-5 h-5 adm-surface adm-border border rounded-full shadow-md transition-all", editingProduct.popular ? "left-[22px]" : "left-0.5")} />
                   </div>
-                  <span className="text-sm font-medium text-dark flex items-center gap-1.5">
-                    <Flame size={14} className={editingProduct.popular ? "text-primary" : "text-muted/30"} />
+                  <span className="text-sm font-medium text-dark adm-text flex items-center gap-1.5">
+                    <Flame size={14} className={editingProduct.popular ? "text-primary" : "adm-text-faint"} />
                     Mark as Popular
                   </span>
                 </label>
@@ -733,37 +733,37 @@ export default function ProductsEditor() {
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <Sparkles size={14} className="text-primary/50" />
-                  <h4 className="text-xs font-bold text-muted uppercase tracking-wider">Add-ons / Extras</h4>
+                  <h4 className="text-xs font-bold text-muted adm-text-muted uppercase tracking-wider">Add-ons / Extras</h4>
                 </div>
                 <button onClick={addAddon} className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:brightness-110 transition">
                   <Plus size={14} /> Add Extra
                 </button>
               </div>
               {(editingProduct.addons || []).length === 0 ? (
-                <p className="text-xs text-muted italic py-2">No add-ons yet. Add customization options for this product.</p>
+                <p className="text-xs text-muted adm-text-muted italic py-2">No add-ons yet. Add customization options for this product.</p>
               ) : (
                 <div className="space-y-2">
                   {(editingProduct.addons || []).map((addon) => (
-                    <div key={addon.id} className="bg-bg rounded-2xl p-3 border border-primary/5 space-y-1.5">
+                    <div key={addon.id} className="adm-bg rounded-2xl p-3 border border-primary/5 space-y-1.5">
                       <div className="flex items-center gap-3">
                         <div className="flex-1">
                           <input
                             value={addon.name}
                             onChange={(e) => updateAddonField(addon.id, "name", e.target.value)}
                             placeholder="Addon name"
-                            className="w-full px-3 py-2 bg-white rounded-xl text-sm text-dark border border-primary/10 focus:border-primary outline-none transition"
+                            className="w-full px-3 py-2 adm-surface adm-border border rounded-xl text-sm text-dark adm-text border border-primary/10 focus:border-primary outline-none transition"
                           />
                           <BsCollapse hasValue={!!(addon.name_bs)}>
                             <input
                               value={addon.name_bs || ""}
                               onChange={(e) => updateAddonField(addon.id, "name_bs", e.target.value)}
                               placeholder="Naziv dodatka"
-                              className="w-full px-3 py-2 bg-white rounded-xl text-sm text-dark border border-blue-200/30 focus:border-blue-400 outline-none transition"
+                              className="w-full px-3 py-2 adm-surface adm-border border rounded-xl text-sm text-dark adm-text border border-blue-200/30 focus:border-blue-400 outline-none transition"
                             />
                           </BsCollapse>
                         </div>
                         <div className="flex items-center gap-1">
-                          <span className="text-xs text-muted font-medium">KM</span>
+                          <span className="text-xs text-muted adm-text-muted font-medium">KM</span>
                           <input
                             type="number"
                             step="0.01"
@@ -771,10 +771,10 @@ export default function ProductsEditor() {
                             value={addon.price || ""}
                             onChange={(e) => updateAddonField(addon.id, "price", parseFloat(e.target.value) || 0)}
                             placeholder="0.00"
-                            className="w-20 px-3 py-2 bg-white rounded-xl text-sm text-dark border border-primary/10 focus:border-primary outline-none transition"
+                            className="w-20 px-3 py-2 adm-surface adm-border border rounded-xl text-sm text-dark adm-text border border-primary/10 focus:border-primary outline-none transition"
                           />
                         </div>
-                        <button onClick={() => removeAddon(addon.id)} className="p-1.5 rounded-xl text-muted/30 hover:text-accent-red hover:bg-red-50 transition">
+                        <button onClick={() => removeAddon(addon.id)} className="p-1.5 rounded-xl adm-text-faint hover:text-accent-red hover:bg-red-50 transition">
                           <Trash2 size={14} />
                         </button>
                       </div>
@@ -789,37 +789,37 @@ export default function ProductsEditor() {
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <Package size={14} className="text-accent-blue/50" />
-                  <h4 className="text-xs font-bold text-muted uppercase tracking-wider">Variations</h4>
-                  <span className="text-[10px] text-muted/60">(e.g. Size, Flavor)</span>
+                  <h4 className="text-xs font-bold text-muted adm-text-muted uppercase tracking-wider">Variations</h4>
+                  <span className="text-[10px] adm-text-muted">(e.g. Size, Flavor)</span>
                 </div>
                 <button onClick={addVariation} className="flex items-center gap-1.5 text-xs font-semibold text-accent-blue hover:brightness-110 transition">
                   <Plus size={14} /> Add Variation
                 </button>
               </div>
               {(editingProduct.variations || []).length === 0 ? (
-                <p className="text-xs text-muted italic py-2">No variations. Add size, flavor, or other options customers choose from.</p>
+                <p className="text-xs text-muted adm-text-muted italic py-2">No variations. Add size, flavor, or other options customers choose from.</p>
               ) : (
                 <div className="space-y-4">
                   {(editingProduct.variations || []).map((variation) => (
-                    <div key={variation.id} className="bg-bg rounded-2xl p-4 border border-primary/5">
+                    <div key={variation.id} className="adm-bg rounded-2xl p-4 border border-primary/5">
                       <div className="flex items-start gap-3 mb-3">
                         <div className="flex-1">
                           <input
                             value={variation.name}
                             onChange={(e) => updateVariationField(variation.id, "name", e.target.value)}
                             placeholder="Variation name (e.g. Size)"
-                            className="w-full px-3 py-2 bg-white rounded-xl text-sm text-dark font-semibold border border-primary/10 focus:border-primary outline-none transition"
+                            className="w-full px-3 py-2 adm-surface adm-border border rounded-xl text-sm text-dark adm-text font-semibold border border-primary/10 focus:border-primary outline-none transition"
                           />
                           <BsCollapse hasValue={!!(variation.name_bs)}>
                             <input
                               value={variation.name_bs || ""}
                               onChange={(e) => updateVariationField(variation.id, "name_bs", e.target.value)}
                               placeholder="Naziv varijacije (npr. Veličina)"
-                              className="w-full px-3 py-2 bg-white rounded-xl text-sm text-dark font-semibold border border-blue-200/30 focus:border-blue-400 outline-none transition"
+                              className="w-full px-3 py-2 adm-surface adm-border border rounded-xl text-sm text-dark adm-text font-semibold border border-blue-200/30 focus:border-blue-400 outline-none transition"
                             />
                           </BsCollapse>
                         </div>
-                        <label className="flex items-center gap-1.5 text-xs text-muted whitespace-nowrap cursor-pointer">
+                        <label className="flex items-center gap-1.5 text-xs text-muted adm-text-muted whitespace-nowrap cursor-pointer">
                           <input
                             type="checkbox"
                             checked={variation.required}
@@ -828,32 +828,32 @@ export default function ProductsEditor() {
                           />
                           Required
                         </label>
-                        <button onClick={() => removeVariation(variation.id)} className="p-1.5 rounded-xl text-muted/30 hover:text-accent-red hover:bg-red-50 transition">
+                        <button onClick={() => removeVariation(variation.id)} className="p-1.5 rounded-xl adm-text-faint hover:text-accent-red hover:bg-red-50 transition">
                           <Trash2 size={14} />
                         </button>
                       </div>
                       <div className="space-y-2">
                         {variation.options.map((opt) => (
                           <div key={opt.id} className="flex items-start gap-2 pl-2">
-                            <span className="text-muted/30 text-xs mt-2">•</span>
+                            <span className="adm-text-faint text-xs mt-2">•</span>
                             <div className="flex-1">
                               <input
                                 value={opt.label}
                                 onChange={(e) => updateVariationOption(variation.id, opt.id, "label", e.target.value)}
                                 placeholder="Option label (e.g. Small)"
-                                className="w-full px-2 py-1.5 bg-white rounded-lg text-sm text-dark border border-primary/10 focus:border-primary outline-none transition"
+                                className="w-full px-2 py-1.5 adm-surface adm-border border rounded-lg text-sm text-dark adm-text border border-primary/10 focus:border-primary outline-none transition"
                               />
                               <BsCollapse hasValue={!!(opt.label_bs)}>
                                 <input
                                   value={opt.label_bs || ""}
                                   onChange={(e) => updateVariationOption(variation.id, opt.id, "label_bs", e.target.value)}
                                   placeholder="Oznaka opcije (npr. Malo)"
-                                  className="w-full px-2 py-1.5 bg-white rounded-lg text-sm text-dark border border-blue-200/30 focus:border-blue-400 outline-none transition"
+                                  className="w-full px-2 py-1.5 adm-surface adm-border border rounded-lg text-sm text-dark adm-text border border-blue-200/30 focus:border-blue-400 outline-none transition"
                                 />
                               </BsCollapse>
                             </div>
                             <div className="flex items-center gap-1">
-                              <span className="text-[10px] text-muted">+KM</span>
+                              <span className="text-[10px] text-muted adm-text-muted">+KM</span>
                               <input
                                 type="number"
                                 step="0.01"
@@ -861,13 +861,13 @@ export default function ProductsEditor() {
                                 value={opt.priceAdjustment || ""}
                                 onChange={(e) => updateVariationOption(variation.id, opt.id, "priceAdjustment", parseFloat(e.target.value) || 0)}
                                 placeholder="0.00"
-                                className="w-16 px-2 py-1.5 bg-white rounded-lg text-sm text-dark border border-primary/10 focus:border-primary outline-none transition"
+                                className="w-16 px-2 py-1.5 adm-surface adm-border border rounded-lg text-sm text-dark adm-text border border-primary/10 focus:border-primary outline-none transition"
                               />
                             </div>
                             <button
                               onClick={() => removeVariationOption(variation.id, opt.id)}
                               disabled={variation.options.length <= 1}
-                              className={clsx("p-1 rounded-lg transition", variation.options.length <= 1 ? "text-muted/15 cursor-not-allowed" : "text-muted/30 hover:text-accent-red hover:bg-red-50")}
+                              className={clsx("p-1 rounded-lg transition", variation.options.length <= 1 ? "adm-text-faint cursor-not-allowed" : "adm-text-faint hover:text-accent-red hover:bg-red-50")}
                             >
                               <X size={12} />
                             </button>
@@ -887,7 +887,7 @@ export default function ProductsEditor() {
             </div>
 
             <div className="flex gap-3 mt-6">
-              <button onClick={cancelEdit} className="flex-1 py-3 rounded-2xl border border-primary/10 text-sm font-semibold text-dark hover:bg-bg transition">Cancel</button>
+              <button onClick={cancelEdit} className="flex-1 py-3 rounded-2xl border border-primary/10 text-sm font-semibold text-dark adm-text hover:bg-[var(--adm-surface-2)] transition">Cancel</button>
               <button
                 onClick={saveProduct}
                 disabled={!editingProduct.name || !editingProduct.price || !editingProduct.category?.trim()}
@@ -908,8 +908,8 @@ export default function ProductsEditor() {
           if (catProducts.length === 0 && searchQuery) return null;
           const catObj = categories.find((c) => c.label === cat);
           return (
-            <div key={cat} className="bg-white rounded-2xl border border-primary/5 shadow-soft overflow-hidden">
-              <div className="bg-bg border-b border-primary/5 flex items-center">
+            <div key={cat} className="adm-surface adm-border border rounded-2xl-primary/5 shadow-soft overflow-hidden">
+              <div className="adm-bg border-b border-primary/5 flex items-center">
               <button
                 onClick={() => toggleCategory(cat)}
                 className="flex-1 px-5 py-3.5 flex items-center gap-2 hover:bg-primary/[0.03] transition cursor-pointer text-left"
@@ -917,13 +917,13 @@ export default function ProductsEditor() {
                 <ChevronDown
                   size={14}
                   className={clsx(
-                    "text-muted/40 transition-transform duration-200 shrink-0",
+                    "adm-text-faint transition-transform duration-200 shrink-0",
                     collapsedCategories.has(cat) && "-rotate-90"
                   )}
                 />
                 {catObj?.icon && <span className="text-base">{catObj.icon}</span>}
-                <h3 className="text-sm font-extrabold text-dark">{cat}</h3>
-                <span className="text-xs text-muted ml-auto">{catProducts.length} item{catProducts.length !== 1 ? "s" : ""}</span>
+                <h3 className="text-sm font-extrabold text-dark adm-text">{cat}</h3>
+                <span className="text-xs text-muted adm-text-muted ml-auto">{catProducts.length} item{catProducts.length !== 1 ? "s" : ""}</span>
               </button>
               <button
                 onClick={(e) => { e.stopPropagation(); startAdd(cat); if (collapsedCategories.has(cat)) toggleCategory(cat); }}
@@ -940,21 +940,21 @@ export default function ProductsEditor() {
                     key={product.id}
                     className={clsx(
                       "flex items-center gap-3 px-5 py-3 transition",
-                      saved === product.id ? "bg-accent-green/5" : "hover:bg-bg/50",
+                      saved === product.id ? "bg-accent-green/5" : "hover:bg-[var(--adm-surface-2)]/50",
                       editingProduct?.id === product.id && "ring-2 ring-primary/20 bg-primary/[0.02]"
                     )}
                   >
-                    <span className="text-xs font-bold text-muted/40 w-5 text-center shrink-0">{idx + 1}</span>
-                    <div className="w-10 h-10 rounded-xl bg-bg overflow-hidden shrink-0">
+                    <span className="text-xs font-bold adm-text-faint w-5 text-center shrink-0">{idx + 1}</span>
+                    <div className="w-10 h-10 rounded-xl adm-bg overflow-hidden shrink-0">
                       {product.image ? (
                         <img src={product.image} alt="" className="w-full h-full object-cover" />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center"><ImageIcon size={14} className="text-muted/20" /></div>
+                        <div className="w-full h-full flex items-center justify-center"><ImageIcon size={14} className="adm-text-faint" /></div>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-bold text-dark truncate">{product.name}</p>
+                        <p className="text-sm font-bold text-dark adm-text truncate">{product.name}</p>
                         {product.popular && (
                           <span className="shrink-0 bg-gradient-to-r from-primary to-amber-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
                             <Flame size={8} /> Popular
@@ -964,7 +964,7 @@ export default function ProductsEditor() {
                           <Check size={14} className="text-accent-green shrink-0" strokeWidth={3} />
                         )}
                       </div>
-                      <p className="text-xs text-muted">
+                      <p className="text-xs text-muted adm-text-muted">
                         {product.price.toFixed(2)} KM
                         {product.addons && product.addons.length > 0 && (
                           <span className="ml-1.5 text-accent-blue">{product.addons.length} addon{product.addons.length > 1 ? "s" : ""}</span>
@@ -976,7 +976,7 @@ export default function ProductsEditor() {
                     <div className="flex items-center gap-0.5 shrink-0">
                       <button
                         onClick={() => startEdit(product)}
-                        className="p-1.5 rounded-lg text-muted hover:text-primary hover:bg-primary/10 transition"
+                        className="p-1.5 rounded-lg text-muted adm-text-muted hover:text-primary hover:bg-primary/10 transition"
                         title="Edit"
                       >
                         <Pencil size={14} />
@@ -984,12 +984,12 @@ export default function ProductsEditor() {
                       {confirmDelete === product.id ? (
                         <div className="flex items-center gap-1">
                           <button onClick={() => handleDelete(product.id)} className="px-2 py-1 rounded-lg text-[10px] font-bold bg-accent-red text-white hover:brightness-110 transition">Delete</button>
-                          <button onClick={() => setConfirmDelete(null)} className="px-1.5 py-1 rounded-lg text-[10px] text-muted hover:bg-bg transition">No</button>
+                          <button onClick={() => setConfirmDelete(null)} className="px-1.5 py-1 rounded-lg text-[10px] text-muted adm-text-muted hover:bg-[var(--adm-surface-2)] transition">No</button>
                         </div>
                       ) : (
                         <button
                           onClick={() => setConfirmDelete(product.id)}
-                          className="p-1.5 rounded-lg text-muted/30 hover:text-accent-red hover:bg-red-50 transition"
+                          className="p-1.5 rounded-lg adm-text-faint hover:text-accent-red hover:bg-red-50 transition"
                           title="Delete"
                         >
                           <Trash2 size={14} />
@@ -1001,7 +1001,7 @@ export default function ProductsEditor() {
                         disabled={idx === 0}
                         className={clsx(
                           "p-1.5 rounded-lg transition",
-                          idx === 0 ? "text-muted/15 cursor-not-allowed" : "text-muted hover:text-primary hover:bg-primary/10"
+                          idx === 0 ? "adm-text-faint cursor-not-allowed" : "text-muted adm-text-muted hover:text-primary hover:bg-primary/10"
                         )}
                         title="Move up"
                       >
@@ -1012,7 +1012,7 @@ export default function ProductsEditor() {
                         disabled={idx === catProducts.length - 1}
                         className={clsx(
                           "p-1.5 rounded-lg transition",
-                          idx === catProducts.length - 1 ? "text-muted/15 cursor-not-allowed" : "text-muted hover:text-primary hover:bg-primary/10"
+                          idx === catProducts.length - 1 ? "adm-text-faint cursor-not-allowed" : "text-muted adm-text-muted hover:text-primary hover:bg-primary/10"
                         )}
                         title="Move down"
                       >
@@ -1029,10 +1029,10 @@ export default function ProductsEditor() {
 
         {/* Empty state */}
         {products.filter(matchesSearch).length === 0 && (
-          <div className="text-center py-20 bg-white rounded-2xl shadow-soft border border-primary/5">
-            <Package size={40} className="text-muted/20 mx-auto mb-3" />
-            <p className="text-muted text-sm font-medium">No products found</p>
-            <p className="text-muted/50 text-xs mt-1">
+          <div className="text-center py-20 adm-surface adm-border border rounded-2xl shadow-soft border border-primary/5">
+            <Package size={40} className="adm-text-faint mx-auto mb-3" />
+            <p className="text-muted adm-text-muted text-sm font-medium">No products found</p>
+            <p className="adm-text-faint text-xs mt-1">
               {searchQuery || filterCategory !== "all"
                 ? "Try a different search or category filter"
                 : "Add a category first, then create your first product"}
@@ -1057,23 +1057,23 @@ export default function ProductsEditor() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.92, y: 16 }}
               transition={{ type: "spring", damping: 28, stiffness: 320 }}
-              className="bg-white rounded-3xl max-w-[440px] w-full shadow-elevated overflow-hidden"
+              className="adm-surface adm-border border rounded-3xl max-w-[440px] w-full shadow-elevated overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="px-6 pt-6 pb-4 border-b border-gray-100 flex items-center justify-between">
+              <div className="px-6 pt-6 pb-4 border-b border adm-border flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center">
                     <Tags size={18} className="text-primary" />
                   </div>
                   <div>
-                    <h3 className="text-[16px] font-extrabold text-dark">New category</h3>
-                    <p className="text-[11px] text-muted">Products are grouped under categories on the menu</p>
+                    <h3 className="text-[16px] font-extrabold text-dark adm-text">New category</h3>
+                    <p className="text-[11px] text-muted adm-text-muted">Products are grouped under categories on the menu</p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowProductCatModal(false)}
-                  className="w-8 h-8 rounded-xl hover:bg-gray-100 flex items-center justify-center text-muted"
+                  className="w-8 h-8 rounded-xl hover:bg-[var(--adm-surface-2)] flex items-center justify-center text-muted adm-text-muted"
                 >
                   <X size={16} />
                 </button>
@@ -1114,7 +1114,7 @@ export default function ProductsEditor() {
                   placeholder="🍕"
                 />
                 <div>
-                  <label className="block text-[10px] font-bold text-muted uppercase tracking-wider mb-2">Color</label>
+                  <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Color</label>
                   <div className="flex flex-wrap gap-1.5">
                     {colorPresets.map((color) => (
                       <button
@@ -1131,11 +1131,11 @@ export default function ProductsEditor() {
                   </div>
                 </div>
               </div>
-              <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex gap-3">
+              <div className="px-6 py-4 border-t border adm-border adm-surface-2/50 flex gap-3">
                 <button
                   type="button"
                   onClick={() => setShowProductCatModal(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-gray-200 text-[13px] font-bold text-dark hover:bg-white transition"
+                  className="flex-1 py-2.5 rounded-xl border border adm-border text-[13px] font-bold text-dark adm-text hover:adm-surface adm-border border transition"
                 >
                   Cancel
                 </button>
@@ -1155,7 +1155,7 @@ export default function ProductsEditor() {
 
       {/* ── Live Preview Panel ── */}
       {showPreview && (
-        <div className="hidden lg:flex flex-col shrink-0 border-l border-gray-100 bg-white sticky top-0 h-[calc(100vh-64px)] w-[340px] xl:w-[420px]">
+        <div className="hidden lg:flex flex-col shrink-0 border-l border adm-border adm-surface adm-border border sticky top-0 h-[calc(100vh-64px)] w-[340px] xl:w-[420px]">
           <LivePreview
             pageContent={pageContent}
             componentStyles={componentStyles}
@@ -1171,7 +1171,7 @@ export default function ProductsEditor() {
 function Field({ label, value, onChange, placeholder, type = "text" }: { label: string; value: string | number; onChange: (v: string) => void; placeholder?: string; type?: string }) {
   return (
     <div>
-      <label className="block text-[10px] font-bold text-muted uppercase tracking-wider mb-2">{label}</label>
+      <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">{label}</label>
       <input
         type={type}
         step={type === "number" ? "0.01" : undefined}
@@ -1179,7 +1179,7 @@ function Field({ label, value, onChange, placeholder, type = "text" }: { label: 
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full px-3.5 py-2.5 bg-bg rounded-2xl text-sm text-dark border border-primary/10 focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:text-muted/40"
+        className="w-full px-3.5 py-2.5 adm-bg rounded-2xl text-sm text-dark adm-text border border-primary/10 focus:border-primary focus:adm-surface adm-border border focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:adm-text-faint"
       />
     </div>
   );
@@ -1188,12 +1188,12 @@ function Field({ label, value, onChange, placeholder, type = "text" }: { label: 
 function CatField({ label, value, onChange, placeholder }: { label?: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
   return (
     <div>
-      {label && <label className="block text-[10px] font-bold text-muted uppercase tracking-wider mb-2">{label}</label>}
+      {label && <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">{label}</label>}
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full px-3 py-2 bg-bg rounded-xl text-sm text-dark border border-primary/10 focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:text-muted/40"
+        className="w-full px-3 py-2 adm-bg rounded-xl text-sm text-dark adm-text border border-primary/10 focus:border-primary focus:adm-surface adm-border border focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:adm-text-faint"
       />
     </div>
   );

@@ -101,7 +101,7 @@ export default function VenueRolePicker() {
   if (!venueData) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-muted text-sm">Venue not found.</p>
+        <p className="text-muted adm-text-muted text-sm">Venue not found.</p>
       </div>
     );
   }
@@ -117,9 +117,9 @@ export default function VenueRolePicker() {
         initial={{ opacity: 0, x: -8 }}
         animate={{ opacity: 1, x: 0 }}
         onClick={() => router.push("/admin")}
-        className="flex items-center gap-2 text-[13px] font-semibold text-muted hover:text-dark transition mb-6 group"
+        className="flex items-center gap-2 text-[13px] font-semibold text-muted adm-text-muted hover:adm-text transition mb-6 group"
       >
-        <div className="w-7 h-7 rounded-lg bg-bg group-hover:bg-primary/10 flex items-center justify-center transition">
+        <div className="w-7 h-7 rounded-lg adm-bg group-hover:bg-primary/10 flex items-center justify-center transition">
           <ArrowLeft size={14} className="group-hover:text-primary transition" />
         </div>
         Back to venues
@@ -130,7 +130,7 @@ export default function VenueRolePicker() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35 }}
-        className="bg-white rounded-2xl shadow-card overflow-hidden border border-gray-100/80 mb-8"
+        className="adm-surface adm-border border rounded-2xl shadow-card overflow-hidden border border adm-border mb-8"
       >
         <div className="h-36 bg-gradient-to-br from-primary/20 to-amber-500/10 relative overflow-hidden">
           {venueData.restaurant.image && (
@@ -138,7 +138,7 @@ export default function VenueRolePicker() {
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
           <div className="absolute top-3 left-3">
-            <div className={clsx("flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border backdrop-blur-sm bg-white/90", vColor.text, vColor.border)}>
+            <div className={clsx("flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border backdrop-blur-sm adm-surface adm-border border/90", vColor.text, vColor.border)}>
               <vConf.icon size={11} />
               {vConf.label}
             </div>
@@ -154,7 +154,7 @@ export default function VenueRolePicker() {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-2xl shadow-card border border-gray-100/80 p-6 mb-6"
+          className="adm-surface adm-border border rounded-2xl shadow-card p-6 mb-6"
         >
           <AdminLoginForm
             title={venueLoginTitle(venueData.restaurant.name)}
@@ -167,7 +167,7 @@ export default function VenueRolePicker() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.25 }}
-          className="text-[11px] text-muted text-center mt-6 leading-relaxed"
+          className="text-[11px] text-muted adm-text-muted text-center mt-6 leading-relaxed"
         >
           {VENUE_LOGIN_FOOTER}
         </motion.p>

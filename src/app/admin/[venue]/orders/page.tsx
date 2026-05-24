@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Clock,
   ChefHat,
@@ -17,12 +17,48 @@ import {
   AlertTriangle,
   Filter,
   RefreshCw,
+  Download,
+  CreditCard,
+  Banknote,
+  User,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useParams } from "next/navigation";
 import { useOrders } from "@/hooks/useOrders";
 import { Order, OrderStatus } from "@/types/order";
+import * as tabService from "@/services/tabService";
+import type { OpenTabRow } from "@/services/tabService";
 import clsx from "clsx";
+
+type DateRangeKey = "today" | "week" | "custom";
+
+function rangeBounds(
+  key: DateRangeKey,
+  customFrom: string,
+  customTo: string
+): { from: Date; to: Date } {
+  const to = new Date();
+  to.setHours(23, 59, 59, 999);
+  if (key === "today") {
+    const from = new Date();
+    from.setHours(0, 0, 0, 0);
+    return { from, to };
+  }
+  if (key === "week") {
+    const from = new Date();
+    from.setDate(from.getDate() - 7);
+    from.setHours(0, 0, 0, 0);
+    return { from, to };
+  }
+  const from = customFrom ? new Date(`${customFrom}T00:00:00`) : new Date(0);
+  const end = customTo ? new Date(`${customTo}T23:59:59`) : to;
+  return { from, to: end };
+}
+
+function inRange(iso: string, from: Date, to: Date) {
+  const t = new Date(iso).getTime();
+  return t >= from.getTime() && t <= to.getTime();
+}
 
 /* ── Status config ───────────────────────────────── */
 const STATUS_CONFIG: Record<
@@ -53,8 +89,8 @@ const STATUS_CONFIG: Record<
   served: {
     label: "Served",
     icon: Utensils,
-    color: "text-gray-500",
-    bg: "bg-gray-50",
+    color: "adm-text-muted",
+    bg: "adm-surface-2",
     ring: "ring-gray-200",
   },
   cancelled: {
@@ -102,20 +138,101 @@ export default function AdminOrdersPage() {
   const [filter, setFilter] = useState<OrderStatus | "all">("all");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [dateRange, setDateRange] = useState<DateRangeKey>("today");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
+  const [closedTabs, setClosedTabs] = useState<OpenTabRow[]>([]);
+
+  const { from: rangeFrom, to: rangeTo } = useMemo(
+    () => rangeBounds(dateRange, customFrom, customTo),
+    [dateRange, customFrom, customTo]
+  );
+
+  const loadTabs = useCallback(async () => {
+    if (!venueSlug) return;
+    try {
+      const tabs = await tabService.getClosedTabs(
+        venueSlug,
+        rangeFrom.toISOString(),
+        rangeTo.toISOString()
+      );
+      setClosedTabs(tabs);
+    } catch {
+      setClosedTabs([]);
+    }
+  }, [venueSlug, rangeFrom, rangeTo]);
+
+  useEffect(() => {
+    void loadTabs();
+  }, [loadTabs]);
+
+  const ordersInRange = useMemo(
+    () => orders.filter((o) => inRange(o.createdAt, rangeFrom, rangeTo)),
+    [orders, rangeFrom, rangeTo]
+  );
 
   const filtered =
     filter === "all"
-      ? orders
-      : orders.filter((o) => o.status === filter);
+      ? ordersInRange
+      : ordersInRange.filter((o) => o.status === filter);
 
   const activeCount = orders.filter(
     (o) => o.status === "pending" || o.status === "preparing"
   ).length;
 
-  const todayOrders = orders.filter(
-    (o) => new Date(o.createdAt).toDateString() === new Date().toDateString()
-  );
-  const todayRevenue = todayOrders.reduce((s, o) => s + o.total, 0);
+  const analytics = useMemo(() => {
+    const allSales = [
+      ...ordersInRange.map((o) => ({ total: o.total, items: o.items, at: o.createdAt })),
+      ...closedTabs.map((t) => ({
+        total: Number(t.total),
+        items: [] as Order["items"],
+        at: t.closed_at ?? t.created_at,
+      })),
+    ];
+    const revenue = allSales.reduce((s, x) => s + x.total, 0);
+    const count = ordersInRange.length + closedTabs.length;
+    const avg = count > 0 ? revenue / count : 0;
+    const productCounts = new Map<string, number>();
+    for (const o of ordersInRange) {
+      for (const item of o.items) {
+        const name = item.name;
+        productCounts.set(name, (productCounts.get(name) ?? 0) + item.quantity);
+      }
+    }
+    for (const tab of closedTabs) {
+      void tab;
+    }
+    let topProduct = "—";
+    let topQty = 0;
+    productCounts.forEach((qty, name) => {
+      if (qty > topQty) {
+        topQty = qty;
+        topProduct = name;
+      }
+    });
+    return { count, revenue, avg, topProduct };
+  }, [ordersInRange, closedTabs]);
+
+  const exportCsv = () => {
+    const lines = [
+      "type,id,date,table,waiter,payment,total,status",
+      ...ordersInRange.map(
+        (o) =>
+          `order,${o.id},${o.createdAt},${o.tableNumber},,,${o.total.toFixed(2)},${o.status}`
+      ),
+      ...closedTabs.map(
+        (t) =>
+          `tab,${t.id},${t.closed_at ?? t.created_at},${t.table_label},${t.waiter_name},${t.payment_method ?? ""},${Number(t.total).toFixed(2)},closed`
+      ),
+    ];
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `narudzbe-${venueSlug}-${dateRange}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   /* ── Next status action ────────────────── */
   const getNextStatus = (current: OrderStatus): OrderStatus | null => {
@@ -140,54 +257,120 @@ export default function AdminOrdersPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-extrabold text-dark tracking-tight">
+          <h1 className="text-2xl lg:text-3xl font-extrabold text-dark adm-text tracking-tight">
             Orders
           </h1>
-          <p className="text-sm text-muted mt-1">
+          <p className="text-sm text-muted adm-text-muted mt-1">
             Track and manage customer orders in real-time
           </p>
         </div>
-        {orders.length > 0 && (
+        <div className="flex flex-wrap gap-2 self-start">
           <button
-            onClick={() => setShowClearConfirm(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-semibold text-accent-red/70 hover:text-accent-red hover:bg-red-50 border border-red-100 transition self-start"
+            type="button"
+            onClick={exportCsv}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-semibold border border-primary/20 text-primary hover:bg-primary/5 transition"
           >
-            <Trash2 size={14} />
-            Clear All
+            <Download size={14} />
+            Export CSV
           </button>
+          {orders.length > 0 && (
+            <button
+              onClick={() => setShowClearConfirm(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-semibold text-accent-red/70 hover:text-accent-red hover:bg-red-50 border border-red-100 transition"
+            >
+              <Trash2 size={14} />
+              Clear All
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Date range */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        {(
+          [
+            ["today", "Danas"],
+            ["week", "Ova sedmica"],
+            ["custom", "Prilagođeno"],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setDateRange(key)}
+            className={clsx(
+              "px-3 py-1.5 rounded-full text-[12px] font-semibold",
+              dateRange === key ? "bg-primary text-white" : "adm-surface adm-border border border text-muted adm-text-muted"
+            )}
+          >
+            {label}
+          </button>
+        ))}
+        {dateRange === "custom" && (
+          <>
+            <input
+              type="date"
+              value={customFrom}
+              onChange={(e) => setCustomFrom(e.target.value)}
+              className="px-2 py-1 rounded-lg border text-sm"
+            />
+            <input
+              type="date"
+              value={customTo}
+              onChange={(e) => setCustomTo(e.target.value)}
+              className="px-2 py-1 rounded-lg border text-sm"
+            />
+          </>
         )}
+        <button
+          type="button"
+          onClick={() => {
+            void refresh();
+            void loadTabs();
+          }}
+          className="ml-auto flex items-center gap-1 text-[12px] font-semibold text-muted adm-text-muted hover:adm-text"
+        >
+          <RefreshCw size={14} /> Osvježi
+        </button>
       </div>
 
       {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         {[
           {
-            label: "Total Orders",
-            value: orders.length,
+            label: "Ukupno narudžbi",
+            value: analytics.count,
             icon: ShoppingBag,
             iconBg: "bg-primary/10",
             iconColor: "text-primary",
           },
           {
-            label: "Active",
-            value: activeCount,
-            icon: RefreshCw,
-            iconBg: "bg-blue-50",
-            iconColor: "text-blue-500",
+            label: "Ukupno prihoda",
+            value: `${analytics.revenue.toFixed(2)} KM`,
+            icon: Package,
+            iconBg: "bg-amber-50",
+            iconColor: "text-amber-500",
           },
           {
-            label: "Today",
-            value: todayOrders.length,
+            label: "Prosječna vrijednost",
+            value: `${analytics.avg.toFixed(2)} KM`,
             icon: Clock,
             iconBg: "bg-emerald-50",
             iconColor: "text-emerald-500",
           },
           {
-            label: "Today Revenue",
-            value: `${todayRevenue.toFixed(2)} KM`,
-            icon: Package,
-            iconBg: "bg-amber-50",
-            iconColor: "text-amber-500",
+            label: "Najprodavaniji artikal",
+            value: analytics.topProduct,
+            icon: RefreshCw,
+            iconBg: "bg-blue-50",
+            iconColor: "text-blue-500",
+          },
+          {
+            label: "Aktivne (QR)",
+            value: activeCount,
+            icon: Filter,
+            iconBg: "adm-surface-2",
+            iconColor: "adm-text-muted",
           },
         ].map((stat, i) => (
           <motion.div
@@ -195,7 +378,7 @@ export default function AdminOrdersPage() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.06 }}
-            className="bg-white rounded-2xl p-4 shadow-soft border border-primary/5"
+            className="adm-surface adm-border border rounded-2xl p-4 shadow-soft border border-primary/5"
           >
             <div className="flex items-center gap-3">
               <div
@@ -207,10 +390,10 @@ export default function AdminOrdersPage() {
                 <stat.icon size={16} className={stat.iconColor} />
               </div>
               <div>
-                <p className="text-lg font-extrabold text-dark leading-tight">
+                <p className="text-lg font-extrabold text-dark adm-text leading-tight">
                   {stat.value}
                 </p>
-                <p className="text-[10px] text-muted font-medium">
+                <p className="text-[10px] text-muted adm-text-muted font-medium">
                   {stat.label}
                 </p>
               </div>
@@ -221,13 +404,13 @@ export default function AdminOrdersPage() {
 
       {/* Filter pills */}
       <div className="flex items-center gap-2 mb-5 overflow-x-auto pb-1">
-        <Filter size={14} className="text-muted shrink-0" />
+        <Filter size={14} className="text-muted adm-text-muted shrink-0" />
         {(["all", "pending", "preparing", "ready", "served", "cancelled"] as const).map(
           (s) => {
             const count =
               s === "all"
-                ? orders.length
-                : orders.filter((o) => o.status === s).length;
+                ? ordersInRange.length
+                : ordersInRange.filter((o) => o.status === s).length;
             return (
               <button
                 key={s}
@@ -236,7 +419,7 @@ export default function AdminOrdersPage() {
                   "px-3 py-1.5 rounded-full text-[12px] font-semibold transition-all whitespace-nowrap",
                   filter === s
                     ? "bg-primary text-white shadow-sm"
-                    : "bg-white text-muted hover:text-dark border border-gray-100"
+                    : "adm-surface adm-border border text-muted adm-text-muted hover:adm-text border border adm-border"
                 )}
               >
                 {s === "all" ? "All" : STATUS_CONFIG[s].label}
@@ -247,8 +430,49 @@ export default function AdminOrdersPage() {
         )}
       </div>
 
+      {/* Closed table tabs in range */}
+      {closedTabs.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-sm font-extrabold text-dark adm-text mb-3">Zatvorene kartice (konobar)</h2>
+          <div className="space-y-3">
+            {closedTabs.map((tab) => (
+              <div
+                key={tab.id}
+                className="adm-surface adm-border border rounded-2xl-purple-100 shadow-soft p-4 flex flex-wrap items-center gap-3"
+              >
+                <div className="flex-1 min-w-0">
+                  <span className="text-[10px] font-bold uppercase text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
+                    Kartica
+                  </span>
+                  <p className="font-extrabold text-dark adm-text mt-1">
+                    {tab.table_label} · {Number(tab.total).toFixed(2)} KM
+                  </p>
+                  <div className="flex flex-wrap gap-3 text-[11px] text-muted adm-text-muted mt-1">
+                    <span className="flex items-center gap-1">
+                      <User size={10} /> {tab.waiter_name}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      {tab.payment_method === "card" ? (
+                        <CreditCard size={10} />
+                      ) : (
+                        <Banknote size={10} />
+                      )}
+                      {tab.payment_method === "card" ? "Kartica" : "Gotovina"}
+                    </span>
+                    <span>
+                      {formatDate(tab.closed_at ?? tab.created_at)}{" "}
+                      {formatTime(tab.closed_at ?? tab.created_at)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Orders list */}
-      {filtered.length === 0 ? (
+      {filtered.length === 0 && closedTabs.length === 0 ? (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -257,8 +481,8 @@ export default function AdminOrdersPage() {
           <div className="w-20 h-20 rounded-3xl bg-primary/10 flex items-center justify-center mx-auto mb-5">
             <ShoppingBag size={32} className="text-primary/50" />
           </div>
-          <h3 className="text-lg font-bold text-dark">No orders yet</h3>
-          <p className="text-sm text-muted mt-1.5 max-w-xs mx-auto">
+          <h3 className="text-lg font-bold text-dark adm-text">No orders yet</h3>
+          <p className="text-sm text-muted adm-text-muted mt-1.5 max-w-xs mx-auto">
             When customers place orders, they will appear here for you to
             manage.
           </p>
@@ -276,11 +500,11 @@ export default function AdminOrdersPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.04 }}
                 className={clsx(
-                  "bg-white rounded-2xl shadow-soft border overflow-hidden transition-all hover:shadow-card",
+                  "adm-surface adm-border border rounded-2xl shadow-soft border overflow-hidden transition-all hover:shadow-card",
                   order.status === "pending" && "border-amber-200",
                   order.status === "preparing" && "border-blue-200",
                   order.status === "ready" && "border-emerald-200",
-                  order.status === "served" && "border-gray-100",
+                  order.status === "served" && "border adm-border",
                   order.status === "cancelled" && "border-red-200"
                 )}
               >
@@ -299,7 +523,7 @@ export default function AdminOrdersPage() {
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-extrabold text-dark text-[15px]">
+                          <span className="font-extrabold text-dark adm-text text-[15px]">
                             {order.id}
                           </span>
                           <span
@@ -312,16 +536,19 @@ export default function AdminOrdersPage() {
                             {sc.label}
                           </span>
                         </div>
-                        <div className="flex items-center gap-3 mt-0.5 text-[11px] text-muted">
+                        <div className="flex items-center gap-3 mt-0.5 text-[11px] text-muted adm-text-muted flex-wrap">
                           <span className="flex items-center gap-1">
                             <MapPin size={10} />
-                            Table {order.tableNumber}
+                            Stol {order.tableNumber || "—"}
+                          </span>
+                          <span className="flex items-center gap-1 adm-text-muted">
+                            QR meni
                           </span>
                           <span className="flex items-center gap-1">
                             <Clock size={10} />
                             {formatTime(order.createdAt)}
                           </span>
-                          <span className="text-muted/50">
+                          <span className="adm-text-faint">
                             {timeAgo(order.createdAt)}
                           </span>
                         </div>
@@ -329,10 +556,10 @@ export default function AdminOrdersPage() {
                     </div>
 
                     <div className="text-right shrink-0">
-                      <p className="text-lg font-extrabold text-dark">
+                      <p className="text-lg font-extrabold text-dark adm-text">
                         {order.total.toFixed(2)} KM
                       </p>
-                      <p className="text-[10px] text-muted">
+                      <p className="text-[10px] text-muted adm-text-muted">
                         {order.itemCount} item{order.itemCount !== 1 ? "s" : ""}
                       </p>
                     </div>
@@ -343,7 +570,7 @@ export default function AdminOrdersPage() {
                     {order.items.slice(0, 4).map((item) => (
                       <div
                         key={item.cartKey || item.id}
-                        className="flex items-center gap-1.5 bg-bg rounded-lg px-2 py-1"
+                        className="flex items-center gap-1.5 adm-bg rounded-lg px-2 py-1"
                       >
                         {item.image && (
                           <img
@@ -352,13 +579,13 @@ export default function AdminOrdersPage() {
                             className="w-5 h-5 rounded object-cover"
                           />
                         )}
-                        <span className="text-[11px] font-medium text-dark">
+                        <span className="text-[11px] font-medium text-dark adm-text">
                           {item.quantity}× {item.name}
                         </span>
                       </div>
                     ))}
                     {order.items.length > 4 && (
-                      <span className="text-[11px] text-muted font-medium">
+                      <span className="text-[11px] text-muted adm-text-muted font-medium">
                         +{order.items.length - 4} more
                       </span>
                     )}
@@ -366,7 +593,7 @@ export default function AdminOrdersPage() {
 
                   {/* Kitchen note */}
                   {order.kitchenNote && (
-                    <div className="mt-2 flex items-start gap-1.5 text-[11px] text-muted bg-amber-50/50 rounded-lg px-2.5 py-1.5">
+                    <div className="mt-2 flex items-start gap-1.5 text-[11px] text-muted adm-text-muted bg-amber-50/50 rounded-lg px-2.5 py-1.5">
                       <MessageSquare
                         size={12}
                         className="text-amber-500 shrink-0 mt-0.5"
@@ -379,7 +606,7 @@ export default function AdminOrdersPage() {
                   <div className="mt-3 flex items-center gap-2 flex-wrap">
                     <button
                       onClick={() => setSelectedOrder(order)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold text-muted hover:text-dark hover:bg-bg border border-gray-100 transition"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)] border border adm-border transition"
                     >
                       <Eye size={13} />
                       Details
@@ -407,7 +634,7 @@ export default function AdminOrdersPage() {
                     {(order.status === "served" || order.status === "cancelled") && (
                       <button
                         onClick={() => removeOrder(order.id)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold text-muted hover:text-red-500 hover:bg-red-50 transition"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold text-muted adm-text-muted hover:text-red-500 hover:bg-red-50 transition"
                       >
                         <Trash2 size={13} />
                         Remove
@@ -436,23 +663,23 @@ export default function AdminOrdersPage() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.92, y: 20 }}
               transition={{ type: "spring", damping: 25 }}
-              className="bg-white rounded-3xl max-w-lg w-full max-h-[85vh] overflow-y-auto shadow-elevated"
+              className="adm-surface adm-border border rounded-3xl max-w-lg w-full max-h-[85vh] overflow-y-auto shadow-elevated"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Modal header */}
-              <div className="sticky top-0 bg-white/95 backdrop-blur-md rounded-t-3xl border-b border-gray-100 px-6 py-4 flex items-center justify-between z-10">
+              <div className="sticky top-0 adm-header backdrop-blur-md backdrop-blur-md rounded-t-3xl border-b border adm-border px-6 py-4 flex items-center justify-between z-10">
                 <div>
-                  <h2 className="text-lg font-extrabold text-dark">
+                  <h2 className="text-lg font-extrabold text-dark adm-text">
                     {selectedOrder.id}
                   </h2>
-                  <p className="text-[11px] text-muted">
+                  <p className="text-[11px] text-muted adm-text-muted">
                     {formatDate(selectedOrder.createdAt)} at{" "}
                     {formatTime(selectedOrder.createdAt)}
                   </p>
                 </div>
                 <button
                   onClick={() => setSelectedOrder(null)}
-                  className="w-9 h-9 rounded-xl hover:bg-bg flex items-center justify-center text-muted hover:text-dark transition"
+                  className="w-9 h-9 rounded-xl hover:bg-[var(--adm-surface-2)] flex items-center justify-center text-muted adm-text-muted hover:adm-text transition"
                 >
                   <X size={18} />
                 </button>
@@ -483,9 +710,9 @@ export default function AdminOrdersPage() {
                       </div>
                     );
                   })()}
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-bg">
-                    <MapPin size={12} className="text-muted" />
-                    <span className="text-[12px] font-semibold text-dark">
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full adm-bg">
+                    <MapPin size={12} className="text-muted adm-text-muted" />
+                    <span className="text-[12px] font-semibold text-dark adm-text">
                       Table {selectedOrder.tableNumber}
                     </span>
                   </div>
@@ -511,14 +738,14 @@ export default function AdminOrdersPage() {
 
                 {/* Items */}
                 <div>
-                  <p className="text-[11px] font-bold text-muted uppercase tracking-wider mb-2">
+                  <p className="text-[11px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">
                     Items ({selectedOrder.itemCount})
                   </p>
                   <div className="space-y-2">
                     {selectedOrder.items.map((item) => (
                       <div
                         key={item.cartKey || item.id}
-                        className="flex items-center gap-3 p-3 rounded-xl bg-bg"
+                        className="flex items-center gap-3 p-3 rounded-xl adm-bg"
                       >
                         {item.image && (
                           <img
@@ -528,7 +755,7 @@ export default function AdminOrdersPage() {
                           />
                         )}
                         <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-bold text-dark truncate">
+                          <p className="text-[13px] font-bold text-dark adm-text truncate">
                             {item.name}
                           </p>
                           {/* Variations */}
@@ -538,7 +765,7 @@ export default function AdminOrdersPage() {
                                 {item.selectedVariations.map((v, vi) => (
                                   <span
                                     key={vi}
-                                    className="text-[10px] font-medium text-muted bg-white rounded px-1.5 py-0.5"
+                                    className="text-[10px] font-medium text-muted adm-text-muted adm-surface adm-border border rounded px-1.5 py-0.5"
                                   >
                                     {v.variationName}: {v.optionLabel}
                                     {v.priceAdjustment > 0 &&
@@ -547,11 +774,11 @@ export default function AdminOrdersPage() {
                                 ))}
                               </div>
                             )}
-                          <p className="text-[11px] text-muted mt-0.5">
+                          <p className="text-[11px] text-muted adm-text-muted mt-0.5">
                             {item.price.toFixed(2)} KM × {item.quantity}
                           </p>
                         </div>
-                        <p className="text-[14px] font-extrabold text-dark">
+                        <p className="text-[14px] font-extrabold text-dark adm-text">
                           {(item.price * item.quantity).toFixed(2)} KM
                         </p>
                       </div>
@@ -561,7 +788,7 @@ export default function AdminOrdersPage() {
 
                 {/* Total */}
                 <div className="flex items-center justify-between p-4 rounded-2xl bg-gradient-to-r from-primary/5 to-amber-50 border border-primary/10">
-                  <span className="text-[13px] font-bold text-dark">
+                  <span className="text-[13px] font-bold text-dark adm-text">
                     Order Total
                   </span>
                   <span className="text-xl font-extrabold text-primary">
@@ -625,22 +852,22 @@ export default function AdminOrdersPage() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               transition={{ type: "spring", damping: 25 }}
-              className="bg-white rounded-3xl p-6 max-w-[380px] w-full shadow-elevated"
+              className="adm-surface adm-border border rounded-3xl p-6 max-w-[380px] w-full shadow-elevated"
             >
               <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
                 <AlertTriangle size={22} className="text-accent-red" />
               </div>
-              <h3 className="text-lg font-extrabold text-dark text-center">
+              <h3 className="text-lg font-extrabold text-dark adm-text text-center">
                 Clear All Orders?
               </h3>
-              <p className="text-sm text-muted mt-2 text-center leading-relaxed">
+              <p className="text-sm text-muted adm-text-muted mt-2 text-center leading-relaxed">
                 This will permanently remove all order history. This cannot be
                 undone.
               </p>
               <div className="flex gap-3 mt-6">
                 <button
                   onClick={() => setShowClearConfirm(false)}
-                  className="flex-1 py-3 rounded-2xl border border-gray-200 text-sm font-bold text-dark hover:bg-bg transition"
+                  className="flex-1 py-3 rounded-2xl border border adm-border text-sm font-bold text-dark adm-text hover:bg-[var(--adm-surface-2)] transition"
                 >
                   Cancel
                 </button>

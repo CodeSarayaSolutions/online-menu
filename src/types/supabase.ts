@@ -437,6 +437,185 @@ export interface Database {
         };
         Relationships: [];
       };
+
+      restaurant_tables: {
+        Row: {
+          id: string;
+          restaurant_id: string;
+          label: string;
+          capacity: number;
+          position: number;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          restaurant_id: string;
+          label: string;
+          capacity?: number;
+          position?: number;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          restaurant_id?: string;
+          label?: string;
+          capacity?: number;
+          position?: number;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+
+      table_tabs: {
+        Row: {
+          id: string;
+          restaurant_id: string;
+          table_id: string;
+          waiter_id: string;
+          status: 'open' | 'closed';
+          payment_method: 'cash' | 'card' | null;
+          total: number;
+          closed_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          restaurant_id: string;
+          table_id: string;
+          waiter_id: string;
+          status?: 'open' | 'closed';
+          payment_method?: 'cash' | 'card' | null;
+          total?: number;
+          closed_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          restaurant_id?: string;
+          table_id?: string;
+          waiter_id?: string;
+          status?: 'open' | 'closed';
+          payment_method?: 'cash' | 'card' | null;
+          total?: number;
+          closed_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+
+      tab_items: {
+        Row: {
+          id: string;
+          tab_id: string;
+          product_id: string;
+          product_name: string;
+          quantity: number;
+          unit_price: number;
+          total_price: number;
+          station: 'kitchen' | 'bar' | 'both';
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tab_id: string;
+          product_id: string;
+          product_name: string;
+          quantity?: number;
+          unit_price?: number;
+          total_price?: number;
+          station?: 'kitchen' | 'bar' | 'both';
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          tab_id?: string;
+          product_id?: string;
+          product_name?: string;
+          quantity?: number;
+          unit_price?: number;
+          total_price?: number;
+          station?: 'kitchen' | 'bar' | 'both';
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+
+      inventory: {
+        Row: {
+          id: string;
+          restaurant_id: string;
+          product_id: string;
+          product_name: string;
+          quantity: number;
+          unit: string;
+          low_stock_threshold: number | null;
+          updated_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          restaurant_id: string;
+          product_id: string;
+          product_name: string;
+          quantity?: number;
+          unit?: string;
+          low_stock_threshold?: number | null;
+          updated_at?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          restaurant_id?: string;
+          product_id?: string;
+          product_name?: string;
+          quantity?: number;
+          unit?: string;
+          low_stock_threshold?: number | null;
+          updated_at?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+
+      inventory_movements: {
+        Row: {
+          id: string;
+          restaurant_id: string;
+          product_id: string;
+          product_name: string;
+          quantity_delta: number;
+          reason: string;
+          tab_id: string | null;
+          waiter_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          restaurant_id: string;
+          product_id: string;
+          product_name: string;
+          quantity_delta: number;
+          reason?: string;
+          tab_id?: string | null;
+          waiter_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          restaurant_id?: string;
+          product_id?: string;
+          product_name?: string;
+          quantity_delta?: number;
+          reason?: string;
+          tab_id?: string | null;
+          waiter_id?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
 
     Views: Record<string, never>;

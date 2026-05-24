@@ -114,8 +114,8 @@ export default function AdminLoginForm({
   return (
     <div>
       <div className="text-center mb-6">
-        <h2 className="text-xl font-extrabold text-dark">{title}</h2>
-        <p className="text-[13px] text-muted mt-1">
+        <h2 className="text-xl font-extrabold text-dark adm-text">{title}</h2>
+        <p className="text-[13px] text-muted adm-text-muted mt-1">
           {step === "invite"
             ? `Dobrodošli${displayName ? `, ${displayName}` : ""} — unesite kod od administratora`
             : step === "password"
@@ -127,16 +127,16 @@ export default function AdminLoginForm({
       {step === "email" && (
         <form onSubmit={handleEmailContinue} className="space-y-4">
           <div>
-            <label className="block text-[11px] font-bold text-muted uppercase tracking-wider mb-1.5">
+            <label className="block text-[11px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-1.5">
               Email
             </label>
             <div className="relative">
-              <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted/40" />
+              <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 adm-text-faint" />
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 bg-gray-50/50 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full pl-10 pr-4 py-3 rounded-xl border adm-input text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/30"
                 placeholder="you@example.com"
                 required
                 disabled={loading}
@@ -158,18 +158,18 @@ export default function AdminLoginForm({
 
       {step === "password" && (
         <form onSubmit={handlePasswordLogin} className="space-y-4">
-          <p className="text-[12px] text-muted bg-bg rounded-lg px-3 py-2">{email}</p>
+          <p className="text-[12px] text-muted adm-text-muted adm-bg rounded-lg px-3 py-2">{email}</p>
           <div>
-            <label className="block text-[11px] font-bold text-muted uppercase tracking-wider mb-1.5">
+            <label className="block text-[11px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-1.5">
               Lozinka
             </label>
             <div className="relative">
-              <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted/40" />
+              <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 adm-text-faint" />
               <input
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-10 py-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full pl-10 pr-10 py-3 rounded-xl border adm-input text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/30"
                 required
                 disabled={loading}
                 autoFocus
@@ -178,7 +178,7 @@ export default function AdminLoginForm({
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted adm-text-muted"
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
@@ -193,7 +193,7 @@ export default function AdminLoginForm({
             {loading ? <Loader2 size={18} className="animate-spin" /> : <LogIn size={18} />}
             {BTN_SIGN_IN}
           </button>
-          <button type="button" onClick={resetToEmail} className="w-full text-[12px] text-muted hover:text-dark">
+          <button type="button" onClick={resetToEmail} className="w-full text-[12px] text-muted adm-text-muted hover:adm-text">
             {BTN_DIFFERENT_EMAIL}
           </button>
         </form>
@@ -201,22 +201,22 @@ export default function AdminLoginForm({
 
       {step === "invite" && (
         <form onSubmit={handleInviteActivate} className="space-y-4">
-          <p className="text-[12px] text-muted bg-amber-50 border border-amber-200/60 rounded-lg px-3 py-2">
-            {INVITE_HELP} <span className="font-semibold text-dark">{email}</span>
+          <p className="text-[12px] text-muted adm-text-muted bg-amber-50 border border-amber-200/60 rounded-lg px-3 py-2">
+            {INVITE_HELP} <span className="font-semibold text-dark adm-text">{email}</span>
           </p>
           <div>
-            <label className="block text-[11px] font-bold text-muted uppercase tracking-wider mb-1.5">
+            <label className="block text-[11px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-1.5">
               Pozivni kod
             </label>
             <div className="relative">
-              <KeyRound size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted/40" />
+              <KeyRound size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 adm-text-faint" />
               <input
                 type="text"
                 inputMode="numeric"
                 maxLength={6}
                 value={otp}
                 onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 text-[13px] tracking-[0.3em] font-mono font-bold focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full pl-10 pr-4 py-3 rounded-xl border adm-input text-[13px] tracking-[0.3em] font-mono font-bold focus:outline-none focus:ring-2 focus:ring-primary/30"
                 placeholder="000000"
                 required
                 disabled={loading}
@@ -225,14 +225,14 @@ export default function AdminLoginForm({
             </div>
           </div>
           <div>
-            <label className="block text-[11px] font-bold text-muted uppercase tracking-wider mb-1.5">
+            <label className="block text-[11px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-1.5">
               Nova lozinka
             </label>
             <input
               type={showPassword ? "text" : "password"}
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="w-full px-4 py-3 rounded-xl border adm-input text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/30"
               minLength={8}
               required
               disabled={loading}
@@ -240,14 +240,14 @@ export default function AdminLoginForm({
             />
           </div>
           <div>
-            <label className="block text-[11px] font-bold text-muted uppercase tracking-wider mb-1.5">
+            <label className="block text-[11px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-1.5">
               Potvrdi lozinku
             </label>
             <input
               type={showPassword ? "text" : "password"}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="w-full px-4 py-3 rounded-xl border adm-input text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/30"
               minLength={8}
               required
               disabled={loading}
@@ -263,7 +263,7 @@ export default function AdminLoginForm({
             {loading ? <Loader2 size={18} className="animate-spin" /> : <LogIn size={18} />}
             {BTN_ACTIVATE}
           </button>
-          <button type="button" onClick={resetToEmail} className="w-full text-[12px] text-muted hover:text-dark">
+          <button type="button" onClick={resetToEmail} className="w-full text-[12px] text-muted adm-text-muted hover:adm-text">
             {BTN_DIFFERENT_EMAIL}
           </button>
         </form>
