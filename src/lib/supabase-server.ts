@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/supabase';
+import { supabasePostgrestSchema } from '@/lib/supabase-schema';
 
 // ─── Server-side Supabase client ────────────────────────
 // Uses the service_role key, which BYPASSES Row Level Security.
@@ -12,7 +13,15 @@ import type { Database } from '@/types/supabase';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-export const supabaseAdmin = createClient<Database>(supabaseUrl, supabaseServiceKey, {
+if (!supabaseUrl || !supabaseServiceKey) {
+  throw new Error(
+    'Missing Supabase server env: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY ' +
+    '(.env or .env.local; see .env.example).'
+  );
+}
+
+export const supabaseAdmin = createClient<Database, 'sarayamenu'>(supabaseUrl, supabaseServiceKey, {
+  db: { schema: supabasePostgrestSchema as 'sarayamenu' },
   auth: {
     autoRefreshToken: false,
     persistSession: false,

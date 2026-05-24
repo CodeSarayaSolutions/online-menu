@@ -1,7 +1,11 @@
 "use client";
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import {
+  deleteVenueFromCloud,
+  queueSaveVenueToCloud,
+  saveVenueToCloud,
+} from "@/lib/venue-cloud/sync";
 import {
   RestaurantInfo,
   CategoryInfo,
@@ -4053,9 +4057,7 @@ interface CmsState {
   getRestaurantData: (id: string) => RestaurantData | undefined;
 }
 
-export const useCmsStore = create<CmsState>()(
-  persist(
-    (set, get) => ({
+export const useCmsStore = create<CmsState>()((set, get) => ({
       // ── Initial data (empty — restaurants are created by user) ──
       restaurant: {
         name: '',
@@ -4237,7 +4239,7 @@ export const useCmsStore = create<CmsState>()(
       // ══════════════════════════════════════════════════════
 
       /** Create a new restaurant with default data, 1 sample category, and 3 sample products */
-      createRestaurant: (id, name, venueType) =>
+      createRestaurant: (id, name, venueType) => {
         set((s) => {
           const vt = venueType || 'restaurant';
 
@@ -4367,14 +4369,19 @@ export const useCmsStore = create<CmsState>()(
               },
             },
           };
-        }),
+        });
+        const bundle = get().allRestaurants[id];
+        if (bundle) void saveVenueToCloud(id, bundle);
+      },
 
       /** Delete a restaurant's data */
-      deleteRestaurant: (id) =>
+      deleteRestaurant: (id) => {
+        void deleteVenueFromCloud(id);
         set((s) => {
           const { [id]: _, ...rest } = s.allRestaurants;
           return { allRestaurants: rest };
-        }),
+        });
+      },
 
       /** Switch active restaurant: save current flat data to fromId, load toId into flat fields */
       switchRestaurant: (fromId, toId) =>
@@ -4412,22 +4419,26 @@ export const useCmsStore = create<CmsState>()(
 
       /** Save active flat data into allRestaurants under the given id (without switching) */
       saveActiveToAllRestaurants: (id) =>
-        set((s) => ({
-          allRestaurants: {
-            ...s.allRestaurants,
-            [id]: {
-              venueType: s.allRestaurants[id]?.venueType || 'restaurant' as VenueType,
-              restaurant: { ...s.restaurant },
-              categories: [...s.categories],
-              products: [...s.products],
-              pageContent: { ...s.pageContent },
-              componentStyles: { ...s.componentStyles },
-              layoutConfig: { ...s.layoutConfig },
-              themeCustomizations: { ...s.themeCustomizations },
-              createdAt: s.allRestaurants[id]?.createdAt || new Date().toISOString(),
+        set((s) => {
+          const bundle: RestaurantData = {
+            venueType: s.allRestaurants[id]?.venueType || ('restaurant' as VenueType),
+            restaurant: { ...s.restaurant },
+            categories: [...s.categories],
+            products: [...s.products],
+            pageContent: { ...s.pageContent },
+            componentStyles: { ...s.componentStyles },
+            layoutConfig: { ...s.layoutConfig },
+            themeCustomizations: { ...s.themeCustomizations },
+            createdAt: s.allRestaurants[id]?.createdAt || new Date().toISOString(),
+          };
+          queueSaveVenueToCloud(id, bundle);
+          return {
+            allRestaurants: {
+              ...s.allRestaurants,
+              [id]: bundle,
             },
-          },
-        })),
+          };
+        }),
 
       /** Load a venue's data into flat fields for public pages (no save-back) */
       loadVenuePublic: (slug) => {
@@ -4450,30 +4461,4 @@ export const useCmsStore = create<CmsState>()(
 
       /** Get a specific restaurant's stored data */
       getRestaurantData: (id) => get().allRestaurants[id],
-    }),
-    {
-      name: "saraya-cms",
-      version: 4,
-      migrate: (persistedState: any, version: number) => {
-        if (version < 4) {
-          // v4: Remove pre-seeded bella-cucina, keep user-created venues.
-          // Ensure themeCustomizations exist on all restaurants.
-          const allRestaurants = persistedState.allRestaurants || {};
-          const migrated: Record<string, any> = {};
-          for (const key of Object.keys(allRestaurants)) {
-            migrated[key] = {
-              ...allRestaurants[key],
-              themeCustomizations: allRestaurants[key].themeCustomizations || {},
-            };
-          }
-          return {
-            ...persistedState,
-            themeCustomizations: persistedState.themeCustomizations || {},
-            allRestaurants: migrated,
-          };
-        }
-        return persistedState;
-      },
-    }
-  )
-);
+}));

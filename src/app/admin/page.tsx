@@ -37,6 +37,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useCmsStore, VenueType } from "@/store/cmsStore";
 import { useAuthStore } from "@/store/authStore";
+import * as authService from "@/services/authService";
 import clsx from "clsx";
 
 // ─── Venue type config ──────────────────────────────────
@@ -74,7 +75,6 @@ export default function AdminDashboard() {
   const activeRestaurantId = useAuthStore((s) => s.activeRestaurantId);
   const setActiveRestaurant = useAuthStore((s) => s.setActiveRestaurant);
   const users = useAuthStore((s) => s.users);
-  const addUser = useAuthStore((s) => s.addUser);
   const assignRestaurantRole = useAuthStore((s) => s.assignRestaurantRole);
   const getUserRestaurantRole = useAuthStore((s) => s.getUserRestaurantRole);
   const login = useAuthStore((s) => s.login);
@@ -94,7 +94,14 @@ export default function AdminDashboard() {
   const [newVenueType, setNewVenueType] = useState<VenueType>("restaurant");
 
   const isAdmin = currentUser?.platformRole === "admin";
-  const restaurantIds = Object.keys(allRestaurants);
+  const restaurantIds = useMemo(() => {
+    const all = Object.keys(allRestaurants);
+    if (!currentUser) return [];
+    if (isAdmin) return all;
+    return all.filter((id) =>
+      currentUser.restaurantAccess.some((a) => a.restaurantId === id)
+    );
+  }, [allRestaurants, currentUser, isAdmin]);
 
   // ─── Computed global stats ─────────────────────────────
   const globalStats = useMemo(() => {
@@ -157,36 +164,12 @@ export default function AdminDashboard() {
     }
     createRestaurant(slug, newName.trim(), newVenueType);
 
-    // Auto-assign current admin user as manager if logged in
     if (currentUser) {
-      assignRestaurantRole(currentUser.id, slug, "manager");
+      void authService
+        .assignRestaurantRole(currentUser.id, slug, "owner")
+        .then(() => assignRestaurantRole(currentUser.id, slug, "owner"))
+        .catch(console.error);
     }
-
-    // Create 3 default users for this new venue: Admin, Manager, Employee
-    const venueName = newName.trim();
-    const safeSlug = slug;
-
-    addUser({
-      name: `${venueName} Admin`,
-      email: `admin@${safeSlug}.com`,
-      avatar: "👑",
-      platformRole: "user",
-      restaurantAccess: [{ restaurantId: safeSlug, role: "manager" }],
-    });
-    addUser({
-      name: `${venueName} Manager`,
-      email: `manager@${safeSlug}.com`,
-      avatar: "👨‍🍳",
-      platformRole: "user",
-      restaurantAccess: [{ restaurantId: safeSlug, role: "manager" }],
-    });
-    addUser({
-      name: `${venueName} Employee`,
-      email: `employee@${safeSlug}.com`,
-      avatar: "🧑‍💼",
-      platformRole: "user",
-      restaurantAccess: [{ restaurantId: safeSlug, role: "employee" }],
-    });
 
     setNewName("");
     setNewSlug("");

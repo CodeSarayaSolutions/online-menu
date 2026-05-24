@@ -55,6 +55,7 @@ import clsx from "clsx";
 import { useRef } from "react";
 import LivePreview from "@/components/admin/LivePreview";
 import BsCollapse from "@/components/admin/BsCollapse";
+import ImageUploadField from "@/components/admin/ImageUploadField";
 
 // ═══════════════════════════════════════════════════════════
 // TEXT CONTENT CONFIG
@@ -666,29 +667,24 @@ export default function PageContentEditor() {
               { value: "video", label: "Video" },
             ]} />
             {(!styles.heroMediaType || styles.heroMediaType === 'image') && (
-              <div>
-                <label className="block text-[12px] font-bold text-dark mb-1.5">Image URL</label>
-                <input
-                  type="text"
-                  value={styles.heroImageUrl || ''}
-                  onChange={(e) => handleStyleChange("heroImageUrl", e.target.value)}
-                  placeholder="https://images.unsplash.com/..."
-                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-[13px] text-dark placeholder:text-muted/40 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition bg-bg"
-                />
-                <p className="text-[10px] text-muted mt-1">Direct link to a hero banner image. Leave empty to use the image from Restaurant Info.</p>
-              </div>
+              <ImageUploadField
+                label="Hero banner image"
+                restaurantId={venue as string}
+                placement="page-hero"
+                value={styles.heroImageUrl || ''}
+                onChange={(url) => handleStyleChange("heroImageUrl", url)}
+              />
             )}
             {(styles.heroMediaType === 'video') && (
               <div>
-                <label className="block text-[12px] font-bold text-dark mb-1.5">Video URL</label>
-                <input
-                  type="text"
+                <ImageUploadField
+                  label="Hero video"
+                  restaurantId={venue as string}
+                  placement="video"
                   value={styles.heroVideoUrl || ''}
-                  onChange={(e) => handleStyleChange("heroVideoUrl", e.target.value)}
-                  placeholder="https://example.com/video.mp4"
-                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-[13px] text-dark placeholder:text-muted/40 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition bg-bg"
+                  onChange={(url) => handleStyleChange("heroVideoUrl", url)}
                 />
-                <p className="text-[10px] text-muted mt-1">Direct link to .mp4, .webm, or .ogg video file. The video will autoplay, loop, and be muted.</p>
+                <p className="text-[10px] text-muted mt-1">Upload .mp4 or .webm — autoplays muted on the menu.</p>
               </div>
             )}
           </div>

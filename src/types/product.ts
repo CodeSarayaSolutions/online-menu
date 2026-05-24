@@ -20,6 +20,8 @@ export interface Variation {
   options: VariationOption[];
 }
 
+import type { ProductStation } from '@/types/auth';
+
 export interface Product {
   id: string;
   restaurantId: string;
@@ -30,6 +32,8 @@ export interface Product {
   price: number;
   image: string;
   category: string;
+  /** Which station screen shows this item (default kitchen) */
+  station?: ProductStation;
   addons?: Addon[];
   variations?: Variation[];
   popular?: boolean;

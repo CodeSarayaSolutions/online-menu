@@ -7,12 +7,10 @@ import {
   Tags,
   UtensilsCrossed,
   ArrowLeft,
-  RotateCcw,
   Menu,
   X,
   ChevronRight,
   ChevronDown,
-  Database,
   FileText,
   Moon,
   Sun,
@@ -22,6 +20,8 @@ import {
   LogOut,
   Shield,
   ShieldCheck,
+  ChefHat,
+  Wine,
 } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -29,6 +29,20 @@ import { useCmsStore } from "@/store/cmsStore";
 import { useAdminStore } from "@/store/adminStore";
 import { useAuthStore } from "@/store/authStore";
 import { RestaurantRole } from "@/types/auth";
+import {
+  canManageVenueCms,
+  canViewBarStation,
+  canViewKitchenStation,
+  canViewOrdersList,
+  canManageVenueStaff,
+  isPlatformAdmin,
+  restaurantRoleLabel,
+} from "@/lib/permissions";
+import { useAdminSession } from "@/hooks/useAdminSession";
+import { useVenueCloudSync } from "@/hooks/useVenueCloudSync";
+import { useDbUsers } from "@/hooks/useDbUsers";
+import { ADMIN_PANEL_TAGLINE, ADMIN_PANEL_TITLE, BRAND_NAME } from "@/lib/admin-branding";
+import { getDefaultPlatformPath, getDefaultVenuePath } from "@/lib/permissions";
 import clsx from "clsx";
 
 // ─── Nav item definitions ──────────────────────────────────
@@ -47,7 +61,9 @@ const navItems: NavItem[] = [
   { path: "restaurant", label: "Restaurant", icon: Store, desc: "Name, images, info", minRole: "manager" },
   { path: "products", label: "Products", icon: UtensilsCrossed, desc: "Menu items & categories", minRole: "manager" },
   { path: "page-content", label: "Page Content", icon: FileText, desc: "All frontend text", minRole: "manager" },
-  { path: "orders", label: "Orders", icon: ClipboardList, desc: "Customer orders" },
+  { path: "orders", label: "Orders", icon: ClipboardList, desc: "All orders & status", minRole: "employee" },
+  { path: "kitchen", label: "Kitchen", icon: ChefHat, desc: "Food tickets — no prices" },
+  { path: "bar", label: "Bar", icon: Wine, desc: "Drinks + full order" },
 ];
 
 const platformNavItems: NavItem[] = [
@@ -60,7 +76,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const restaurant = useCmsStore((s) => s.restaurant);
   const allRestaurants = useCmsStore((s) => s.allRestaurants);
-  const resetToDefaults = useCmsStore((s) => s.resetToDefaults);
   const switchRestaurant = useCmsStore((s) => s.switchRestaurant);
   const darkMode = useAdminStore((s) => s.darkMode);
   const toggleDarkMode = useAdminStore((s) => s.toggleDarkMode);
@@ -73,11 +88,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const getUserRestaurantRole = useAuthStore((s) => s.getUserRestaurantRole);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showRestaurantPicker, setShowRestaurantPicker] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const { ready: sessionReady, error: sessionError } = useAdminSession();
+  const { venuesReady, loading: venuesLoading, error: venuesError } = useVenueCloudSync(
+    sessionReady && !!currentUserId && pathname !== "/admin/login"
+  );
+  useDbUsers(sessionReady && !!currentUserId && pathname !== "/admin/login");
+  const isLoginPage = pathname === "/admin/login";
 
   useEffect(() => { setHydrated(true); }, []);
+
+  const isVenueGrid = pathname === "/admin";
+  const needsVenueLoad = !!currentUserId && pathname !== "/admin/login";
+  /** Venue list page can render while restaurants load in the background */
+  const blockOnVenues = needsVenueLoad && !venuesReady && !isVenueGrid;
+  const cloudReady = isLoginPage || (sessionReady && (!blockOnVenues || venuesReady));
 
   // Determine page type from URL segments
   const urlSegments = useMemo(() => pathname.split("/").filter(Boolean), [pathname]);
@@ -104,21 +130,46 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return pathname.includes(`/${item.path}`);
   };
 
-  // ─── Gate: redirect sub-routes to /admin if no venue+user selected ──
-  // Also redirect /admin → active venue when already logged in
+  // ─── Auth gates ───────────────────────────────────────────
   useEffect(() => {
-    if (!isOnVenuePage && (!activeRestaurantId || !currentUserId)) {
-      router.replace("/admin");
-    }
-    if (pathname === "/admin" && activeRestaurantId && currentUserId) {
-      router.replace(`/admin/${activeRestaurantId}/restaurant`);
-    }
-  }, [pathname, isOnVenuePage, activeRestaurantId, currentUserId, router]);
+    if (!hydrated || !sessionReady || isLoginPage) return;
 
-  const handleReset = () => {
-    resetToDefaults();
-    setShowResetConfirm(false);
-  };
+    if (!currentUserId) {
+      router.replace("/admin/login");
+      return;
+    }
+
+    if (!cloudReady) return;
+
+    // Venue-only users should not sit on /admin (platform venue grid)
+    if (pathname === "/admin" && currentUser && currentUser.platformRole !== "admin") {
+      const first = currentUser.restaurantAccess[0]?.restaurantId;
+      const target = first
+        ? getDefaultVenuePath(currentUser, first)
+        : getDefaultPlatformPath(currentUser);
+      if (target !== "/admin" && target !== "/admin/login") {
+        router.replace(target);
+      }
+      return;
+    }
+
+    if (!isOnVenuePage && (!activeRestaurantId || !currentUserId)) {
+      router.replace(currentUser?.platformRole === "admin" ? "/admin" : "/admin/login");
+      return;
+    }
+
+  }, [
+    pathname,
+    isOnVenuePage,
+    activeRestaurantId,
+    currentUserId,
+    currentUser,
+    router,
+    hydrated,
+    cloudReady,
+    isLoginPage,
+    sessionReady,
+  ]);
 
   const currentRestaurantRole = useMemo(() => {
     if (!currentUser || !activeRestaurantId) return null;
@@ -126,25 +177,28 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }, [currentUser, activeRestaurantId, getUserRestaurantRole]);
 
   const visibleNavItems = useMemo(() => {
-    if (!currentUser) return navItems.filter((item) => !item.minRole);
-    const isAdmin = currentUser.platformRole === "admin";
+    if (!currentUser || !activeRestaurantId) return [];
     return navItems.filter((item) => {
-      if (!item.minRole) return true;
-      if (isAdmin) return true;
-      if (!currentRestaurantRole) return false;
-      if (currentRestaurantRole === "manager") return true;
-      if (currentRestaurantRole === "employee") return !item.minRole || item.minRole === "employee";
+      if (item.path === "/admin") return isPlatformAdmin(currentUser);
+      if (item.path === "restaurant" || item.path === "products" || item.path === "page-content") {
+        return canManageVenueCms(currentUser, activeRestaurantId);
+      }
+      if (item.path === "orders") return canViewOrdersList(currentUser, activeRestaurantId);
+      if (item.path === "kitchen") return canViewKitchenStation(currentUser, activeRestaurantId);
+      if (item.path === "bar") return canViewBarStation(currentUser, activeRestaurantId);
       return false;
     });
-  }, [currentUser, currentRestaurantRole]);
+  }, [currentUser, activeRestaurantId]);
 
   const visiblePlatformNav = useMemo(() => {
-    if (!currentUser) return [];
+    if (!currentUser || !activeRestaurantId) return [];
     return platformNavItems.filter((item) => {
-      if (item.adminOnly) return currentUser.platformRole === "admin";
+      if (item.adminOnly) {
+        return isPlatformAdmin(currentUser) || canManageVenueStaff(currentUser, activeRestaurantId);
+      }
       return true;
     });
-  }, [currentUser]);
+  }, [currentUser, activeRestaurantId]);
 
   const allNavItems = [...navItems, ...platformNavItems];
   const currentPage = allNavItems.find((item) => isItemActive(item));
@@ -170,14 +224,114 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      const { signOut } = await import("@/services/authService");
+      await signOut();
+    } catch {
+      /* ignore */
+    }
     logout();
-    router.push("/admin");
+    router.push("/admin/login");
   };
 
-  // ─── Hydration guard: prevent SSR/client mismatch ──
-  if (!hydrated) {
-    return <div className="fixed inset-0 z-[60] bg-bg" />;
+  if (isLoginPage) {
+    return <>{children}</>;
+  }
+
+  // ─── Hydration / session guard ──
+  if (!hydrated || !sessionReady) {
+    return (
+      <div className="fixed inset-0 z-[60] bg-bg flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!currentUserId) {
+    if (sessionError) {
+      return (
+        <div className="fixed inset-0 z-[60] bg-bg flex items-center justify-center p-6">
+          <div className="max-w-md w-full bg-white rounded-2xl border border-red-200 p-6 text-center shadow-card">
+            <p className="text-sm font-bold text-dark mb-2">Session check failed</p>
+            <p className="text-[13px] text-muted mb-4">{sessionError}</p>
+            <button
+              type="button"
+              onClick={() => router.replace("/admin/login")}
+              className="w-full py-3 rounded-xl bg-primary text-white font-bold text-sm"
+            >
+              Go to login
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="fixed inset-0 z-[60] bg-bg flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (blockOnVenues) {
+    return (
+      <div className="fixed inset-0 z-[60] bg-bg flex items-center justify-center p-6">
+        <div className="text-center max-w-sm">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-sm font-semibold text-dark">Loading restaurants…</p>
+          {venuesError && (
+            <p className="text-[12px] text-red-600 mt-2 bg-red-50 px-3 py-2 rounded-lg">{venuesError}</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const bootBanner =
+    venuesLoading && isVenueGrid ? (
+      <div className="bg-amber-50 border-b border-amber-200/80 px-4 py-2 text-[12px] text-amber-900 text-center">
+        Učitavanje restorana iz baze…
+        {venuesError ? ` — ${venuesError}` : ""}
+      </div>
+    ) : venuesError && isVenueGrid ? (
+      <div className="bg-red-50 border-b border-red-200/80 px-4 py-2 text-[12px] text-red-800 text-center">
+        {venuesError} — provjerite da je schema <strong>sarayamenu</strong> izložena u PostgREST.
+      </div>
+    ) : null;
+
+  // Non–platform-admin on /admin: show redirect UI (never a blank screen)
+  if (pathname === "/admin" && currentUser && currentUser.platformRole !== "admin") {
+    const first = currentUser.restaurantAccess[0]?.restaurantId;
+    const target = first
+      ? getDefaultVenuePath(currentUser, first)
+      : getDefaultPlatformPath(currentUser);
+    if (target === "/admin/login") {
+      return (
+        <div className="fixed inset-0 z-[60] bg-bg flex items-center justify-center p-6">
+          <div className="max-w-md w-full bg-white rounded-2xl border border-amber-200 p-6 text-center shadow-card">
+            <p className="text-sm font-bold text-dark mb-2">Nema dodijeljenog restorana</p>
+            <p className="text-[13px] text-muted mb-4">
+              Vaš račun nema pristup nijednom lokalu. Administrator mora dodijeliti ulogu u Users &amp; Roles.
+            </p>
+            <button
+              type="button"
+              onClick={() => router.replace("/admin/login")}
+              className="w-full py-3 rounded-xl bg-primary text-white font-bold text-sm"
+            >
+              Nazad na prijavu
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="fixed inset-0 z-[60] bg-bg flex items-center justify-center p-6">
+        <div className="text-center max-w-sm">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-sm font-semibold text-dark">Preusmjeravanje na vaš restoran…</p>
+        </div>
+      </div>
+    );
   }
 
   // ─── Venue selector page: full sidebar chrome, consistent with sub-routes ──────────
@@ -200,8 +354,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <span className="text-white font-black text-sm">S</span>
               </div>
               <div>
-                <span className="font-extrabold text-dark text-[15px] tracking-tight">Saraya CMS</span>
-                <span className="block text-[10px] text-muted font-medium -mt-0.5">Venue Manager</span>
+                <span className="font-extrabold text-dark text-[15px] tracking-tight">{BRAND_NAME}</span>
+                <span className="block text-[10px] text-muted font-medium -mt-0.5">{ADMIN_PANEL_TITLE}</span>
               </div>
             </div>
             <button className="lg:hidden p-1.5 rounded-xl hover:bg-bg text-muted transition" onClick={() => setSidebarOpen(false)}>
@@ -254,10 +408,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 </div>
               </div>
             )}
-            <div className="mx-1 mb-2 p-3 rounded-2xl bg-bg border border-primary/10">
-              <div className="flex items-center gap-2 mb-1"><Database size={11} className="text-primary" /><span className="text-[9px] font-bold text-dark uppercase tracking-wider">Local Storage</span></div>
-              <p className="text-[9px] text-muted leading-relaxed">Data saved in browser. No cloud sync.</p>
-            </div>
             <Link href={`/${activeRestaurantId}`} className="flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium text-muted hover:text-dark hover:bg-bg transition"><ArrowLeft size={15} />Back to Menu</Link>
           </div>
         </aside>
@@ -283,6 +433,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <Link href={`/${activeRestaurantId}`} target="_blank" className="hidden md:flex items-center gap-1.5 bg-gradient-to-r from-primary to-amber-500 text-white px-3.5 py-1.5 rounded-full text-[11px] font-bold shadow-glow hover:brightness-105 transition">View Menu</Link>
             </div>
           </header>
+          {bootBanner}
           <main className="flex-1 overflow-y-auto">
             <motion.div key={pathname} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: "easeOut" }} className="p-5 lg:p-8">
               {children}
@@ -317,8 +468,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <span className="text-white font-black text-sm">S</span>
             </div>
             <div>
-              <span className="font-extrabold text-dark text-[15px] tracking-tight">Saraya CMS</span>
-              <span className="block text-[10px] text-muted font-medium -mt-0.5">Restaurant Manager</span>
+              <span className="font-extrabold text-dark text-[15px] tracking-tight">{BRAND_NAME}</span>
+              <span className="block text-[10px] text-muted font-medium -mt-0.5">{ADMIN_PANEL_TAGLINE}</span>
             </div>
           </div>
           <button className="lg:hidden p-1.5 rounded-xl hover:bg-bg text-muted transition" onClick={() => setSidebarOpen(false)}>
@@ -343,7 +494,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
             <div className="flex-1 min-w-0">
               <span className="block text-[12px] font-bold text-dark truncate">{restaurant.name}</span>
-              <span className="block text-[9px] text-muted">{currentRestaurantRole === "manager" ? "Manager" : "Employee"}</span>
+                    <span className="block text-[9px] text-muted">{currentRestaurantRole ? restaurantRoleLabel(currentRestaurantRole) : "—"}</span>
             </div>
             <ChevronDown size={14} className={clsx("text-muted transition-transform", showRestaurantPicker && "rotate-180")} />
           </button>
@@ -423,15 +574,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center text-base shrink-0">{currentUser.avatar || "👤"}</div>
               <div className="flex-1 min-w-0">
                 <span className="block text-[11px] font-bold text-dark truncate">{currentUser.name}</span>
-                <span className="block text-[9px] text-muted">{currentRestaurantRole === "manager" ? "Manager" : "Employee"}</span>
+                    <span className="block text-[9px] text-muted">{currentRestaurantRole ? restaurantRoleLabel(currentRestaurantRole) : "—"}</span>
               </div>
             </div>
           </div>
-          <div className="mx-1 mb-2 p-3 rounded-2xl bg-bg border border-primary/10">
-            <div className="flex items-center gap-2 mb-1"><Database size={11} className="text-primary" /><span className="text-[9px] font-bold text-dark uppercase tracking-wider">Local Storage</span></div>
-            <p className="text-[9px] text-muted leading-relaxed">Data saved in browser. No cloud sync.</p>
-          </div>
-          <button onClick={() => setShowResetConfirm(true)} className="flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium text-accent-red/70 hover:text-accent-red hover:bg-red-50 transition w-full"><RotateCcw size={15} />Reset to Defaults</button>
           <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium text-muted hover:text-dark hover:bg-bg transition w-full"><LogOut size={15} />Sign Out</button>
           <Link href={`/${activeRestaurantId}`} className="flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium text-muted hover:text-dark hover:bg-bg transition"><ArrowLeft size={15} />Back to Menu</Link>
         </div>
@@ -461,7 +607,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </motion.button>
             <div className="hidden sm:flex items-center gap-1.5 glass rounded-full px-3 py-1.5 shadow-sm border border-primary/10">
               {currentUser.platformRole === "admin" ? <ShieldCheck size={11} className="text-primary" /> : <Shield size={11} className="text-accent-blue" />}
-              <span className="text-[11px] font-semibold text-dark">{currentRestaurantRole === "manager" ? "Manager" : currentRestaurantRole === "employee" ? "Employee" : "Viewer"}</span>
+              <span className="text-[11px] font-semibold text-dark">{currentRestaurantRole ? restaurantRoleLabel(currentRestaurantRole) : "Viewer"}</span>
             </div>
             <Link href={`/${activeRestaurantId}`} target="_blank" className="hidden md:flex items-center gap-1.5 bg-gradient-to-r from-primary to-amber-500 text-white px-3.5 py-1.5 rounded-full text-[11px] font-bold shadow-glow hover:brightness-105 transition">View Menu</Link>
           </div>
@@ -473,22 +619,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </main>
       </div>
 
-      {/* ── Reset modal ── */}
-      <AnimatePresence>
-        {showResetConfirm && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }} transition={{ type: "spring", damping: 25 }} className="bg-white rounded-3xl p-6 max-w-[380px] w-full shadow-elevated">
-              <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4"><RotateCcw size={22} className="text-accent-red" /></div>
-              <h3 className="text-lg font-extrabold text-dark text-center">Reset All Data?</h3>
-              <p className="text-sm text-muted mt-2 text-center leading-relaxed">This will restore all restaurant info, categories, and products to their original defaults. This cannot be undone.</p>
-              <div className="flex gap-3 mt-6">
-                <button onClick={() => setShowResetConfirm(false)} className="flex-1 py-3 rounded-2xl border border-gray-200 text-sm font-bold text-dark hover:bg-bg transition">Cancel</button>
-                <button onClick={handleReset} className="flex-1 py-3 rounded-2xl bg-accent-red text-white text-sm font-bold hover:brightness-110 transition shadow-lg shadow-red-200">Reset Everything</button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

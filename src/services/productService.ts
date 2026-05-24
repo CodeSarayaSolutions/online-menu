@@ -74,9 +74,8 @@ export async function getProductById(productId: string): Promise<ProductRow | nu
     .from('products')
     .select('*')
     .eq('id', productId)
-    .single();
+    .maybeSingle();
 
-  if (error?.code === 'PGRST116') return null;
   if (error) throw error;
   return data;
 }

@@ -8,36 +8,68 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export interface Database {
-  public: {
+  sarayamenu: {
     Tables: {
       users: {
         Row: {
           id: string;
-          auth_id: string | null;
           name: string;
           email: string;
+          password_hash: string | null;
+          invite_otp_hash: string | null;
+          invite_otp_expires_at: string | null;
           avatar: string | null;
           platform_role: 'admin' | 'user';
           created_at: string;
         };
         Insert: {
           id?: string;
-          auth_id?: string | null;
           name: string;
           email: string;
+          password_hash?: string | null;
+          invite_otp_hash?: string | null;
+          invite_otp_expires_at?: string | null;
           avatar?: string | null;
           platform_role?: 'admin' | 'user';
           created_at?: string;
         };
         Update: {
           id?: string;
-          auth_id?: string | null;
           name?: string;
           email?: string;
+          password_hash?: string | null;
+          invite_otp_hash?: string | null;
+          invite_otp_expires_at?: string | null;
           avatar?: string | null;
           platform_role?: 'admin' | 'user';
           created_at?: string;
         };
+        Relationships: [];
+      };
+
+      sessions: {
+        Row: {
+          id: string;
+          user_id: string;
+          token_hash: string;
+          expires_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          token_hash: string;
+          expires_at: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          token_hash?: string;
+          expires_at?: string;
+          created_at?: string;
+        };
+        Relationships: [];
       };
 
       restaurants: {
@@ -92,6 +124,7 @@ export interface Database {
           phone?: string;
           venue_type?: 'restaurant' | 'cafe' | 'bar' | 'bakery' | 'food-truck' | 'pizzeria' | 'pub' | 'lounge';
         };
+        Relationships: [];
       };
 
       restaurant_access: {
@@ -99,22 +132,38 @@ export interface Database {
           id: string;
           user_id: string;
           restaurant_id: string;
-          role: 'manager' | 'employee';
+          role: 'owner' | 'manager' | 'kitchen' | 'bar' | 'employee';
           created_at: string;
         };
         Insert: {
           id?: string;
           user_id: string;
           restaurant_id: string;
-          role?: 'manager' | 'employee';
+          role?: 'owner' | 'manager' | 'kitchen' | 'bar' | 'employee';
           created_at?: string;
         };
         Update: {
           id?: string;
           user_id?: string;
           restaurant_id?: string;
-          role?: 'manager' | 'employee';
+          role?: 'owner' | 'manager' | 'kitchen' | 'bar' | 'employee';
         };
+        Relationships: [
+          {
+            foreignKeyName: 'restaurant_access_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'restaurant_access_restaurant_id_fkey';
+            columns: ['restaurant_id'];
+            isOneToOne: false;
+            referencedRelation: 'restaurants';
+            referencedColumns: ['id'];
+          },
+        ];
       };
 
       categories: {
@@ -145,6 +194,7 @@ export interface Database {
           color?: string;
           sort_order?: number;
         };
+        Relationships: [];
       };
 
       products: {
@@ -160,6 +210,7 @@ export interface Database {
           image: string;
           popular: boolean;
           sort_order: number;
+          station: 'kitchen' | 'bar' | 'both';
           updated_at: string;
         };
         Insert: {
@@ -174,6 +225,7 @@ export interface Database {
           image?: string;
           popular?: boolean;
           sort_order?: number;
+          station?: 'kitchen' | 'bar' | 'both';
         };
         Update: {
           id?: string;
@@ -187,7 +239,9 @@ export interface Database {
           image?: string;
           popular?: boolean;
           sort_order?: number;
+          station?: 'kitchen' | 'bar' | 'both';
         };
+        Relationships: [];
       };
 
       addons: {
@@ -212,6 +266,7 @@ export interface Database {
           name_bs?: string | null;
           price?: number;
         };
+        Relationships: [];
       };
 
       variations: {
@@ -236,6 +291,7 @@ export interface Database {
           name_bs?: string | null;
           required?: boolean;
         };
+        Relationships: [];
       };
 
       variation_options: {
@@ -260,6 +316,7 @@ export interface Database {
           label_bs?: string | null;
           price_adjustment?: number;
         };
+        Relationships: [];
       };
 
       page_content: {
@@ -277,6 +334,7 @@ export interface Database {
           content?: Json;
           updated_at?: string;
         };
+        Relationships: [];
       };
 
       component_styles: {
@@ -294,6 +352,7 @@ export interface Database {
           styles?: Json;
           updated_at?: string;
         };
+        Relationships: [];
       };
 
       layout_config: {
@@ -311,6 +370,7 @@ export interface Database {
           config?: Json;
           updated_at?: string;
         };
+        Relationships: [];
       };
 
       theme_customizations: {
@@ -338,6 +398,7 @@ export interface Database {
           layout_config?: Json;
           page_content?: Json;
         };
+        Relationships: [];
       };
 
       orders: {
@@ -374,8 +435,11 @@ export interface Database {
           item_count?: number;
           status?: 'pending' | 'preparing' | 'ready' | 'served' | 'cancelled';
         };
+        Relationships: [];
       };
     };
+
+    Views: Record<string, never>;
 
     Functions: {
       current_app_user_id: {
@@ -395,6 +459,9 @@ export interface Database {
 }
 
 // ─── Convenience type aliases ────────────────────────────
-export type Tables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row'];
-export type InsertDto<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Insert'];
-export type UpdateDto<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Update'];
+export type Tables<T extends keyof Database['sarayamenu']['Tables']> =
+  Database['sarayamenu']['Tables'][T]['Row'];
+export type InsertDto<T extends keyof Database['sarayamenu']['Tables']> =
+  Database['sarayamenu']['Tables'][T]['Insert'];
+export type UpdateDto<T extends keyof Database['sarayamenu']['Tables']> =
+  Database['sarayamenu']['Tables'][T]['Update'];

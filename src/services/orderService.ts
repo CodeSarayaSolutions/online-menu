@@ -3,9 +3,12 @@
 // Uses: Supabase table + Realtime subscription for live updates
 
 import { supabase } from '@/lib/supabase';
+import { supabasePostgrestSchema } from '@/lib/supabase-schema';
 import type { Tables, InsertDto } from '@/types/supabase';
 import type { OrderStatus } from '@/types/order';
 import type { CartItem } from '@/types/cart';
+
+const realtimeSchema = supabasePostgrestSchema;
 
 export type OrderRow = Tables<'orders'>;
 
@@ -109,7 +112,7 @@ export function subscribeToOrders(
       'postgres_changes',
       {
         event: 'INSERT',
-        schema: 'public',
+        schema: realtimeSchema,
         table: 'orders',
         filter: `restaurant_id=eq.${restaurantId}`,
       },
@@ -119,7 +122,7 @@ export function subscribeToOrders(
       'postgres_changes',
       {
         event: 'UPDATE',
-        schema: 'public',
+        schema: realtimeSchema,
         table: 'orders',
         filter: `restaurant_id=eq.${restaurantId}`,
       },
@@ -129,7 +132,7 @@ export function subscribeToOrders(
       'postgres_changes',
       {
         event: 'DELETE',
-        schema: 'public',
+        schema: realtimeSchema,
         table: 'orders',
         filter: `restaurant_id=eq.${restaurantId}`,
       },

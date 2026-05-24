@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import {
   Plus, Trash2, Save, Search, X, Pencil, Flame,
@@ -13,6 +13,7 @@ import { useCmsStore } from "@/store/cmsStore";
 import { ProductItem, Addon, Variation, VariationOption, CategoryInfo } from "@/types/cms";
 import LivePreview from "@/components/admin/LivePreview";
 import BsCollapse from "@/components/admin/BsCollapse";
+import ImageUploadField from "@/components/admin/ImageUploadField";
 import clsx from "clsx";
 
 /* ─── Color presets for categories ──────────────────────── */
@@ -32,14 +33,14 @@ const colorPresets = [
 ];
 
 /* ─── Blank helpers ─────────────────────────────────────── */
-const blankProduct = (): ProductItem => ({
+const blankProduct = (venueSlug: string): ProductItem => ({
   id: `p${Date.now()}`,
-  restaurantId: "1",
+  restaurantId: venueSlug,
   name: "",
   description: "",
   price: 0,
   image: "",
-  category: "Pizza",
+  category: "",
   addons: [],
   popular: false,
 });
@@ -101,6 +102,14 @@ export default function ProductsEditor() {
   const [newCat, setNewCat] = useState<CategoryInfo>({ id: "", label: "", icon: "🍽️", color: "from-amber-400 to-orange-500" });
   const [catSaved, setCatSaved] = useState<string | null>(null);
   const [catConfirmDelete, setCatConfirmDelete] = useState<string | null>(null);
+  /** Quick-create category from product form dropdown */
+  const [showProductCatModal, setShowProductCatModal] = useState(false);
+  const [quickNewCat, setQuickNewCat] = useState<CategoryInfo>({
+    id: "",
+    label: "",
+    icon: "🍽️",
+    color: "from-amber-400 to-orange-500",
+  });
 
   /* ─── Preview state ──────────────────────────────────────── */
   const [showPreview, setShowPreview] = useState(true);
@@ -153,13 +162,44 @@ export default function ProductsEditor() {
     });
   };
 
-  const menuCategories = categories.filter((c) => c.id !== "all" && c.id !== "popular").map((c) => c.label);
+  const realCategories = categories.filter((c) => c.id !== "all" && c.id !== "popular");
+  /** Labels used in product.category — includes DB categories + any product bucket not in the list */
+  const menuCategories = useMemo(() => {
+    const fromCats = realCategories.map((c) => c.label);
+    const fromProducts = products.map((p) => p.category).filter(Boolean);
+    return Array.from(new Set([...fromCats, ...fromProducts]));
+  }, [realCategories, products]);
 
   const startAdd = (category?: string) => {
-    const p = blankProduct();
+    const p = blankProduct(venue);
     if (category) p.category = category;
     setEditingProduct(p);
     setIsNew(true);
+  };
+
+  const openProductCatModal = () => {
+    setQuickNewCat({ id: "", label: "", icon: "🍽️", color: "from-amber-400 to-orange-500" });
+    setShowProductCatModal(true);
+  };
+
+  const saveQuickCategory = () => {
+    if (!quickNewCat.label.trim()) return;
+    const id =
+      quickNewCat.id.trim() ||
+      quickNewCat.label
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+    const cat: CategoryInfo = { ...quickNewCat, id, label: quickNewCat.label.trim() };
+    addCategory(cat);
+    setTimeout(() => saveActiveToAllRestaurants(venue), 0);
+    if (editingProduct) {
+      setEditingProduct({ ...editingProduct, category: cat.label });
+    }
+    setFilterCategory(id);
+    setShowProductCatModal(false);
+    setCatSaved(id);
+    setTimeout(() => setCatSaved(null), 1200);
   };
   const startEdit = (p: ProductItem) => {
     setEditingProduct({
@@ -173,8 +213,28 @@ export default function ProductsEditor() {
 
   const saveProduct = () => {
     if (!editingProduct || !editingProduct.name || !editingProduct.price) return;
-    if (isNew) addProduct(editingProduct);
-    else updateProduct(editingProduct.id, editingProduct);
+    const catLabel = editingProduct.category?.trim();
+    if (!catLabel) {
+      openProductCatModal();
+      return;
+    }
+    const payload = { ...editingProduct, restaurantId: venue, category: catLabel };
+    if (catLabel) {
+      const catId = catLabel.toLowerCase().replace(/\s+/g, "-");
+      const hasCat = categories.some(
+        (c) => c.label.toLowerCase() === catLabel.toLowerCase() || c.id === catId
+      );
+      if (!hasCat) {
+        addCategory({
+          id: catId,
+          label: catLabel,
+          icon: "🍽️",
+          color: "from-amber-400 to-orange-500",
+        });
+      }
+    }
+    if (isNew) addProduct(payload);
+    else updateProduct(payload.id, payload);
     /* Sync flat state → allRestaurants so public pages & reloads see the change */
     setTimeout(() => saveActiveToAllRestaurants(venue), 0);
     setSaved(editingProduct.id);
@@ -521,13 +581,20 @@ export default function ProductsEditor() {
         </div>
         <select
           value={filterCategory}
-          onChange={(e) => setFilterCategory(e.target.value)}
-          className="px-4 py-2.5 bg-white rounded-2xl text-sm text-dark border border-primary/10 focus:border-primary outline-none min-w-[160px] shadow-soft"
+          onChange={(e) => {
+            if (e.target.value === "__create__") {
+              openProductCatModal();
+              return;
+            }
+            setFilterCategory(e.target.value);
+          }}
+          className="px-4 py-2.5 bg-white rounded-2xl text-sm text-dark border border-primary/10 focus:border-primary outline-none min-w-[180px] shadow-soft"
         >
-          <option value="all">All Categories</option>
-          {categories.filter((c) => c.id !== "all" && c.id !== "popular").map((c) => (
+          <option value="all">All Categories (filter only)</option>
+          {realCategories.map((c) => (
             <option key={c.id} value={c.id}>{c.icon} {c.label}</option>
           ))}
+          <option value="__create__">➕ Create category…</option>
         </select>
       </div>
 
@@ -602,16 +669,47 @@ export default function ProductsEditor() {
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Field label="Image URL" value={editingProduct.image} onChange={(v) => setEditingProduct({ ...editingProduct, image: v })} placeholder="https://images.unsplash.com/..." />
+                  <ImageUploadField
+                    label="Product image"
+                    restaurantId={venue}
+                    placement="product"
+                    value={editingProduct.image}
+                    onChange={(url) => setEditingProduct({ ...editingProduct, image: url })}
+                  />
                   <div>
-                    <label className="block text-[10px] font-bold text-muted uppercase tracking-wider mb-2">Category</label>
+                    <label className="block text-[10px] font-bold text-muted uppercase tracking-wider mb-2">Category *</label>
                     <select
-                      value={editingProduct.category}
-                      onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
+                      value={editingProduct.category || ""}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (v === "__create__") {
+                          openProductCatModal();
+                          return;
+                        }
+                        setEditingProduct({ ...editingProduct, category: v });
+                      }}
                       className="w-full px-3.5 py-2.5 bg-bg rounded-2xl text-sm text-dark border border-primary/10 focus:border-primary outline-none transition-all"
                     >
-                      {menuCategories.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+                      <option value="" disabled>
+                        {realCategories.length === 0 ? "No categories yet — create one" : "Select category"}
+                      </option>
+                      {realCategories.map((c) => (
+                        <option key={c.id} value={c.label}>
+                          {c.icon} {c.label}
+                        </option>
+                      ))}
+                      {menuCategories
+                        .filter((label) => !realCategories.some((c) => c.label === label))
+                        .map((label) => (
+                          <option key={`legacy-${label}`} value={label}>
+                            {label} (from existing products)
+                          </option>
+                        ))}
+                      <option value="__create__">➕ Create new category…</option>
                     </select>
+                    <p className="text-[10px] text-muted mt-1.5">
+                      “All Categories” above is only a list filter — each product needs its own menu category.
+                    </p>
                   </div>
                 </div>
 
@@ -792,7 +890,7 @@ export default function ProductsEditor() {
               <button onClick={cancelEdit} className="flex-1 py-3 rounded-2xl border border-primary/10 text-sm font-semibold text-dark hover:bg-bg transition">Cancel</button>
               <button
                 onClick={saveProduct}
-                disabled={!editingProduct.name || !editingProduct.price}
+                disabled={!editingProduct.name || !editingProduct.price || !editingProduct.category?.trim()}
                 className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-primary to-amber-500 text-white text-sm font-bold hover:brightness-105 transition disabled:opacity-40 flex items-center justify-center gap-2 shadow-glow"
               >
                 <Save size={15} /> {isNew ? "Add Product" : "Save Changes"}
@@ -930,18 +1028,130 @@ export default function ProductsEditor() {
         })}
 
         {/* Empty state */}
-        {menuCategories.every((cat) => {
-          if (!matchesCategory(cat)) return true;
-          return getProductsByCategory(cat).filter(matchesSearch).length === 0;
-        }) && (
+        {products.filter(matchesSearch).length === 0 && (
           <div className="text-center py-20 bg-white rounded-2xl shadow-soft border border-primary/5">
             <Package size={40} className="text-muted/20 mx-auto mb-3" />
             <p className="text-muted text-sm font-medium">No products found</p>
-            <p className="text-muted/50 text-xs mt-1">Try a different search or category filter</p>
+            <p className="text-muted/50 text-xs mt-1">
+              {searchQuery || filterCategory !== "all"
+                ? "Try a different search or category filter"
+                : "Add a category first, then create your first product"}
+            </p>
           </div>
         )}
       </div>
       </div>
+
+      {/* Quick-create category modal (from product category dropdown or filter) */}
+      <AnimatePresence>
+        {showProductCatModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
+            onClick={() => setShowProductCatModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 16 }}
+              transition={{ type: "spring", damping: 28, stiffness: 320 }}
+              className="bg-white rounded-3xl max-w-[440px] w-full shadow-elevated overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="px-6 pt-6 pb-4 border-b border-gray-100 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center">
+                    <Tags size={18} className="text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="text-[16px] font-extrabold text-dark">New category</h3>
+                    <p className="text-[11px] text-muted">Products are grouped under categories on the menu</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowProductCatModal(false)}
+                  className="w-8 h-8 rounded-xl hover:bg-gray-100 flex items-center justify-center text-muted"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="px-6 py-5 space-y-4">
+                <CatField
+                  label="ID (slug)"
+                  value={quickNewCat.id}
+                  onChange={(v) =>
+                    setQuickNewCat((c) => ({
+                      ...c,
+                      id: v.toLowerCase().replace(/[^a-z0-9-]+/g, "-"),
+                    }))
+                  }
+                  placeholder="e.g. pizza"
+                />
+                <CatField
+                  label="Display name *"
+                  value={quickNewCat.label}
+                  onChange={(v) => {
+                    setQuickNewCat((c) => ({
+                      ...c,
+                      label: v,
+                      id:
+                        c.id ||
+                        v
+                          .toLowerCase()
+                          .replace(/[^a-z0-9]+/g, "-")
+                          .replace(/^-|-$/g, ""),
+                    }));
+                  }}
+                  placeholder="e.g. Pizza"
+                />
+                <CatField
+                  label="Emoji"
+                  value={quickNewCat.icon}
+                  onChange={(v) => setQuickNewCat((c) => ({ ...c, icon: v }))}
+                  placeholder="🍕"
+                />
+                <div>
+                  <label className="block text-[10px] font-bold text-muted uppercase tracking-wider mb-2">Color</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {colorPresets.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => setQuickNewCat((c) => ({ ...c, color }))}
+                        className={clsx(
+                          "w-7 h-7 rounded-lg bg-gradient-to-br transition-all",
+                          color,
+                          quickNewCat.color === color ? "ring-2 ring-offset-1 ring-dark scale-110" : "hover:scale-105"
+                        )}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowProductCatModal(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-gray-200 text-[13px] font-bold text-dark hover:bg-white transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={saveQuickCategory}
+                  disabled={!quickNewCat.label.trim()}
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-primary to-amber-500 text-white text-[13px] font-bold hover:brightness-105 transition disabled:opacity-40 shadow-glow"
+                >
+                  Create &amp; use
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Live Preview Panel ── */}
       {showPreview && (

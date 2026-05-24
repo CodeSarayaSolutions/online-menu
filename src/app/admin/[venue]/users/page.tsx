@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus,
@@ -14,10 +15,14 @@ import {
   UserCog,
   ClipboardList,
   AlertTriangle,
+  Copy,
+  KeyRound,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useCmsStore } from "@/store/cmsStore";
-import { PlatformRole, RestaurantRole } from "@/types/auth";
+import { AppUser, PlatformRole, RestaurantRole } from "@/types/auth";
+import * as authService from "@/services/authService";
+import { mapApiUserToAppUser } from "@/lib/auth/map-user";
 import clsx from "clsx";
 
 const PLATFORM_ROLE_LABELS: Record<PlatformRole, { label: string; color: string; icon: typeof Shield }> = {
@@ -26,16 +31,24 @@ const PLATFORM_ROLE_LABELS: Record<PlatformRole, { label: string; color: string;
 };
 
 const RESTAURANT_ROLE_LABELS: Record<RestaurantRole, { label: string; desc: string; color: string }> = {
-  manager: { label: "Manager", desc: "Edit prices, categories & products", color: "text-primary bg-primary/10 border-primary/20" },
-  employee: { label: "Employee", desc: "View & manage orders", color: "text-accent-green bg-accent-green/10 border-accent-green/20" },
+  owner: { label: "Owner", desc: "Full venue + staff + invite", color: "text-amber-700 bg-amber-500/10 border-amber-500/20" },
+  manager: { label: "Manager", desc: "Meni, narudžbe i postavke", color: "text-primary bg-primary/10 border-primary/20" },
+  kitchen: { label: "Kitchen", desc: "Kitchen station only", color: "text-orange-700 bg-orange-500/10 border-orange-500/20" },
+  bar: { label: "Bar", desc: "Bar station only", color: "text-purple-700 bg-purple-500/10 border-purple-500/20" },
+  employee: { label: "Staff", desc: "Orders list", color: "text-accent-green bg-accent-green/10 border-accent-green/20" },
 };
 
 const AVATARS = ["👑", "👨‍🍳", "🧑‍💼", "👩‍🍳", "🧑‍💻", "👤", "🍽️", "⭐"];
 
 export default function UsersPage() {
+  const params = useParams();
+  const venueSlug =
+    typeof params.venue === "string" ? params.venue : useAuthStore.getState().activeRestaurantId ?? "";
+
   const users = useAuthStore((s) => s.users);
   const currentUser = useAuthStore((s) => s.getCurrentUser());
   const addUser = useAuthStore((s) => s.addUser);
+  const setUsers = useAuthStore((s) => s.setUsers);
   const updateUser = useAuthStore((s) => s.updateUser);
   const removeUser = useAuthStore((s) => s.removeUser);
   const assignRestaurantRole = useAuthStore((s) => s.assignRestaurantRole);
@@ -53,27 +66,125 @@ export default function UsersPage() {
   const [newEmail, setNewEmail] = useState("");
   const [newAvatar, setNewAvatar] = useState("👤");
   const [newPlatformRole, setNewPlatformRole] = useState<PlatformRole>("user");
+  const [newRestaurantRole, setNewRestaurantRole] = useState<RestaurantRole>("owner");
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteError, setInviteError] = useState("");
+  const [inviteResult, setInviteResult] = useState<{
+    code: string;
+    email: string;
+    name: string;
+    expiresAt: string;
+  } | null>(null);
 
   const isAdmin = currentUser?.platformRole === "admin";
 
-  const handleCreate = () => {
+  const handleInvite = async () => {
     if (!newName.trim() || !newEmail.trim()) return;
-    addUser({
-      name: newName.trim(),
-      email: newEmail.trim(),
-      avatar: newAvatar,
-      platformRole: newPlatformRole,
-      restaurantAccess: [],
-    });
-    setNewName("");
-    setNewEmail("");
-    setNewAvatar("👤");
-    setNewPlatformRole("user");
-    setShowCreateModal(false);
+    setInviteLoading(true);
+    setInviteError("");
+    try {
+      const result = await authService.inviteUser({
+        email: newEmail.trim(),
+        name: newName.trim(),
+        platformRole: newPlatformRole,
+        restaurantId: venueSlug || undefined,
+        restaurantRole: newRestaurantRole,
+      });
+      const appUser = mapApiUserToAppUser(
+        {
+          id: result.user.id,
+          name: result.user.name,
+          email: result.user.email,
+          avatar: newAvatar,
+          platform_role: newPlatformRole,
+          created_at: new Date().toISOString(),
+        },
+        venueSlug
+          ? [{ restaurantId: venueSlug, role: newRestaurantRole }]
+          : []
+      );
+      addUser(appUser);
+      const all = await authService.fetchAllUsersForAdmin();
+      setUsers(all);
+      setInviteResult({
+        code: result.inviteCode,
+        email: result.user.email,
+        name: result.user.name,
+        expiresAt: result.inviteExpiresAt,
+      });
+      setShowCreateModal(false);
+      setNewName("");
+      setNewEmail("");
+      setNewAvatar("👤");
+      setNewPlatformRole("user");
+      setNewRestaurantRole("owner");
+    } catch (err) {
+      setInviteError(err instanceof Error ? err.message : "Invite failed");
+    } finally {
+      setInviteLoading(false);
+    }
   };
 
-  const handleDelete = (id: string) => {
-    removeUser(id);
+  const copyInviteCode = () => {
+    if (inviteResult?.code) navigator.clipboard.writeText(inviteResult.code);
+  };
+
+  const handleReinvite = async (user: AppUser) => {
+    setInviteLoading(true);
+    setInviteError("");
+    try {
+      const access = user.restaurantAccess.find((a) => a.restaurantId === venueSlug);
+      const result = await authService.inviteUser({
+        email: user.email,
+        name: user.name,
+        platformRole: user.platformRole,
+        restaurantId: venueSlug || undefined,
+        restaurantRole: access?.role ?? "owner",
+      });
+      setInviteResult({
+        code: result.inviteCode,
+        email: result.user.email,
+        name: result.user.name,
+        expiresAt: result.inviteExpiresAt,
+      });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Re-invite failed");
+    } finally {
+      setInviteLoading(false);
+    }
+  };
+
+  const persistRestaurantRole = async (
+    userId: string,
+    restaurantId: string,
+    role: RestaurantRole
+  ) => {
+    try {
+      await authService.assignRestaurantRole(userId, restaurantId, role);
+      assignRestaurantRole(userId, restaurantId, role);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Could not save role");
+    }
+  };
+
+  const persistRemoveAccess = async (userId: string, restaurantId: string) => {
+    try {
+      await authService.removeRestaurantAccess(userId, restaurantId);
+      removeRestaurantAccess(userId, restaurantId);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Could not remove access");
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await authService.deleteUser(id);
+      removeUser(id);
+      const all = await authService.fetchAllUsersForAdmin();
+      setUsers(all);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Could not delete user");
+    }
     setDeleteTarget(null);
   };
 
@@ -97,7 +208,7 @@ export default function UsersPage() {
             className="flex items-center gap-2 bg-gradient-to-r from-primary to-amber-500 text-white px-5 py-2.5 rounded-2xl text-sm font-bold shadow-glow hover:brightness-105 transition"
           >
             <Plus size={16} />
-            Add User
+            Invite user
           </motion.button>
         )}
       </div>
@@ -224,6 +335,18 @@ export default function UsersPage() {
                         </div>
                       )}
 
+                      {isAdmin && !isSelf && (
+                        <button
+                          type="button"
+                          onClick={() => void handleReinvite(user)}
+                          disabled={inviteLoading}
+                          className="mb-4 w-full py-2.5 rounded-xl border border-primary/20 text-[12px] font-bold text-primary hover:bg-primary/5 transition"
+                        >
+                          <KeyRound size={14} className="inline mr-1.5 -mt-0.5" />
+                          Novi pozivni kod (6 znamenki)
+                        </button>
+                      )}
+
                       {/* Restaurant access */}
                       {user.platformRole !== "admin" && (
                         <div>
@@ -244,10 +367,10 @@ export default function UsersPage() {
                                   </span>
                                   {isAdmin && (
                                     <div className="flex items-center gap-1.5">
-                                      {(["manager", "employee"] as RestaurantRole[]).map((role) => (
+                                      {(["owner", "manager", "kitchen", "bar", "employee"] as RestaurantRole[]).map((role) => (
                                         <button
                                           key={role}
-                                          onClick={() => assignRestaurantRole(user.id, rId, role)}
+                                          onClick={() => void persistRestaurantRole(user.id, rId, role)}
                                           className={clsx(
                                             "px-3 py-1.5 rounded-lg text-[11px] font-bold transition border",
                                             access?.role === role
@@ -260,7 +383,7 @@ export default function UsersPage() {
                                       ))}
                                       {access && (
                                         <button
-                                          onClick={() => removeRestaurantAccess(user.id, rId)}
+                                          onClick={() => void persistRemoveAccess(user.id, rId)}
                                           className="p-1.5 rounded-lg text-muted hover:text-accent-red hover:bg-red-50 transition"
                                           title="Remove access"
                                         >
@@ -330,7 +453,8 @@ export default function UsersPage() {
               className="bg-white rounded-3xl p-6 max-w-[420px] w-full shadow-elevated"
             >
               <div className="flex items-center justify-between mb-5">
-                <h3 className="text-lg font-extrabold text-dark">Add New User</h3>
+                <h3 className="text-lg font-extrabold text-dark">Invite user</h3>
+                <p className="text-[11px] text-muted mt-0.5">No email sent — copy the code below</p>
                 <button onClick={() => setShowCreateModal(false)} className="p-1.5 rounded-xl hover:bg-bg text-muted transition">
                   <X size={18} />
                 </button>
@@ -380,40 +504,121 @@ export default function UsersPage() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-[12px] font-bold text-dark/70 mb-1.5 uppercase tracking-wider">Platform Role</label>
-                  <div className="flex gap-2">
-                    {(["user", "admin"] as PlatformRole[]).map((role) => (
-                      <button
-                        key={role}
-                        onClick={() => setNewPlatformRole(role)}
-                        className={clsx(
-                          "flex-1 py-2.5 rounded-xl text-[13px] font-bold transition border",
-                          newPlatformRole === role
-                            ? "bg-primary/10 text-primary border-primary/20"
-                            : "bg-bg text-muted border-transparent hover:text-dark"
-                        )}
-                      >
-                        {PLATFORM_ROLE_LABELS[role].label}
-                      </button>
-                    ))}
+                {isAdmin && (
+                  <div>
+                    <label className="block text-[12px] font-bold text-dark/70 mb-1.5 uppercase tracking-wider">Platform Role</label>
+                    <div className="flex gap-2">
+                      {(["user", "admin"] as PlatformRole[]).map((role) => (
+                        <button
+                          key={role}
+                          type="button"
+                          onClick={() => setNewPlatformRole(role)}
+                          className={clsx(
+                            "flex-1 py-2.5 rounded-xl text-[13px] font-bold transition border",
+                            newPlatformRole === role
+                              ? "bg-primary/10 text-primary border-primary/20"
+                              : "bg-bg text-muted border-transparent hover:text-dark"
+                          )}
+                        >
+                          {PLATFORM_ROLE_LABELS[role].label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
+
+                {venueSlug && (
+                  <div>
+                    <label className="block text-[12px] font-bold text-dark/70 mb-1.5 uppercase tracking-wider">Role at this venue</label>
+                    <select
+                      value={newRestaurantRole}
+                      onChange={(e) => setNewRestaurantRole(e.target.value as RestaurantRole)}
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm font-medium"
+                    >
+                      {(["owner", "manager", "kitchen", "bar", "employee"] as RestaurantRole[]).map((r) => (
+                        <option key={r} value={r}>
+                          {RESTAURANT_ROLE_LABELS[r].label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <p className="text-[11px] text-muted bg-amber-50 border border-amber-200/60 rounded-xl px-3 py-2 leading-relaxed">
+                  <strong>Prva prijava:</strong> korisnik unese email → dobije polje za{" "}
+                  <strong>6-cifreni kod</strong> (ne lozinku koju vi znate). Zatim postavi svoju lozinku.
+                </p>
+
+                {inviteError && (
+                  <p className="text-[12px] text-red-600 bg-red-50 px-3 py-2 rounded-lg">{inviteError}</p>
+                )}
               </div>
 
               <div className="flex gap-3 mt-6">
                 <button
+                  type="button"
                   onClick={() => setShowCreateModal(false)}
                   className="flex-1 py-3 rounded-2xl border border-gray-200 text-sm font-bold text-dark hover:bg-bg transition"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={handleCreate}
-                  disabled={!newName.trim() || !newEmail.trim()}
+                  type="button"
+                  onClick={handleInvite}
+                  disabled={!newName.trim() || !newEmail.trim() || inviteLoading}
                   className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-primary to-amber-500 text-white text-sm font-bold hover:brightness-105 transition shadow-glow disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  Add User
+                  {inviteLoading ? "Creating…" : "Create & get code"}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Invite code (copy for client) ── */}
+      <AnimatePresence>
+        {inviteResult && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white rounded-3xl p-6 max-w-[400px] w-full shadow-elevated"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                <KeyRound size={22} className="text-primary" />
+              </div>
+              <h3 className="text-lg font-extrabold text-dark text-center">Invite code</h3>
+              <p className="text-sm text-muted text-center mt-2">
+                Pošaljite kod korisniku <span className="font-bold text-dark">{inviteResult.name}</span> (
+                {inviteResult.email}). Prijava: email → <strong>kod</strong> → nova lozinka (ne postojeća lozinka).
+              </p>
+              <div className="mt-4 p-4 bg-bg rounded-2xl text-center">
+                <p className="text-3xl font-black tracking-[0.4em] text-dark font-mono">{inviteResult.code}</p>
+                <p className="text-[10px] text-muted mt-2">
+                  Valid until {new Date(inviteResult.expiresAt).toLocaleDateString()}
+                </p>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={copyInviteCode}
+                  className="flex-1 py-3 rounded-2xl border border-primary/20 text-sm font-bold text-primary flex items-center justify-center gap-2"
+                >
+                  <Copy size={16} />
+                  Copy code
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInviteResult(null)}
+                  className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-primary to-amber-500 text-white text-sm font-bold"
+                >
+                  Done
                 </button>
               </div>
             </motion.div>

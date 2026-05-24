@@ -1,79 +1,155 @@
 // ─── Auth Service ────────────────────────────────────────
-// Replaces: authStore's hardcoded password checks and localStorage users
-// Uses: Supabase Auth for real authentication + public.users profile table
+// App-owned accounts in sarayamenu.users + sarayamenu.sessions
+// Does NOT use Supabase Auth (auth.users).
 
-import { supabase } from '@/lib/supabase';
-import type { Tables, InsertDto } from '@/types/supabase';
+import { fetchWithTimeout } from '@/lib/fetch-with-timeout';
+import { supabase, setAppSessionToken } from '@/lib/supabase';
+import type { Tables, InsertDto, UpdateDto } from '@/types/supabase';
+import type { AppUser, RestaurantRole } from '@/types/auth';
+import { mapApiUserToAppUser } from '@/lib/auth/map-user';
+import { USER_PUBLIC_COLUMNS } from '@/lib/auth/constants';
 
 export type AppUserRow = Tables<'users'>;
 export type RestaurantAccessRow = Tables<'restaurant_access'>;
 
-// ─── Authentication ──────────────────────────────────────
+export type PublicUser = Pick<
+  AppUserRow,
+  'id' | 'name' | 'email' | 'avatar' | 'platform_role' | 'created_at'
+>;
 
-export async function signUp(email: string, password: string, name: string) {
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: { data: { name } },
+export type SessionPayload = {
+  user: PublicUser;
+  restaurantAccess: { restaurantId: string; role: string }[];
+  sessionToken: string;
+};
+
+// ─── Authentication (Next.js API + session header) ───────
+
+export type LoginModeResult =
+  | { mode: 'password'; name?: string }
+  | { mode: 'invite'; name?: string }
+  | { mode: 'not_found'; hint?: string };
+
+export async function checkLoginMode(email: string): Promise<LoginModeResult> {
+  const res = await fetch('/api/auth/login-mode', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+    credentials: 'include',
   });
-  if (error) throw error;
-  return data;
+  const body = await res.json();
+  // Route may return 503 with { mode, hint } when PostgREST does not expose sarayamenu
+  if (body.mode === 'password' || body.mode === 'invite' || body.mode === 'not_found') {
+    return body as LoginModeResult;
+  }
+  if (!res.ok) throw new Error(body.error ?? body.hint ?? 'Could not verify email');
+  return body as LoginModeResult;
 }
 
-export async function signIn(email: string, password: string) {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) throw error;
-  return data;
+export async function signIn(
+  email: string,
+  creds: { password?: string; otp?: string; newPassword?: string }
+) {
+  const res = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email,
+      password: creds.password,
+      otp: creds.otp,
+      newPassword: creds.newPassword,
+    }),
+    credentials: 'include',
+  });
+
+  const body = await res.json();
+  if (!res.ok) {
+    throw new Error(body.error ?? 'Login failed');
+  }
+
+  setAppSessionToken(body.sessionToken);
+  return body as SessionPayload;
+}
+
+export type InviteUserPayload = {
+  email: string;
+  name: string;
+  platformRole?: 'admin' | 'user';
+  restaurantId?: string;
+  restaurantRole?: 'owner' | 'manager' | 'kitchen' | 'bar' | 'employee';
+};
+
+export type InviteUserResult = {
+  inviteCode: string;
+  inviteExpiresAt: string;
+  user: { id: string; email: string; name: string };
+  message: string;
+};
+
+export async function inviteUser(payload: InviteUserPayload): Promise<InviteUserResult> {
+  const res = await fetch('/api/admin/users/invite', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: payload.email,
+      name: payload.name,
+      platformRole: payload.platformRole ?? 'user',
+      restaurantId: payload.restaurantId,
+      restaurantRole: payload.restaurantRole ?? 'owner',
+    }),
+    credentials: 'include',
+  });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error ?? 'Invite failed');
+  return body as InviteUserResult;
 }
 
 export async function signOut() {
-  const { error } = await supabase.auth.signOut();
-  if (error) throw error;
+  await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+  setAppSessionToken(null);
 }
 
-export async function getCurrentSession() {
-  const { data: { session } } = await supabase.auth.getSession();
-  return session;
+/** Restore session from httpOnly cookie on page load. */
+export async function restoreSession(): Promise<SessionPayload | null> {
+  const res = await fetchWithTimeout('/api/auth/session', { credentials: 'include' }, 12000);
+  if (!res.ok) return null;
+
+  const body = await res.json();
+  if (!body.sessionToken || !body.user) {
+    setAppSessionToken(null);
+    return null;
+  }
+
+  setAppSessionToken(body.sessionToken);
+  return body as SessionPayload;
 }
 
-export function onAuthStateChange(callback: (session: unknown) => void) {
-  return supabase.auth.onAuthStateChange((_event, session) => {
-    callback(session);
-  });
+// ─── User profile (sarayamenu.users) ─────────────────────
+
+export async function getCurrentUserProfile(): Promise<SessionPayload | null> {
+  return restoreSession();
 }
 
-// ─── User Profile (public.users) ─────────────────────────
-
-export async function getCurrentUserProfile(): Promise<AppUserRow | null> {
-  const session = await getCurrentSession();
-  if (!session) return null;
-
+export async function getAllUsers(): Promise<PublicUser[]> {
   const { data, error } = await supabase
     .from('users')
-    .select('*')
-    .eq('auth_id', session.user.id)
-    .single();
-
-  if (error) return null;
-  return data;
-}
-
-export async function getAllUsers(): Promise<AppUserRow[]> {
-  const { data, error } = await supabase
-    .from('users')
-    .select('*')
+    .select(USER_PUBLIC_COLUMNS)
     .order('created_at', { ascending: true });
 
   if (error) throw error;
   return data ?? [];
 }
 
-export async function updateUserProfile(userId: string, updates: Partial<InsertDto<'users'>>) {
+export async function updateUserProfile(userId: string, updates: UpdateDto<'users'>) {
+  const { password_hash: _pw, ...safe } = updates as UpdateDto<'users'> & {
+    password_hash?: string;
+  };
+
   const { data, error } = await supabase
     .from('users')
-    .update(updates)
+    .update(safe)
     .eq('id', userId)
-    .select()
+    .select(USER_PUBLIC_COLUMNS)
     .single();
 
   if (error) throw error;
@@ -85,7 +161,7 @@ export async function deleteUser(userId: string) {
   if (error) throw error;
 }
 
-// ─── Restaurant Access (roles) ───────────────────────────
+// ─── Restaurant access ───────────────────────────────────
 
 export async function getUserRestaurantAccess(userId: string): Promise<RestaurantAccessRow[]> {
   const { data, error } = await supabase
@@ -97,20 +173,42 @@ export async function getUserRestaurantAccess(userId: string): Promise<Restauran
   return data ?? [];
 }
 
-export async function getRestaurantStaff(restaurantId: string): Promise<(RestaurantAccessRow & { user: AppUserRow })[]> {
+export async function getRestaurantStaff(
+  restaurantId: string
+): Promise<(RestaurantAccessRow & { user: PublicUser })[]> {
   const { data, error } = await supabase
     .from('restaurant_access')
-    .select('*, user:users(*)')
+    .select(`*, user:users(${USER_PUBLIC_COLUMNS})`)
     .eq('restaurant_id', restaurantId);
 
   if (error) throw error;
-  return (data ?? []) as any;
+  return (data ?? []) as (RestaurantAccessRow & { user: PublicUser })[];
+}
+
+export async function fetchAllUsersForAdmin(): Promise<AppUser[]> {
+  const [{ data: users, error: uErr }, { data: access, error: aErr }] = await Promise.all([
+    supabase.from('users').select(USER_PUBLIC_COLUMNS).order('created_at', { ascending: true }),
+    supabase.from('restaurant_access').select('user_id, restaurant_id, role'),
+  ]);
+  if (uErr) throw uErr;
+  if (aErr) throw aErr;
+
+  const accessByUser = new Map<string, { restaurantId: string; role: string }[]>();
+  for (const row of access ?? []) {
+    const list = accessByUser.get(row.user_id) ?? [];
+    list.push({ restaurantId: row.restaurant_id, role: row.role });
+    accessByUser.set(row.user_id, list);
+  }
+
+  return (users ?? []).map((u) =>
+    mapApiUserToAppUser(u, accessByUser.get(u.id) ?? [])
+  );
 }
 
 export async function assignRestaurantRole(
   userId: string,
   restaurantId: string,
-  role: 'manager' | 'employee'
+  role: RestaurantRole
 ) {
   const { data, error } = await supabase
     .from('restaurant_access')

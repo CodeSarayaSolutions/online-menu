@@ -7,6 +7,7 @@ import { useParams } from "next/navigation";
 import { useCmsStore } from "@/store/cmsStore";
 import { RestaurantInfo } from "@/types/cms";
 import BsCollapse from "@/components/admin/BsCollapse";
+import ImageUploadField from "@/components/admin/ImageUploadField";
 import clsx from "clsx";
 
 export default function RestaurantEditor() {
@@ -35,14 +36,23 @@ export default function RestaurantEditor() {
     setTimeout(() => setSaved(false), 2000);
   };
 
-  const generalFields: { key: keyof RestaurantInfo; label: string; icon: any; placeholder: string; bilingual?: boolean }[] = [
+  type FieldDef = {
+    key: keyof RestaurantInfo;
+    label: string;
+    icon: typeof Type;
+    placeholder: string;
+    bilingual?: boolean;
+    upload?: "hero" | "logo";
+  };
+
+  const generalFields: FieldDef[] = [
     { key: "name", label: "Restaurant Name", icon: Type, placeholder: "e.g. My Restaurant", bilingual: true },
     { key: "tagline", label: "Tagline", icon: FileText, placeholder: "e.g. Authentic Italian Kitchen", bilingual: true },
-    { key: "image", label: "Hero Image URL", icon: Image, placeholder: "https://images.unsplash.com/..." },
-    { key: "logo", label: "Logo Image URL", icon: Image, placeholder: "https://images.unsplash.com/..." },
+    { key: "image", label: "Hero image", icon: Image, placeholder: "", upload: "hero" },
+    { key: "logo", label: "Logo", icon: Image, placeholder: "", upload: "logo" },
   ];
 
-  const contactFields: { key: keyof RestaurantInfo; label: string; icon: any; placeholder: string; bilingual?: boolean }[] = [
+  const contactFields: FieldDef[] = [
     { key: "address", label: "Address", icon: MapPin, placeholder: "123 Main Street, Downtown", bilingual: true },
     { key: "openHours", label: "Opening Hours", icon: Clock, placeholder: "10:00 AM - 11:00 PM", bilingual: true },
     { key: "wifi", label: "WiFi Network", icon: Wifi, placeholder: "GuestWiFi" },
@@ -141,7 +151,15 @@ export default function RestaurantEditor() {
                 <f.icon size={12} className="text-primary/50" />
                 {f.label}
               </label>
-              {f.bilingual ? (
+              {f.upload ? (
+                <ImageUploadField
+                  label={f.label}
+                  restaurantId={venue}
+                  placement={f.upload}
+                  value={form[f.key] ?? ""}
+                  onChange={(url) => handleChange(f.key, url)}
+                />
+              ) : f.bilingual ? (
                 <div>
                   <input
                     type="text"

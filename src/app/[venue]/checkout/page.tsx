@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCartStore } from "@/store/cartStore";
-import { useOrderStore } from "@/store/orderStore";
+import * as orderService from "@/services/orderService";
 import { useCmsData } from "@/hooks/useCmsData";
 import { useTranslation } from "@/hooks/useTranslation";
 import { isDark, mutedText, subtleBorder, subtleSurface, contrastText } from "@/lib/color-utils";
@@ -30,7 +30,6 @@ export default function CheckoutPage() {
   const getTotal = useCartStore((s) => s.getTotal);
   const getItemCount = useCartStore((s) => s.getItemCount);
   const clearCart = useCartStore((s) => s.clearCart);
-  const addOrder = useOrderStore((s) => s.addOrder);
   const { pageContent, componentStyles: cs } = useCmsData();
   const { t } = useTranslation();
 
@@ -79,21 +78,27 @@ export default function CheckoutPage() {
   const disabledBg = cardIsDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)";
   const disabledText = cardIsDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.3)";
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
+    if (!venueSlug) return;
     setIsSending(true);
-    setTimeout(() => {
-      // Save the order before clearing cart
-      addOrder({
+    try {
+      const id = `ORD-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+      await orderService.createOrder({
+        id,
+        restaurantId: venueSlug,
         items: [...items],
         tableNumber,
         kitchenNote: note,
         total,
         itemCount: count,
       });
-      setIsSending(false);
       setIsPlaced(true);
       clearCart();
-    }, 1200);
+    } catch {
+      setIsSending(false);
+      return;
+    }
+    setIsSending(false);
   };
 
   // ══════════════════════════════════════════════

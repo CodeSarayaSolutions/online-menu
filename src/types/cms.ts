@@ -65,6 +65,7 @@ export interface ProductItem {
   price: number;
   image: string;
   category: string;
+  station?: 'kitchen' | 'bar' | 'both';
   addons?: Addon[];
   variations?: Variation[];
   popular?: boolean;

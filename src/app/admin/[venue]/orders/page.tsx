@@ -19,7 +19,8 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useOrderStore } from "@/store/orderStore";
+import { useParams } from "next/navigation";
+import { useOrders } from "@/hooks/useOrders";
 import { Order, OrderStatus } from "@/types/order";
 import clsx from "clsx";
 
@@ -93,10 +94,10 @@ function timeAgo(iso: string) {
 }
 
 export default function AdminOrdersPage() {
-  const orders = useOrderStore((s) => s.orders);
-  const updateStatus = useOrderStore((s) => s.updateStatus);
-  const removeOrder = useOrderStore((s) => s.removeOrder);
-  const clearAllOrders = useOrderStore((s) => s.clearAllOrders);
+  const params = useParams();
+  const venueSlug = typeof params.venue === "string" ? params.venue : "";
+  const { orders, updateStatus, removeOrder, clearAllOrders, loading, refresh } =
+    useOrders(venueSlug);
 
   const [filter, setFilter] = useState<OrderStatus | "all">("all");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -645,7 +646,7 @@ export default function AdminOrdersPage() {
                 </button>
                 <button
                   onClick={() => {
-                    clearAllOrders();
+                    void clearAllOrders();
                     setShowClearConfirm(false);
                   }}
                   className="flex-1 py-3 rounded-2xl bg-accent-red text-white text-sm font-bold hover:brightness-110 transition shadow-lg shadow-red-200"

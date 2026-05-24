@@ -5,6 +5,7 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Store, MapPin, Clock, UtensilsCrossed, Coffee, Wine, CakeSlice, Truck, Pizza, Beer, Martini, Search, X } from "lucide-react";
 import { useCmsStore, VenueType, RestaurantData } from "@/store/cmsStore";
+import { loadAllVenuesIntoStore } from "@/lib/venue-cloud/sync";
 import clsx from "clsx";
 
 // ─── Venue type config ──────────────────────────────────
@@ -36,7 +37,18 @@ export default function VenuePickerPage() {
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    setHydrated(true);
+    let cancelled = false;
+    (async () => {
+      try {
+        await loadAllVenuesIntoStore();
+      } catch (e) {
+        console.error("[venue-cloud] home load:", e);
+      }
+      if (!cancelled) setHydrated(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (!hydrated) {
@@ -69,7 +81,7 @@ export default function VenuePickerPage() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
             <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-1.5 mb-6">
               <Store size={14} />
-              <span className="text-xs font-bold tracking-wide uppercase">Saraya CMS</span>
+              <span className="text-xs font-bold tracking-wide uppercase">Saraya</span>
             </div>
             <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight leading-tight">
               Discover Restaurants
@@ -193,7 +205,7 @@ export default function VenuePickerPage() {
 
       {/* Footer */}
       <footer className="py-8 text-center border-t border-gray-100">
-        <p className="text-xs text-gray-400">Powered by Saraya CMS</p>
+        <p className="text-xs text-gray-400">Saraya — digitalni meni</p>
       </footer>
     </div>
   );
