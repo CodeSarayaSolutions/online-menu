@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { LayoutGrid, Plus, Pencil, Trash2, X, Users } from "lucide-react";
+import { LayoutGrid, Plus, Pencil, Trash2, X, Users, QrCode } from "lucide-react";
+import TableQrModal from "@/components/admin/TableQrModal";
 import * as tableService from "@/services/tableService";
 import type { Tables } from "@/types/supabase";
 import clsx from "clsx";
@@ -23,6 +24,7 @@ export default function TablesPage() {
   const [newLabel, setNewLabel] = useState("");
   const [newCapacity, setNewCapacity] = useState(4);
   const [error, setError] = useState("");
+  const [qrTable, setQrTable] = useState<TableRow | null>(null);
 
   const load = useCallback(async () => {
     if (!venueSlug) return;
@@ -146,6 +148,9 @@ export default function TablesPage() {
                     onChange={(e) => setEditLabel(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl border border-primary/20 text-sm font-bold text-center"
                   />
+                  <p className="text-[10px] text-muted adm-text-muted text-center -mt-1">
+                    Mora biti jedinstveno (npr. Stol 1, Terasa A)
+                  </p>
                   <input
                     type="number"
                     min={1}
@@ -182,6 +187,14 @@ export default function TablesPage() {
                   <div className="flex gap-2 mt-4">
                     <button
                       type="button"
+                      onClick={() => setQrTable(t)}
+                      className="p-2 rounded-xl hover:bg-[var(--adm-surface-2)] text-muted adm-text-muted hover:text-primary transition"
+                      title="QR kod"
+                    >
+                      <QrCode size={15} />
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => startEdit(t)}
                       className="p-2 rounded-xl hover:bg-[var(--adm-surface-2)] text-muted adm-text-muted hover:text-primary transition"
                       title="Uredi"
@@ -205,6 +218,13 @@ export default function TablesPage() {
       )}
 
       <AnimatePresence>
+        {qrTable && venueSlug && (
+          <TableQrModal
+            table={qrTable}
+            venueSlug={venueSlug}
+            onClose={() => setQrTable(null)}
+          />
+        )}
         {showAdd && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -231,8 +251,11 @@ export default function TablesPage() {
                 value={newLabel}
                 onChange={(e) => setNewLabel(e.target.value)}
                 placeholder="Stol 1"
-                className="w-full px-4 py-3 rounded-xl border border adm-border mb-4 text-sm"
+                className="w-full px-4 py-3 rounded-xl border border adm-border mb-1 text-sm"
               />
+              <p className="text-[10px] text-muted adm-text-muted mb-4">
+                Mora biti jedinstveno (npr. Stol 1, Terasa A)
+              </p>
               <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase mb-1.5">Kapacitet</label>
               <input
                 type="number"

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="100" fill="#0f0f14"/>
+
+  <!-- Tray (ellipse) -->
+  <ellipse cx="256" cy="310" rx="160" ry="28" fill="#F4B400"/>
+
+  <!-- Arm/hand holding tray from below -->
+  <rect x="220" y="310" width="72" height="90" rx="20" fill="#F4B400"/>
+  <ellipse cx="256" cy="400" rx="50" ry="22" fill="#d99e00"/>
+
+  <!-- Drink 1: tall glass left -->
+  <rect x="140" y="230" width="40" height="80" rx="6" fill="white" opacity="0.9"/>
+  <rect x="143" y="233" width="34" height="30" rx="4" fill="#3b82f6" opacity="0.7"/>
+
+  <!-- Drink 2: wine glass center -->
+  <path d="M236 230 Q256 270 236 290 L276 290 Q256 270 276 230 Z" fill="white" opacity="0.9"/>
+  <rect x="251" y="290" width="10" height="20" fill="white" opacity="0.9"/>
+  <rect x="241" y="308" width="30" height="4" rx="2" fill="white" opacity="0.9"/>
+  <ellipse cx="256" cy="248" rx="14" ry="8" fill="#dc2626" opacity="0.7"/>
+
+  <!-- Drink 3: bottle right -->
+  <rect x="332" y="220" width="36" height="90" rx="8" fill="white" opacity="0.9"/>
+  <rect x="338" y="210" width="24" height="16" rx="4" fill="white" opacity="0.9"/>
+  <rect x="344" y="200" width="12" height="14" rx="3" fill="#F4B400"/>
+  <rect x="335" y="240" width="30" height="20" rx="2" fill="#22c55e" opacity="0.6"/>
+</svg>

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { Search, Wifi, Clock, MapPin, X, Star, ChevronRight } from "lucide-react";
+import { Search, Wifi, Clock, MapPin, X, Star, ChevronRight, QrCode } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";
 import { isDark, mutedText, subtleBorder, subtleSurface, hoverSurface } from "@/lib/color-utils";
@@ -11,6 +11,7 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { MenuSectionItem } from "@/types/cms";
 import MenuList from "@/components/MenuList";
 import OrderBar from "@/components/OrderBar";
+import { useTableSessionStore } from "@/store/tableSessionStore";
 
 // ─── Font map helpers ────────────────────────────────────
 const HEADING_FONT_MAP: Record<string, string> = {
@@ -59,6 +60,7 @@ export default function MenuPage() {
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const tableValid = useTableSessionStore((s) => s.isValid());
   const searchRef = useRef<HTMLInputElement>(null);
   const menuContentRef = useRef<HTMLDivElement>(null);
 
@@ -674,6 +676,15 @@ export default function MenuPage() {
   // ─── Render ────────────────────────────────────────────
   return (
     <div className={clsx("pb-28 md:pb-32", "overscroll-none", bodyFont)} style={{ backgroundColor: cs.menuPageBgColor }}>
+      {!tableValid && (
+        <div
+          className="px-4 py-2 text-center text-[11px] font-medium flex items-center justify-center gap-1.5"
+          style={{ backgroundColor: pageSurface, color: pageMuted, borderBottom: `1px solid ${pageBorder}` }}
+        >
+          <QrCode size={13} style={{ color: accentColor }} />
+          Pregledavate meni · Skenirajte QR kod na stolu za naručivanje
+        </div>
+      )}
       {/* Render sections in configured order */}
       {lc.sections
         .filter((sec: MenuSectionItem) => sec.visible)

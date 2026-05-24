@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Store,
@@ -18,6 +19,7 @@ import {
   Users,
   Building2,
   LogOut,
+  Download,
   Shield,
   ShieldCheck,
   ChefHat,
@@ -50,6 +52,8 @@ import { useDbUsers } from "@/hooks/useDbUsers";
 import { ADMIN_PANEL_TAGLINE, ADMIN_PANEL_TITLE, BRAND_NAME } from "@/lib/admin-branding";
 import { getDefaultPlatformPath, getDefaultVenuePath } from "@/lib/permissions";
 import clsx from "clsx";
+
+const AdminPWA = dynamic(() => import("@/components/admin/AdminPWA"), { ssr: false });
 
 // ─── Nav item definitions ──────────────────────────────────
 interface NavItem {
@@ -98,6 +102,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showRestaurantPicker, setShowRestaurantPicker] = useState(false);
+  const [canInstall, setCanInstall] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const { ready: sessionReady, error: sessionError } = useAdminSession();
   const { venuesReady, loading: venuesLoading, error: venuesError } = useVenueCloudSync(
@@ -107,6 +112,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const isLoginPage = pathname === "/admin/login";
 
   useEffect(() => { setHydrated(true); }, []);
+
+  useEffect(() => {
+    const check = () => setCanInstall(!!window.__pwaInstallPrompt);
+    check();
+    const interval = setInterval(check, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleInstall = async () => {
+    const prompt = window.__pwaInstallPrompt;
+    if (!prompt) return;
+    await prompt.prompt();
+    const { outcome } = await prompt.userChoice;
+    if (outcome === "accepted") {
+      window.__pwaInstallPrompt = undefined;
+      setCanInstall(false);
+    }
+  };
 
   const isVenueGrid = pathname === "/admin";
   const needsVenueLoad = !!currentUserId && pathname !== "/admin/login";
@@ -248,7 +271,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   };
 
   if (isLoginPage) {
-    return <>{children}</>;
+    return (
+      <>
+        <AdminPWA />
+        {children}
+      </>
+    );
   }
 
   // ─── Hydration / session guard ──
@@ -350,6 +378,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (isOnVenuePage) {
     return (
       <div className={clsx("fixed inset-0 z-[60] flex adm-bg", darkMode && "admin-dark")} style={{ fontFamily: "Inter, system-ui, sans-serif" }}>
+        <AdminPWA />
         {/* Mobile overlay */}
         <AnimatePresence>
           {sidebarOpen && (
@@ -420,6 +449,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 </div>
               </div>
             )}
+            {canInstall && (
+              <button
+                type="button"
+                onClick={() => void handleInstall()}
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium text-primary hover:bg-primary/10 transition w-full"
+              >
+                <Download size={15} /> Instaliraj aplikaciju
+              </button>
+            )}
             <Link href={`/${activeRestaurantId}`} className="flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)] transition"><ArrowLeft size={15} />Back to Menu</Link>
           </div>
         </aside>
@@ -464,6 +502,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // ─── Full admin panel with sidebar ────────────────────────
   return (
     <div className={clsx("fixed inset-0 z-[60] flex adm-bg", darkMode && "admin-dark")} style={{ fontFamily: "Inter, system-ui, sans-serif" }}>
+      <AdminPWA />
       {/* Mobile overlay */}
       <AnimatePresence>
         {sidebarOpen && (
@@ -591,6 +630,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
           </div>
           <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)] transition w-full"><LogOut size={15} />Sign Out</button>
+          {canInstall && (
+            <button
+              type="button"
+              onClick={() => void handleInstall()}
+              className="flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium text-primary hover:bg-primary/10 transition w-full"
+            >
+              <Download size={15} /> Instaliraj aplikaciju
+            </button>
+          )}
           <Link href={`/${activeRestaurantId}`} className="flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)] transition"><ArrowLeft size={15} />Back to Menu</Link>
         </div>
       </aside>

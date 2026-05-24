@@ -11,4 +11,5 @@ export interface Order {
   itemCount: number;
   status: OrderStatus;
   createdAt: string; // ISO timestamp
+  paymentMethod: string;
 }

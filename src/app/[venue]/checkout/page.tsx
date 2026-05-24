@@ -7,20 +7,20 @@ import {
   Check,
   ChefHat,
   MessageSquare,
-  MapPin,
   Clock,
   Utensils,
   PartyPopper,
+  QrCode,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCartStore } from "@/store/cartStore";
+import { useTableSessionStore } from "@/store/tableSessionStore";
 import * as orderService from "@/services/orderService";
 import { useCmsData } from "@/hooks/useCmsData";
 import { useTranslation } from "@/hooks/useTranslation";
 import { isDark, mutedText, subtleBorder, subtleSurface, contrastText } from "@/lib/color-utils";
-import clsx from "clsx";
 
-const TABLE_COUNT_DEFAULT = 20;
+type PaymentMethod = "cash" | "card";
 
 export default function CheckoutPage() {
   const { venue } = useParams<{ venue: string }>();
@@ -30,6 +30,9 @@ export default function CheckoutPage() {
   const getTotal = useCartStore((s) => s.getTotal);
   const getItemCount = useCartStore((s) => s.getItemCount);
   const clearCart = useCartStore((s) => s.clearCart);
+  const tableNumber = useTableSessionStore((s) => s.tableNumber);
+  const tableValid = useTableSessionStore((s) => s.isValid());
+  const clearTable = useTableSessionStore((s) => s.clearTable);
   const { pageContent, componentStyles: cs } = useCmsData();
   const { t } = useTranslation();
 
@@ -40,10 +43,9 @@ export default function CheckoutPage() {
 
   if (cs.viewOnlyMode) return null;
 
-  const TABLE_COUNT = pageContent.tableCount || TABLE_COUNT_DEFAULT;
-
-  const [tableNumber, setTableNumber] = useState("");
+  const [confirmedTable, setConfirmedTable] = useState("");
   const [note, setNote] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [isPlaced, setIsPlaced] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
@@ -79,7 +81,7 @@ export default function CheckoutPage() {
   const disabledText = cardIsDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.3)";
 
   const handleConfirm = async () => {
-    if (!venueSlug) return;
+    if (!venueSlug || !tableValid || !tableNumber) return;
     setIsSending(true);
     try {
       const id = `ORD-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
@@ -88,18 +90,23 @@ export default function CheckoutPage() {
         restaurantId: venueSlug,
         items: [...items],
         tableNumber,
-        kitchenNote: note,
+        kitchenNote: note.trim(),
+        paymentMethod,
         total,
         itemCount: count,
       });
+      setConfirmedTable(tableNumber);
       setIsPlaced(true);
       clearCart();
+      clearTable();
     } catch {
       setIsSending(false);
       return;
     }
     setIsSending(false);
   };
+
+  const displayTable = confirmedTable || tableNumber || "";
 
   // ══════════════════════════════════════════════
   // ORDER CONFIRMED SCREEN
@@ -207,7 +214,7 @@ export default function CheckoutPage() {
                   <p className="text-sm font-semibold" style={{ color: cardMuted }}>{t(pageContent, "comingToTableText")}</p>
                   <p className="text-[11px] mt-0.5" style={{ color: cardMuted }}>
                     A waiter will bring it to{" "}
-                    <span className="font-bold" style={{ color: contrastText(confirmCardBg) }}>Table {tableNumber}</span>
+                    <span className="font-bold" style={{ color: contrastText(confirmCardBg) }}>Stol {displayTable}</span>
                   </p>
                 </div>
               </div>
@@ -300,18 +307,18 @@ export default function CheckoutPage() {
               </div>
               <span className="text-[11px] font-semibold" style={{ color: stepDoneBg }}>Order</span>
             </div>
-            <div className="h-px flex-1" style={{ backgroundColor: tableNumber ? stepDoneBg : cardBorder }} />
+            <div className="h-px flex-1" style={{ backgroundColor: tableValid ? stepDoneBg : cardBorder }} />
             <div className="flex items-center gap-1.5">
               <div
                 className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold"
                 style={{
-                  backgroundColor: tableNumber ? accent : cardSurface,
-                  color: tableNumber ? "#FFFFFF" : cardMuted,
+                  backgroundColor: tableValid ? accent : cardSurface,
+                  color: tableValid ? "#FFFFFF" : cardMuted,
                 }}
               >
                 3
               </div>
-              <span className="text-[11px] font-semibold" style={{ color: tableNumber ? accent : cardMuted }}>
+              <span className="text-[11px] font-semibold" style={{ color: tableValid ? accent : cardMuted }}>
                 Confirm
               </span>
             </div>
@@ -328,54 +335,49 @@ export default function CheckoutPage() {
         <div className="lg:flex lg:gap-6 space-y-4 lg:space-y-0">
           {/* Left column: Table + Kitchen Note */}
           <div className="lg:flex-1 space-y-4">
-            {/* ── Table Number ───────────────────── */}
+            {/* ── Table (QR session only) ─────────── */}
             <div className="rounded-3xl p-5 md:p-6" style={{ backgroundColor: cardBg, boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
               <div className="flex items-center gap-2 mb-1">
-                <MapPin size={16} className="md:w-5 md:h-5" style={{ color: accent }} />
+                <QrCode size={16} className="md:w-5 md:h-5" style={{ color: accent }} />
                 <h3 className="text-base md:text-lg font-extrabold" style={{ color: titleColor }}>{t(pageContent, "yourTableTitle")}</h3>
               </div>
-              <p className="text-[11px] md:text-xs mb-4 ml-6" style={{ color: cardMuted }}>
-                {t(pageContent, "yourTableDescription")}
-              </p>
 
-              <div className="grid grid-cols-5 md:grid-cols-10 gap-2.5">
-                {Array.from({ length: TABLE_COUNT }, (_, i) => String(i + 1)).map(
-                  (num) => {
-                    const isSelected = tableNumber === num;
-                    return (
-                      <motion.button
-                        key={num}
-                        whileTap={{ scale: 0.88 }}
-                        onClick={() => setTableNumber(num)}
-                        className="h-12 md:h-14 rounded-xl text-sm md:text-base font-bold transition-all duration-200 relative"
-                        style={
-                          isSelected
-                            ? {
-                                background: `linear-gradient(135deg, ${accent}, ${accent}CC)`,
-                                color: "#FFFFFF",
-                                boxShadow: `0 0 16px ${accent}40`,
-                              }
-                            : {
-                                backgroundColor: cardSurface,
-                                color: titleColor,
-                              }
-                        }
-                      >
-                        {num}
-                        {isSelected && (
-                          <motion.div
-                            layoutId="tableCheck"
-                            className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full flex items-center justify-center"
-                            style={{ backgroundColor: stepDoneBg }}
-                          >
-                            <Check size={9} strokeWidth={3} style={{ color: "#FFFFFF" }} />
-                          </motion.div>
-                        )}
-                      </motion.button>
-                    );
-                  }
-                )}
-              </div>
+              {!tableValid ? (
+                <motion.div
+                  className="mt-3 rounded-2xl px-4 py-4 flex items-start gap-3"
+                  style={{ backgroundColor: cardSurface, border: `1px dashed ${cardBorder}` }}
+                >
+                  <QrCode size={22} className="shrink-0 mt-0.5" style={{ color: accent }} />
+                  <div>
+                    <p className="text-sm font-bold" style={{ color: titleColor }}>
+                      Skenirajte QR kod na stolu da biste naručili
+                    </p>
+                    <p className="text-[11px] mt-1" style={{ color: cardMuted }}>
+                      Broj stola se automatski prepoznaje nakon skeniranja QR koda na stolu.
+                    </p>
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div
+                  className="mt-3 rounded-2xl px-4 py-4 flex items-center gap-3"
+                  style={{ backgroundColor: serviceBg }}
+                >
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                    style={{ backgroundColor: stepDoneBg }}
+                  >
+                    <Check size={18} strokeWidth={3} style={{ color: "#FFFFFF" }} />
+                  </div>
+                  <div>
+                    <p className="text-lg font-extrabold" style={{ color: titleColor }}>
+                      Stol {tableNumber}
+                    </p>
+                    <p className="text-[11px] font-medium" style={{ color: serviceTextSub }}>
+                      Sesija aktivna · spremno za narudžbu
+                    </p>
+                  </div>
+                </motion.div>
+              )}
             </div>
 
             {/* ── Note for Kitchen ─────────────────── */}
@@ -473,7 +475,7 @@ export default function CheckoutPage() {
       >
         {/* Table selected indicator */}
         <AnimatePresence>
-          {tableNumber && (
+          {tableValid && tableNumber && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
@@ -481,21 +483,47 @@ export default function CheckoutPage() {
               className="flex items-center justify-center gap-2 text-[11px] mb-2.5"
               style={{ color: cardMuted }}
             >
-              <MapPin size={12} style={{ color: accent }} />
+              <Check size={12} style={{ color: accent }} />
               <span>
-                Sending to <strong style={{ color: titleColor }}>Table {tableNumber}</strong> · {count} item{count !== 1 ? "s" : ""} · <strong style={{ color: accent }}>{total.toFixed(2)} {pageContent.currencySymbol}</strong>
+                Stol <strong style={{ color: titleColor }}>{tableNumber}</strong> · {count} item{count !== 1 ? "s" : ""} · <strong style={{ color: accent }}>{total.toFixed(2)} {pageContent.currencySymbol}</strong>
               </span>
             </motion.div>
           )}
         </AnimatePresence>
 
+        <div className="flex gap-3 mb-4">
+          <button
+            type="button"
+            onClick={() => setPaymentMethod("cash")}
+            className="flex-1 py-3 rounded-xl border-2 font-semibold text-sm transition"
+            style={{
+              borderColor: paymentMethod === "cash" ? accent : cardBorder,
+              backgroundColor: paymentMethod === "cash" ? accent + "20" : cardSurface,
+              color: paymentMethod === "cash" ? accent : cardMuted,
+            }}
+          >
+            💵 Gotovina
+          </button>
+          <button
+            type="button"
+            disabled
+            className="flex-1 py-3 rounded-xl border-2 font-semibold text-sm opacity-40 cursor-not-allowed relative"
+            style={{ borderColor: "#888", color: "#888" }}
+          >
+            💳 Online plaćanje
+            <span className="absolute -top-2 -right-2 bg-primary text-white text-[9px] px-1.5 py-0.5 rounded-full">
+              Uskoro
+            </span>
+          </button>
+        </div>
+
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={handleConfirm}
-          disabled={!tableNumber || isSending}
+          disabled={!tableValid || isSending}
           className="w-full py-4 md:py-5 rounded-2xl text-base md:text-lg font-extrabold transition-all duration-300 flex items-center justify-center gap-2"
           style={
-            !tableNumber
+            !tableValid
               ? { backgroundColor: disabledBg, color: disabledText, cursor: "not-allowed" }
               : isSending
               ? { backgroundColor: accent, color: "#FFFFFF" }
@@ -513,13 +541,16 @@ export default function CheckoutPage() {
               className="w-5 h-5 border-2 rounded-full"
               style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#FFFFFF" }}
             />
-          ) : tableNumber ? (
+          ) : tableValid ? (
             <>
               <ChefHat size={18} />
               {t(pageContent, "sendToKitchenText")}
             </>
           ) : (
-            t(pageContent, "selectTableText")
+            <>
+              <QrCode size={18} />
+              Skenirajte QR kod
+            </>
           )}
         </motion.button>
       </div>

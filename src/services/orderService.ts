@@ -46,6 +46,7 @@ export async function createOrder(order: {
   items: CartItem[];
   tableNumber: string;
   kitchenNote: string;
+  paymentMethod: string;
   total: number;
   itemCount: number;
 }): Promise<OrderRow> {
@@ -57,6 +58,7 @@ export async function createOrder(order: {
       items: order.items as any,
       table_number: order.tableNumber,
       kitchen_note: order.kitchenNote,
+      payment_method: order.paymentMethod,
       total: order.total,
       item_count: order.itemCount,
       status: 'pending' as const,

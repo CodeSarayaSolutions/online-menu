@@ -12,5 +12,6 @@ export function orderRowToOrder(row: Tables<'orders'>): Order {
     itemCount: row.item_count,
     status: row.status,
     createdAt: row.created_at,
+    paymentMethod: row.payment_method ?? "cash",
   };
 }

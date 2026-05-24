@@ -32,6 +32,12 @@ function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+function paymentBadgeLabel(method: string) {
+  if (method === "cash") return "💵 Gotovina";
+  if (method === "online" || method === "card") return "💳 Online";
+  return null;
+}
+
 function nextStatus(current: OrderStatus): OrderStatus | null {
   const i = STATUS_FLOW.indexOf(current);
   if (i < 0 || i >= STATUS_FLOW.length - 1) return null;
@@ -86,6 +92,8 @@ function OrderCard({
   const foodOnly = mode === "bar" ? itemsFoodOnlyOnBar(order.items) : [];
   const hasPrimary = primary.length > 0;
   const next = nextStatus(order.status);
+  const isBarPending = mode === "bar" && order.status === "pending";
+  const isBarPreparing = mode === "bar" && order.status === "preparing";
 
   if (!hasPrimary && mode === "kitchen") return null;
   if (!hasPrimary && foodOnly.length === 0 && mode === "bar") return null;
@@ -95,7 +103,10 @@ function OrderCard({
       layout
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="adm-surface adm-border border rounded-2xl adm-border shadow-soft overflow-hidden"
+      className={clsx(
+        "adm-surface adm-border border rounded-2xl shadow-soft overflow-hidden",
+        isBarPending && "ring-2 ring-primary animate-pulse"
+      )}
     >
       <div
         className={clsx(
@@ -117,23 +128,59 @@ function OrderCard({
             )}
           </div>
           <div>
-            <p className="text-lg font-extrabold text-dark adm-text">Table {order.tableNumber || "—"}</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-lg font-extrabold text-dark adm-text">Table {order.tableNumber || "—"}</p>
+              {paymentBadgeLabel(order.paymentMethod) && (
+                <span className="px-2 py-0.5 rounded-full bg-[var(--adm-surface-2)] text-[10px] font-bold text-muted adm-text-muted">
+                  {paymentBadgeLabel(order.paymentMethod)}
+                </span>
+              )}
+            </div>
             <p className="text-[11px] text-muted adm-text-muted flex items-center gap-1">
               <Clock size={11} />
-              {formatTime(order.createdAt)} · {order.status}
+              {formatTime(order.createdAt)}
+              {isBarPreparing ? (
+                <span className="ml-1 px-2 py-0.5 rounded-full bg-primary/15 text-primary font-bold text-[10px]">
+                  U pripremi
+                </span>
+              ) : (
+                <> · {order.status}</>
+              )}
             </p>
           </div>
         </div>
-        {next && (
+        {mode === "bar" && isBarPending && (
+          <button
+            type="button"
+            onClick={() => onAdvance(order.id, "preparing")}
+            className="px-4 py-2 rounded-xl text-[12px] font-bold text-white bg-gradient-to-r from-primary to-amber-500 shadow-glow hover:brightness-105 transition"
+          >
+            Prihvati
+          </button>
+        )}
+        {mode === "kitchen" && next && (
           <button
             type="button"
             onClick={() => onAdvance(order.id, next)}
-            className={clsx(
-              "px-3 py-1.5 rounded-xl text-[11px] font-bold text-white transition",
-              mode === "kitchen"
-                ? "bg-amber-600 hover:bg-amber-700"
-                : "bg-purple-600 hover:bg-purple-700"
-            )}
+            className="px-3 py-1.5 rounded-xl text-[11px] font-bold text-white transition bg-amber-600 hover:bg-amber-700"
+          >
+            Mark {next}
+          </button>
+        )}
+        {mode === "bar" && isBarPreparing && next && (
+          <button
+            type="button"
+            onClick={() => onAdvance(order.id, next)}
+            className="px-3 py-1.5 rounded-xl text-[11px] font-bold text-white transition bg-purple-600 hover:bg-purple-700"
+          >
+            Mark {next}
+          </button>
+        )}
+        {mode === "bar" && !isBarPending && !isBarPreparing && next && (
+          <button
+            type="button"
+            onClick={() => onAdvance(order.id, next)}
+            className="px-3 py-1.5 rounded-xl text-[11px] font-bold text-white transition bg-purple-600 hover:bg-purple-700"
           >
             Mark {next}
           </button>

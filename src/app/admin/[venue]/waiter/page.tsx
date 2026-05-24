@@ -48,6 +48,32 @@ export default function WaiterFloorPage() {
   }, [refresh]);
 
   useEffect(() => {
+    let wakeLock: WakeLockSentinel | null = null;
+
+    const requestWakeLock = async () => {
+      try {
+        if ("wakeLock" in navigator) {
+          wakeLock = await navigator.wakeLock.request("screen");
+        }
+      } catch {
+        // Wake lock not available — silent fail
+      }
+    };
+
+    void requestWakeLock();
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") void requestWakeLock();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      void wakeLock?.release();
+    };
+  }, []);
+
+  useEffect(() => {
     if (!venueSlug) return;
     return tabService.subscribeToTabs(venueSlug, {
       onTabChange: () => void refresh(),

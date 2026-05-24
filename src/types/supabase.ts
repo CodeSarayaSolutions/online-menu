@@ -413,6 +413,7 @@ export interface Database {
           status: 'pending' | 'preparing' | 'ready' | 'served' | 'cancelled';
           created_at: string;
           updated_at: string;
+          payment_method: string;
         };
         Insert: {
           id: string;
@@ -424,6 +425,7 @@ export interface Database {
           item_count?: number;
           status?: 'pending' | 'preparing' | 'ready' | 'served' | 'cancelled';
           created_at?: string;
+          payment_method?: string;
         };
         Update: {
           id?: string;
@@ -434,6 +436,7 @@ export interface Database {
           total?: number;
           item_count?: number;
           status?: 'pending' | 'preparing' | 'ready' | 'served' | 'cancelled';
+          payment_method?: string;
         };
         Relationships: [];
       };
