@@ -233,8 +233,21 @@ export default function ProductsEditor() {
         });
       }
     }
-    if (isNew) addProduct(payload);
-    else updateProduct(payload.id, payload);
+    if (isNew) {
+      addProduct(payload);
+      fetch("/api/inventory/adjust", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          restaurantId: venue,
+          productId: payload.id,
+          productName: payload.name,
+          delta: 0,
+          reason: "init",
+        }),
+      }).catch((e) => console.error("[inventory] auto-init failed", e));
+    } else updateProduct(payload.id, payload);
     /* Sync flat state → allRestaurants so public pages & reloads see the change */
     setTimeout(() => saveActiveToAllRestaurants(venue), 0);
     setSaved(editingProduct.id);

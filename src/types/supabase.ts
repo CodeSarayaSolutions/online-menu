@@ -18,6 +18,7 @@ export interface Database {
           password_hash: string | null;
           invite_otp_hash: string | null;
           invite_otp_expires_at: string | null;
+          pin_hash: string | null;
           avatar: string | null;
           platform_role: 'admin' | 'user';
           created_at: string;
@@ -29,6 +30,7 @@ export interface Database {
           password_hash?: string | null;
           invite_otp_hash?: string | null;
           invite_otp_expires_at?: string | null;
+          pin_hash?: string | null;
           avatar?: string | null;
           platform_role?: 'admin' | 'user';
           created_at?: string;
@@ -40,6 +42,7 @@ export interface Database {
           password_hash?: string | null;
           invite_otp_hash?: string | null;
           invite_otp_expires_at?: string | null;
+          pin_hash?: string | null;
           avatar?: string | null;
           platform_role?: 'admin' | 'user';
           created_at?: string;

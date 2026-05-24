@@ -5,11 +5,12 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Minus, Plus, Search, X, CreditCard, Banknote } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCmsStore } from "@/store/cmsStore";
-import { useAuthStore } from "@/store/authStore";
 import * as tabService from "@/services/tabService";
 import type { TabWithItems } from "@/services/tabService";
 import type { ProductItem } from "@/types/cms";
 import type { ProductStation } from "@/types/auth";
+import { clearWaiterSession, getWaiterSession } from "@/lib/waiter-session";
+import { useWaiterIdleTimeout } from "@/hooks/useWaiterIdleTimeout";
 import clsx from "clsx";
 
 export default function WaiterTabPage() {
@@ -22,8 +23,8 @@ export default function WaiterTabPage() {
 
   const products = useCmsStore((s) => s.products);
   const categories = useCmsStore((s) => s.categories);
-  const currentUser = useAuthStore((s) => s.getCurrentUser());
 
+  const [waiterId, setWaiterId] = useState<string | null>(null);
   const [tab, setTab] = useState<TabWithItems | null>(null);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -31,7 +32,20 @@ export default function WaiterTabPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const canEdit = !readonly && tab?.waiter_id === currentUser?.id && tab?.status === "open";
+  useEffect(() => {
+    const session = getWaiterSession(venueSlug);
+    setWaiterId(session?.waiterId ?? null);
+  }, [venueSlug]);
+
+  const handleIdleTimeout = useCallback(() => {
+    clearWaiterSession(venueSlug);
+    router.replace(`/admin/${venueSlug}/waiter`);
+  }, [venueSlug, router]);
+
+  const { showIdleWarning, resetActivity } = useWaiterIdleTimeout(handleIdleTimeout);
+
+  const canEdit =
+    !readonly && !!waiterId && tab?.waiter_id === waiterId && tab?.status === "open";
 
   const menuCategories = useMemo(() => {
     const labels = categories
@@ -162,6 +176,18 @@ export default function WaiterTabPage() {
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-64px)] pb-28">
+      {showIdleWarning && (
+        <div className="fixed top-0 left-0 right-0 z-[200] bg-amber-500 text-amber-950 px-4 py-3 flex flex-wrap items-center justify-between gap-2 shadow-md">
+          <span className="text-sm font-semibold">Automatska odjava za 60 sekundi</span>
+          <button
+            type="button"
+            onClick={resetActivity}
+            className="px-4 py-2 min-h-[44px] rounded-xl bg-amber-950/20 font-bold text-sm"
+          >
+            Ostani
+          </button>
+        </div>
+      )}
       <header className="sticky top-0 z-20 adm-surface adm-border border border-b px-4 py-3 flex items-center gap-3">
         <button
           type="button"
