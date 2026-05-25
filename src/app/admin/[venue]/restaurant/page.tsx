@@ -46,26 +46,26 @@ export default function RestaurantEditor() {
   };
 
   const generalFields: FieldDef[] = [
-    { key: "name", label: "Restaurant Name", icon: Type, placeholder: "e.g. My Restaurant", bilingual: true },
-    { key: "tagline", label: "Tagline", icon: FileText, placeholder: "e.g. Authentic Italian Kitchen", bilingual: true },
-    { key: "image", label: "Hero image", icon: Image, placeholder: "", upload: "hero" },
+    { key: "name", label: "Naziv restorana", icon: Type, placeholder: "npr. Moj restoran", bilingual: true },
+    { key: "tagline", label: "Slogan", icon: FileText, placeholder: "npr. Autentična italijanska kuhinja", bilingual: true },
+    { key: "image", label: "Hero slika", icon: Image, placeholder: "", upload: "hero" },
     { key: "logo", label: "Logo", icon: Image, placeholder: "", upload: "logo" },
   ];
 
   const contactFields: FieldDef[] = [
-    { key: "address", label: "Address", icon: MapPin, placeholder: "123 Main Street, Downtown", bilingual: true },
-    { key: "openHours", label: "Opening Hours", icon: Clock, placeholder: "10:00 AM - 11:00 PM", bilingual: true },
-    { key: "wifi", label: "WiFi Network", icon: Wifi, placeholder: "GuestWiFi" },
-    { key: "phone", label: "Phone Number", icon: Phone, placeholder: "+1 (555) 123-4567" },
+    { key: "address", label: "Adresa", icon: MapPin, placeholder: "Ulica i broj, grad", bilingual: true },
+    { key: "openHours", label: "Radno vrijeme", icon: Clock, placeholder: "10:00 - 23:00", bilingual: true },
+    { key: "wifi", label: "WiFi mreža", icon: Wifi, placeholder: "GuestWiFi" },
+    { key: "phone", label: "Broj telefona", icon: Phone, placeholder: "+387 33 123 456" },
   ];
 
   const activeFields = activeTab === "general" ? generalFields : contactFields;
 
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-3xl w-full px-0 sm:px-0">
       <div className="mb-8">
-        <h1 className="text-2xl font-extrabold text-dark adm-text tracking-tight">Restaurant Info</h1>
-        <p className="text-sm text-muted adm-text-muted mt-1">Customize how your restaurant appears on the menu</p>
+        <h1 className="text-2xl font-extrabold text-dark adm-text tracking-tight">Informacije o restoranu</h1>
+        <p className="text-sm text-muted adm-text-muted mt-1">Prilagodite kako vaš restoran izgleda na meniju</p>
       </div>
 
       {/* Live preview card */}
@@ -73,9 +73,9 @@ export default function RestaurantEditor() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="adm-surface adm-border border rounded-2xl shadow-soft overflow-hidden mb-6 border border-primary/5"
+        className="adm-surface adm-border border rounded-2xl shadow-soft overflow-hidden mb-6 border border-primary/5 w-full"
       >
-        <div className="relative h-44 adm-bg overflow-hidden">
+        <div className="relative h-44 adm-bg overflow-hidden w-full">
           {componentStyles.heroMediaType === 'video' && componentStyles.heroVideoUrl ? (
             <video src={componentStyles.heroVideoUrl} autoPlay loop muted playsInline className="w-full h-full object-cover" />
           ) : (componentStyles.heroImageUrl || form.image) ? (
@@ -112,7 +112,7 @@ export default function RestaurantEditor() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.15, duration: 0.4 }}
-        className="adm-surface adm-border border rounded-2xl shadow-soft overflow-hidden border border-primary/5"
+        className="adm-surface adm-border border rounded-2xl shadow-soft overflow-hidden border border-primary/5 w-full"
       >
         {/* Tabs */}
         <div className="flex border-b border-bg">
@@ -127,7 +127,7 @@ export default function RestaurantEditor() {
                   : "text-muted adm-text-muted hover:adm-text"
               )}
             >
-              {tab === "general" ? "General" : "Contact & Hours"}
+              {tab === "general" ? "Opšte" : "Kontakt i radno vrijeme"}
               {activeTab === tab && (
                 <motion.div
                   layoutId="restaurantTab"
@@ -147,10 +147,12 @@ export default function RestaurantEditor() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: i * 0.05, duration: 0.3 }}
             >
-              <label className="flex items-center gap-2 text-xs font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">
-                <f.icon size={12} className="text-primary/50" />
-                {f.label}
-              </label>
+              {!f.upload && (
+                <label className="flex items-center gap-2 text-xs font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">
+                  <f.icon size={12} className="text-primary/50" />
+                  {f.label}
+                </label>
+              )}
               {f.upload ? (
                 <ImageUploadField
                   label={f.label}
@@ -173,7 +175,7 @@ export default function RestaurantEditor() {
                       type="text"
                       value={(form as any)[`${f.key}_bs`] || ""}
                       onChange={(e) => handleChange(`${f.key}_bs` as keyof RestaurantInfo, e.target.value)}
-                      placeholder={`${f.placeholder} (Bosnian)`}
+                      placeholder={`${f.placeholder} (Bosanski)`}
                       className="w-full px-4 py-3 adm-bg rounded-2xl text-sm text-dark adm-text outline-none border border-blue-200/30 focus:border-blue-400 focus:adm-surface adm-border border focus:ring-4 focus:ring-blue-100 transition-all placeholder:adm-text-faint"
                     />
                   </BsCollapse>
@@ -205,12 +207,12 @@ export default function RestaurantEditor() {
             {saved ? (
               <>
                 <Check size={16} strokeWidth={3} />
-                Saved Successfully
+                Uspješno sačuvano
               </>
             ) : (
               <>
                 <Save size={16} />
-                Save Changes
+                Spremi izmjene
               </>
             )}
           </button>

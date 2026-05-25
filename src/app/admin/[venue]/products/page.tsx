@@ -391,7 +391,7 @@ export default function ProductsEditor() {
   return (
     <div className="flex gap-0">
       {/* ── Editor Panel ── */}
-      <div className={clsx("flex-1 min-w-0 p-5 lg:p-8 transition-all duration-300", showPreview ? "lg:mr-0" : "")}>
+      <div className={clsx("flex-1 min-w-0 h-[calc(100vh-64px)] overflow-y-auto p-5 lg:p-8 transition-all duration-300", showPreview ? "lg:mr-0" : "")}>
       {/* ───────────── Header ───────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
@@ -804,7 +804,7 @@ export default function ProductsEditor() {
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "spring", damping: 32, stiffness: 320 }}
-              className="fixed inset-y-0 right-0 z-50 w-full md:w-[480px] flex flex-col adm-surface adm-border border-l border-primary/10 shadow-elevated relative"
+              className="fixed inset-y-0 right-0 z-50 flex flex-col w-full md:w-[480px] adm-surface adm-border border-l border-primary/10 shadow-elevated relative"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Sticky header */}
@@ -828,7 +828,10 @@ export default function ProductsEditor() {
               </div>
 
               {/* Scrollable body */}
-              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-5 space-y-4">
+              <div
+                className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-5 space-y-4"
+                style={{ WebkitOverflowScrolling: "touch" }}
+              >
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="sm:col-span-2">
                     <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Naziv *</label>
