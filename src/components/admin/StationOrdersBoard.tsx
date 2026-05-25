@@ -58,7 +58,7 @@ function ItemLines({
   showPrices: boolean;
 }) {
   if (items.length === 0) {
-    return <p className="text-[12px] text-muted adm-text-muted italic">No items for this station</p>;
+    return <p className="text-[12px] text-muted adm-text-muted italic">Nema stavki za ovu stanicu</p>;
   }
   return (
     <ul className="space-y-2">
@@ -322,10 +322,17 @@ export default function StationOrdersBoard({
 
       {visible.length === 0 ? (
         <div className="text-center py-16 adm-surface adm-border border rounded-2xl-dashed border adm-border">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted adm-text-muted mb-2">
+            Online narudžbe
+          </p>
           <CheckCircle2 size={40} className="mx-auto adm-text-faint mb-3" />
-          <p className="text-sm font-semibold text-muted adm-text-muted">No active orders for {title.toLowerCase()}</p>
+          <p className="text-sm font-semibold text-muted adm-text-muted">
+            {mode === "kitchen" ? "Nema aktivnih narudžbi za kuhinju" : "Nema aktivnih narudžbi za bar"}
+          </p>
           <p className="text-[12px] text-muted adm-text-muted/70 mt-1">
-            Guest orders appear here when they include {mode === "kitchen" ? "food" : "bar"} items.
+            {mode === "kitchen"
+              ? "Narudžbe gostiju se pojavljuju ovdje kada uključuju jela."
+              : "Narudžbe gostiju se pojavljuju ovdje kada uključuju pića s bara."}
           </p>
         </div>
       ) : (

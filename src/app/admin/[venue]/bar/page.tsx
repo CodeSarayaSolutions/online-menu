@@ -135,33 +135,61 @@ export default function BarStationPage() {
     }
   }, []);
 
+  const controlBtnClass =
+    "w-10 h-10 rounded-xl adm-surface adm-border border flex items-center justify-center text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)] transition";
+
   return (
     <div className="relative">
-      <div className="flex items-center justify-end gap-2 mb-2">
-        <button
-          type="button"
-          onClick={toggleMute}
-          className="w-10 h-10 rounded-xl adm-surface adm-border border flex items-center justify-center text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)] transition"
-          title={muted ? "Uključi zvuk" : "Isključi zvuk"}
-        >
-          {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
-        </button>
-      </div>
+      {!fullscreen && (
+        <div className="flex items-center justify-end gap-2 mb-2">
+          <button
+            type="button"
+            onClick={toggleMute}
+            className={controlBtnClass}
+            title={muted ? "Uključi zvuk" : "Isključi zvuk"}
+          >
+            {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+          </button>
+        </div>
+      )}
+
+      {fullscreen && (
+        <div className="fixed top-2 right-2 z-[60] flex items-center gap-2 bg-black/30 backdrop-blur-sm rounded-2xl px-2 py-1.5">
+          <button
+            type="button"
+            onClick={toggleMute}
+            className={controlBtnClass}
+            title={muted ? "Uključi zvuk" : "Isključi zvuk"}
+          >
+            {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+          </button>
+          <button
+            type="button"
+            onClick={() => void toggleFullscreen()}
+            className={controlBtnClass}
+            title="Izađi iz cijelog ekrana"
+          >
+            <Minimize2 size={18} />
+          </button>
+        </div>
+      )}
 
       <StationOrdersBoard mode="bar" orders={orders} updateStatus={updateStatus} compact />
       {venueSlug ? <BarActiveTabs restaurantId={venueSlug} /> : null}
 
-      <button
-        type="button"
-        onClick={() => void toggleFullscreen()}
-        className={clsx(
-          "fixed bottom-6 right-6 z-50 w-12 h-12 rounded-2xl shadow-elevated flex items-center justify-center transition",
-          "adm-surface adm-border border text-dark adm-text hover:bg-[var(--adm-surface-2)]"
-        )}
-        title={fullscreen ? "Izađi iz cijelog ekrana" : "Cijeli ekran"}
-      >
-        {fullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
-      </button>
+      {!fullscreen && (
+        <button
+          type="button"
+          onClick={() => void toggleFullscreen()}
+          className={clsx(
+            "fixed bottom-6 right-6 z-50 w-12 h-12 rounded-2xl shadow-elevated flex items-center justify-center transition",
+            "adm-surface adm-border border text-dark adm-text hover:bg-[var(--adm-surface-2)]"
+          )}
+          title="Cijeli ekran"
+        >
+          <Maximize2 size={20} />
+        </button>
+      )}
     </div>
   );
 }

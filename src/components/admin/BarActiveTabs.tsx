@@ -87,9 +87,12 @@ export default function BarActiveTabs({ restaurantId }: { restaurantId: string }
         <h2 className="text-lg font-extrabold text-dark adm-text">Aktivne kartice (bar)</h2>
       </div>
       {barTabs.length === 0 ? (
-        <p className="text-sm text-muted adm-text-muted adm-surface adm-border border rounded-xl border p-6 text-center">
-          Nema aktivnih kartica za bar.
-        </p>
+        <div className="text-center adm-surface adm-border border rounded-xl border p-6">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted adm-text-muted mb-2">
+            Konobar kartice
+          </p>
+          <p className="text-sm text-muted adm-text-muted">Nema aktivnih kartica za bar.</p>
+        </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {barTabs.map((tab) => {
