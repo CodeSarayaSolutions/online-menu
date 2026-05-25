@@ -29,7 +29,7 @@ export interface CategoryInfo {
   id: string;
   label: string;
   label_bs?: string;
-  icon: string;
+  icon?: string;
   color: string; // tailwind gradient class e.g. "from-amber-400 to-orange-500"
 }
 

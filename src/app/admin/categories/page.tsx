@@ -34,7 +34,7 @@ export default function CategoriesEditor() {
   const [editForm, setEditForm] = useState<CategoryInfo | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [newCat, setNewCat] = useState<CategoryInfo>({
-    id: "", label: "", icon: "🍽️", color: "from-amber-400 to-orange-500",
+    id: "", label: "", icon: "", color: "from-amber-400 to-orange-500",
   });
   const [saved, setSaved] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -44,7 +44,7 @@ export default function CategoriesEditor() {
 
   const saveEdit = () => {
     if (editingId && editForm) {
-      updateCategory(editingId, editForm);
+      updateCategory(editingId, { ...editForm, icon: (editForm.icon ?? "").trim() });
       setSaved(editingId);
       setTimeout(() => setSaved(null), 1200);
       cancelEdit();
@@ -53,10 +53,10 @@ export default function CategoriesEditor() {
 
   const handleAdd = () => {
     if (!newCat.id || !newCat.label) return;
-    addCategory(newCat);
+    addCategory({ ...newCat, icon: (newCat.icon ?? "").trim() });
     setSaved(newCat.id);
     setTimeout(() => setSaved(null), 1200);
-    setNewCat({ id: "", label: "", icon: "🍽️", color: "from-amber-400 to-orange-500" });
+    setNewCat({ id: "", label: "", icon: "", color: "from-amber-400 to-orange-500" });
     setShowAdd(false);
   };
 
@@ -105,8 +105,7 @@ export default function CategoriesEditor() {
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <InputField label="ID (mala slova)" value={newCat.id} onChange={(v) => setNewCat((c) => ({ ...c, id: v.toLowerCase().replace(/\s/g, "-") }))} placeholder="npr. morski-plodovi" />
                 <InputField label="Naziv za prikaz" value={newCat.label} onChange={(v) => setNewCat((c) => ({ ...c, label: v }))} placeholder="npr. Morski plodovi" />
-                <InputField label="Emoji ikona" value={newCat.icon} onChange={(v) => setNewCat((c) => ({ ...c, icon: v }))} placeholder="🍽️" />
-                <div>
+                <div className="col-span-2">
                   <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Boja</label>
                   <div className="flex flex-wrap gap-1.5">
                     {colorPresets.map((color) => (
@@ -153,7 +152,6 @@ export default function CategoriesEditor() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <InputField label="Naziv za prikaz" value={editForm.label} onChange={(v) => setEditForm((f) => f ? { ...f, label: v } : f)} placeholder="npr. Morski plodovi" />
-                    <InputField label="Emoji ikona" value={editForm.icon} onChange={(v) => setEditForm((f) => f ? { ...f, icon: v } : f)} placeholder="🍽️" />
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Boja</label>
@@ -186,7 +184,9 @@ export default function CategoriesEditor() {
                   </div>
 
                   <div className={clsx("w-10 h-10 rounded-2xl bg-gradient-to-br flex items-center justify-center text-white text-lg shrink-0 shadow-sm", cat.color)}>
-                    {cat.icon}
+                    {cat.icon?.trim() ? cat.icon : (
+                      <span className="text-sm font-bold">{cat.label.charAt(0).toUpperCase()}</span>
+                    )}
                   </div>
 
                   <div className="flex-1 min-w-0">

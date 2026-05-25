@@ -57,6 +57,13 @@ const blankVariationOption = (): VariationOption => ({
   priceAdjustment: 0,
 });
 
+const defaultCategoryColor = "from-amber-400 to-orange-500";
+
+const categoryForSave = (cat: CategoryInfo): CategoryInfo => ({
+  ...cat,
+  icon: (cat.icon ?? "").trim(),
+});
+
 const blankVariation = (): Variation => ({
   id: `v${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
   name: "",
@@ -101,7 +108,7 @@ export default function ProductsEditor() {
   const [catEditingId, setCatEditingId] = useState<string | null>(null);
   const [catEditForm, setCatEditForm] = useState<CategoryInfo | null>(null);
   const [showCatAdd, setShowCatAdd] = useState(false);
-  const [newCat, setNewCat] = useState<CategoryInfo>({ id: "", label: "", icon: "🍽️", color: "from-amber-400 to-orange-500" });
+  const [newCat, setNewCat] = useState<CategoryInfo>({ id: "", label: "", icon: "", color: defaultCategoryColor });
   const [catSaved, setCatSaved] = useState<string | null>(null);
   const [catConfirmDelete, setCatConfirmDelete] = useState<string | null>(null);
   /** Quick-create category from product form dropdown */
@@ -109,8 +116,8 @@ export default function ProductsEditor() {
   const [quickNewCat, setQuickNewCat] = useState<CategoryInfo>({
     id: "",
     label: "",
-    icon: "🍽️",
-    color: "from-amber-400 to-orange-500",
+    icon: "",
+    color: defaultCategoryColor,
   });
 
   /* ─── Preview state ──────────────────────────────────────── */
@@ -126,7 +133,7 @@ export default function ProductsEditor() {
 
   const saveCatEdit = () => {
     if (catEditingId && catEditForm) {
-      updateCategory(catEditingId, catEditForm);
+      updateCategory(catEditingId, categoryForSave(catEditForm));
       setTimeout(() => saveActiveToAllRestaurants(venue), 0);
       setCatSaved(catEditingId);
       setTimeout(() => setCatSaved(null), 1200);
@@ -136,11 +143,11 @@ export default function ProductsEditor() {
 
   const handleCatAdd = () => {
     if (!newCat.id || !newCat.label) return;
-    addCategory(newCat);
+    addCategory(categoryForSave(newCat));
     setTimeout(() => saveActiveToAllRestaurants(venue), 0);
     setCatSaved(newCat.id);
     setTimeout(() => setCatSaved(null), 1200);
-    setNewCat({ id: "", label: "", icon: "🍽️", color: "from-amber-400 to-orange-500" });
+    setNewCat({ id: "", label: "", icon: "", color: defaultCategoryColor });
     setShowCatAdd(false);
   };
 
@@ -182,7 +189,7 @@ export default function ProductsEditor() {
   };
 
   const openProductCatModal = () => {
-    setQuickNewCat({ id: "", label: "", icon: "🍽️", color: "from-amber-400 to-orange-500" });
+    setQuickNewCat({ id: "", label: "", icon: "", color: defaultCategoryColor });
     setShowProductCatModal(true);
   };
 
@@ -194,7 +201,7 @@ export default function ProductsEditor() {
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-|-$/g, "");
-    const cat: CategoryInfo = { ...quickNewCat, id, label: quickNewCat.label.trim() };
+    const cat: CategoryInfo = categoryForSave({ ...quickNewCat, id, label: quickNewCat.label.trim() });
     addCategory(cat);
     setTimeout(() => saveActiveToAllRestaurants(venue), 0);
     if (editingProduct) {
@@ -237,8 +244,8 @@ export default function ProductsEditor() {
         addCategory({
           id: catId,
           label: catLabel,
-          icon: "🍽️",
-          color: "from-amber-400 to-orange-500",
+          icon: "",
+          color: defaultCategoryColor,
         });
       }
     }
@@ -496,8 +503,7 @@ export default function ProductsEditor() {
                             </BsCollapse>
                           </div>
                         </div>
-                        <CatField label="Emoji Icon" value={newCat.icon} onChange={(v) => setNewCat((c) => ({ ...c, icon: v }))} placeholder="🍽️" />
-                        <div>
+                        <div className="sm:col-span-2">
                           <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Boja</label>
                           <div className="flex flex-wrap gap-1.5">
                             {colorPresets.map((color) => (
@@ -543,7 +549,6 @@ export default function ProductsEditor() {
                                 </BsCollapse>
                               </div>
                             </div>
-                            <CatField label="Emoji Icon" value={catEditForm.icon} onChange={(v) => setCatEditForm((f) => f ? { ...f, icon: v } : f)} />
                           </div>
                           <div>
                             <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-1.5">Boja</label>
@@ -571,7 +576,9 @@ export default function ProductsEditor() {
                             <button onClick={() => moveCat(index, "down")} disabled={index === categories.length - 1} className="p-0.5 rounded adm-text-faint hover:text-primary disabled:opacity-20 transition"><ChevronDown size={13} /></button>
                           </div>
                           <div className={clsx("w-9 h-9 rounded-xl bg-gradient-to-br flex items-center justify-center text-white text-base shrink-0 shadow-sm", cat.color)}>
-                            {cat.icon}
+                            {cat.icon?.trim() ? cat.icon : (
+                              <span className="text-sm font-bold">{cat.label.charAt(0).toUpperCase()}</span>
+                            )}
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-[13px] font-semibold text-dark adm-text">{cat.label}</p>
@@ -633,7 +640,7 @@ export default function ProductsEditor() {
         >
           <option value="all">Sve vrste (samo filter)</option>
           {realCategories.map((c) => (
-            <option key={c.id} value={c.id}>{c.icon} {c.label}</option>
+            <option key={c.id} value={c.id}>{c.icon?.trim() ? `${c.icon} ` : ""}{c.label}</option>
           ))}
           <option value="__create__">➕ Kreiraj novu vrstu…</option>
         </select>
@@ -942,7 +949,7 @@ export default function ProductsEditor() {
                       </option>
                       {realCategories.map((c) => (
                         <option key={c.id} value={c.label}>
-                          {c.icon} {c.label}
+                          {c.icon?.trim() ? `${c.icon} ` : ""}{c.label}
                         </option>
                       ))}
                       {menuCategories
@@ -1268,12 +1275,6 @@ export default function ProductsEditor() {
                     }));
                   }}
                   placeholder="e.g. Pizza"
-                />
-                <CatField
-                  label="Emoji"
-                  value={quickNewCat.icon}
-                  onChange={(v) => setQuickNewCat((c) => ({ ...c, icon: v }))}
-                  placeholder="🍕"
                 />
                 <div>
                   <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Boja</label>

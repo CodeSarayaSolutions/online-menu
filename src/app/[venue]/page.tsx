@@ -409,7 +409,7 @@ export default function MenuPage() {
                       color: isActive ? accentColor : catText,
                     }}
                   >
-                    {cs.categoryBarShowIcons && <span className="text-lg">{cat.icon}</span>}
+                    {cs.categoryBarShowIcons && cat.icon?.trim() && <span className="text-lg">{cat.icon}</span>}
                     <span className="text-[10px] font-semibold mt-1">{tCategory(cat)}</span>
                   </motion.button>
                 );
@@ -427,7 +427,7 @@ export default function MenuPage() {
                       color: isActive ? accentColor : catMuted,
                     }}
                   >
-                    {cs.categoryBarShowIcons && <span className="text-base">{cat.icon}</span>} {tCategory(cat)}
+                    {cs.categoryBarShowIcons && cat.icon?.trim() && <span className="text-base">{cat.icon}</span>} {tCategory(cat)}
                   </button>
                 );
               })}
@@ -471,7 +471,7 @@ export default function MenuPage() {
                         : (!isActive ? catText : undefined),
                     }}
                   >
-                    {cs.categoryBarShowIcons && (
+                    {cs.categoryBarShowIcons && cat.icon?.trim() && (
                       <span className={clsx(
                         isPills || isMinimal ? "text-base" : "text-xl md:text-2xl mb-1",
                         isActive && !isPills && !isMinimal && "scale-110 transition-transform duration-200"
