@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import clsx from "clsx";
 import AdminLoginForm from "@/components/admin/AdminLoginForm";
 import AdminQuickLogin from "@/components/admin/AdminQuickLogin";
+import PinResetWithOtp from "@/components/admin/PinResetWithOtp";
 import { useAuthStore } from "@/store/authStore";
 import { useAdminStore } from "@/store/adminStore";
 import { mapApiUserToAppUser } from "@/lib/auth/map-user";
@@ -27,6 +28,7 @@ export default function AdminLoginPage() {
   const [hasHistory, setHasHistory] = useState(false);
   const [showEmailForm, setShowEmailForm] = useState(true);
   const [highlightEmail, setHighlightEmail] = useState(false);
+  const [showPinReset, setShowPinReset] = useState(false);
 
   useEffect(() => {
     const entries = getLoginHistoryEntries();
@@ -77,16 +79,24 @@ export default function AdminLoginPage() {
           <span className="text-white font-black text-lg">S</span>
         </div>
 
-        <AdminQuickLogin
-          onSuccess={onSuccess}
-          onShowEmail={() => {
-            setShowEmailForm(true);
-            setHighlightEmail(true);
-          }}
-          highlightEmail={highlightEmail}
-        />
+        {showPinReset ? (
+          <PinResetWithOtp
+            onDone={() => setShowPinReset(false)}
+            onCancel={() => setShowPinReset(false)}
+          />
+        ) : (
+          <>
+            <AdminQuickLogin
+              onSuccess={onSuccess}
+              onShowEmail={() => {
+                setShowEmailForm(true);
+                setHighlightEmail(true);
+              }}
+              onPinReset={() => setShowPinReset(true)}
+              highlightEmail={highlightEmail}
+            />
 
-        {(showEmailForm || !hasHistory) && (
+            {(showEmailForm || !hasHistory) && (
           <div
             className={clsx(
               hasHistory && !showEmailForm && "hidden",
@@ -103,16 +113,28 @@ export default function AdminLoginPage() {
               }
             />
           </div>
-        )}
+            )}
 
-        {hasHistory && !showEmailForm && (
-          <button
-            type="button"
-            onClick={() => setShowEmailForm(true)}
-            className="w-full mt-4 text-xs text-muted adm-text-muted underline cursor-pointer text-center"
-          >
-            Prijava lozinkom
-          </button>
+            {hasHistory && !showEmailForm && (
+              <button
+                type="button"
+                onClick={() => setShowEmailForm(true)}
+                className="w-full mt-4 text-xs text-muted adm-text-muted underline cursor-pointer text-center"
+              >
+                Prijava lozinkom
+              </button>
+            )}
+
+            {hasHistory && (
+              <button
+                type="button"
+                onClick={() => setShowPinReset(true)}
+                className="w-full mt-2 text-xs text-primary font-semibold underline cursor-pointer text-center"
+              >
+                Promijeni PIN (kod od administratora)
+              </button>
+            )}
+          </>
         )}
       </motion.div>
     </motion.div>

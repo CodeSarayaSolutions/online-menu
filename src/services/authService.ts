@@ -104,6 +104,38 @@ export async function inviteUser(payload: InviteUserPayload): Promise<InviteUser
   return body as InviteUserResult;
 }
 
+export type PinResetOtpResult = {
+  code: string;
+  expiresAt: string;
+  userId: string;
+};
+
+export async function generatePinResetOtp(
+  userId: string,
+  restaurantId?: string
+): Promise<PinResetOtpResult> {
+  const res = await fetch('/api/admin/users/pin-reset', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, restaurantId }),
+    credentials: 'include',
+  });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error ?? 'Generiranje PIN koda nije uspjelo');
+  return body as PinResetOtpResult;
+}
+
+export async function resetPinWithOtp(userId: string, otp: string, pin: string): Promise<void> {
+  const res = await fetch('/api/auth/reset-pin', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, otp, pin }),
+    credentials: 'include',
+  });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error ?? 'Promjena PIN-a nije uspjela');
+}
+
 export async function signOut() {
   await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
   setAppSessionToken(null);

@@ -39,10 +39,11 @@ function UserAvatar({ entry }: { entry: LoginHistoryEntry }) {
 type Props = {
   onSuccess: (session: SessionPayload) => void;
   onShowEmail: () => void;
+  onPinReset?: () => void;
   highlightEmail?: boolean;
 };
 
-export default function AdminQuickLogin({ onSuccess, onShowEmail, highlightEmail }: Props) {
+export default function AdminQuickLogin({ onSuccess, onShowEmail, onPinReset, highlightEmail }: Props) {
   const [history] = useState(() => getLoginHistoryEntries());
   const [selected, setSelected] = useState<LoginHistoryEntry | null>(null);
   const [pinError, setPinError] = useState<string | null>(null);
@@ -169,6 +170,15 @@ export default function AdminQuickLogin({ onSuccess, onShowEmail, highlightEmail
       >
         Prijava lozinkom / novi račun
       </button>
+      {onPinReset && (
+        <button
+          type="button"
+          onClick={onPinReset}
+          className="text-xs text-primary font-semibold underline cursor-pointer mt-2 text-center block w-full"
+        >
+          Promijeni PIN (kod od administratora)
+        </button>
+      )}
     </div>
   );
 }

@@ -136,8 +136,8 @@ export default function BarStationPage() {
   }, []);
 
   return (
-    <div className="p-5 lg:p-8 relative">
-      <div className="flex items-center justify-end gap-2 mb-4">
+    <div className="relative">
+      <div className="flex items-center justify-end gap-2 mb-2">
         <button
           type="button"
           onClick={toggleMute}
@@ -148,7 +148,7 @@ export default function BarStationPage() {
         </button>
       </div>
 
-      <StationOrdersBoard mode="bar" orders={orders} updateStatus={updateStatus} />
+      <StationOrdersBoard mode="bar" orders={orders} updateStatus={updateStatus} compact />
       {venueSlug ? <BarActiveTabs restaurantId={venueSlug} /> : null}
 
       <button

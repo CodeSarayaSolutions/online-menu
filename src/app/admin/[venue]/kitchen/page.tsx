@@ -10,6 +10,6 @@ export default function KitchenStationPage() {
   const { orders, updateStatus } = useOrders(venueSlug);
 
   return (
-    <StationOrdersBoard mode="kitchen" orders={orders} updateStatus={updateStatus} />
+    <StationOrdersBoard mode="kitchen" orders={orders} updateStatus={updateStatus} compact />
   );
 }

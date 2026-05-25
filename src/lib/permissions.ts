@@ -109,6 +109,14 @@ export function canManageInventory(user: AppUser | null, restaurantId: string): 
 }
 
 /** Default landing after venue login */
+export function isStationRoute(pathname: string): boolean {
+  return /\/admin\/[^/]+\/(bar|kitchen)(\/|$)/.test(pathname);
+}
+
+export function isStationOnlyRole(role: RestaurantRole | null): boolean {
+  return role === 'bar' || role === 'kitchen';
+}
+
 export function getDefaultVenuePath(user: AppUser | null, venueSlug: string): string {
   const role = getRestaurantRole(user, venueSlug);
   if (role === 'kitchen') return `/admin/${venueSlug}/kitchen`;

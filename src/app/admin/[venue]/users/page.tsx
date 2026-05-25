@@ -23,6 +23,7 @@ import { useCmsStore } from "@/store/cmsStore";
 import { AppUser, PlatformRole, RestaurantRole } from "@/types/auth";
 import * as authService from "@/services/authService";
 import { mapApiUserToAppUser } from "@/lib/auth/map-user";
+import { canManageVenueStaff, isPlatformAdmin } from "@/lib/permissions";
 import clsx from "clsx";
 
 const PLATFORM_ROLE_LABELS: Record<PlatformRole, { label: string; color: string; icon: typeof Shield }> = {
@@ -75,8 +76,16 @@ export default function UsersPage() {
     name: string;
     expiresAt: string;
   } | null>(null);
+  const [pinResetLoading, setPinResetLoading] = useState(false);
+  const [pinResetResult, setPinResetResult] = useState<{
+    code: string;
+    name: string;
+    expiresAt: string;
+  } | null>(null);
 
   const isAdmin = currentUser?.platformRole === "admin";
+  const canManageStaff =
+    !!venueSlug && !!currentUser && (isPlatformAdmin(currentUser) || canManageVenueStaff(currentUser, venueSlug));
 
   const handleInvite = async () => {
     if (!newName.trim() || !newEmail.trim()) return;
@@ -127,6 +136,26 @@ export default function UsersPage() {
 
   const copyInviteCode = () => {
     if (inviteResult?.code) navigator.clipboard.writeText(inviteResult.code);
+  };
+
+  const copyPinResetCode = () => {
+    if (pinResetResult?.code) navigator.clipboard.writeText(pinResetResult.code);
+  };
+
+  const handlePinResetOtp = async (user: AppUser) => {
+    setPinResetLoading(true);
+    try {
+      const result = await authService.generatePinResetOtp(user.id, venueSlug || undefined);
+      setPinResetResult({
+        code: result.code,
+        name: user.name,
+        expiresAt: result.expiresAt,
+      });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Generiranje PIN koda nije uspjelo");
+    } finally {
+      setPinResetLoading(false);
+    }
   };
 
   const handleReinvite = async (user: AppUser) => {
@@ -340,10 +369,22 @@ export default function UsersPage() {
                           type="button"
                           onClick={() => void handleReinvite(user)}
                           disabled={inviteLoading}
-                          className="mb-4 w-full py-2.5 rounded-xl border border-primary/20 text-[12px] font-bold text-primary hover:bg-primary/5 transition"
+                          className="mb-3 w-full py-2.5 rounded-xl border border-primary/20 text-[12px] font-bold text-primary hover:bg-primary/5 transition"
                         >
                           <KeyRound size={14} className="inline mr-1.5 -mt-0.5" />
                           Novi pozivni kod (6 znamenki)
+                        </button>
+                      )}
+
+                      {canManageStaff && !isSelf && (
+                        <button
+                          type="button"
+                          onClick={() => void handlePinResetOtp(user)}
+                          disabled={pinResetLoading}
+                          className="mb-4 w-full py-2.5 rounded-xl border border-purple-500/25 text-[12px] font-bold text-purple-700 hover:bg-purple-500/5 transition"
+                        >
+                          <KeyRound size={14} className="inline mr-1.5 -mt-0.5" />
+                          Generiraj PIN kod (6 znamenki)
                         </button>
                       )}
 
@@ -569,6 +610,59 @@ export default function UsersPage() {
                   className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-primary to-amber-500 text-white text-sm font-bold hover:brightness-105 transition shadow-glow disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {inviteLoading ? "Creating…" : "Create & get code"}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── PIN reset OTP (copy for employee) ── */}
+      <AnimatePresence>
+        {pinResetResult && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="adm-surface adm-border border rounded-3xl p-6 max-w-[400px] w-full shadow-elevated"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center mx-auto mb-4">
+                <KeyRound size={22} className="text-purple-700" />
+              </div>
+              <h3 className="text-lg font-extrabold text-dark adm-text text-center">PIN kod</h3>
+              <p className="text-sm text-muted adm-text-muted text-center mt-2">
+                Pošaljite kod korisniku{" "}
+                <span className="font-bold text-dark adm-text">{pinResetResult.name}</span>. Na prijavi:
+                <strong> Promijeni PIN</strong> → unos koda → novi PIN (3 cifre).
+              </p>
+              <div className="mt-4 p-4 adm-bg rounded-2xl text-center">
+                <p className="text-3xl font-black tracking-[0.4em] text-dark adm-text font-mono">
+                  {pinResetResult.code}
+                </p>
+                <p className="text-[10px] text-muted adm-text-muted mt-2">
+                  Vrijedi do {new Date(pinResetResult.expiresAt).toLocaleString()}
+                </p>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={copyPinResetCode}
+                  className="flex-1 py-3 rounded-2xl border border-purple-500/25 text-sm font-bold text-purple-700 flex items-center justify-center gap-2"
+                >
+                  <Copy size={16} />
+                  Kopiraj kod
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPinResetResult(null)}
+                  className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-primary to-amber-500 text-white text-sm font-bold"
+                >
+                  Gotovo
                 </button>
               </div>
             </motion.div>

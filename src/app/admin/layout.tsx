@@ -44,6 +44,8 @@ import {
   canViewWaiterMode,
   canManageVenueStaff,
   isPlatformAdmin,
+  isStationRoute,
+  isStationOnlyRole,
   restaurantRoleLabel,
 } from "@/lib/permissions";
 import { useAdminSession } from "@/hooks/useAdminSession";
@@ -103,6 +105,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showRestaurantPicker, setShowRestaurantPicker] = useState(false);
   const [canInstall, setCanInstall] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const { ready: sessionReady, error: sessionError } = useAdminSession();
   const { venuesReady, loading: venuesLoading, error: venuesError } = useVenueCloudSync(
@@ -112,6 +115,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const isLoginPage = pathname === "/admin/login";
 
   useEffect(() => { setHydrated(true); }, []);
+
+  useEffect(() => {
+    const onFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    onFullscreenChange();
+    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
 
   useEffect(() => {
     const check = () => setCanInstall(!!window.__pwaInstallPrompt);
@@ -502,6 +512,41 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const venueReady = effectiveVenueId && (allRestaurants[effectiveVenueId] || !venuesReady);
   if (!venueReady || !currentUserId || !currentUser || !effectiveVenueId) {
     return null;
+  }
+
+  const stationFocus =
+    isStationRoute(pathname) &&
+    (isStationOnlyRole(currentRestaurantRole) || isFullscreen);
+
+  if (stationFocus) {
+    return (
+      <div
+        className={clsx("fixed inset-0 z-[60] flex flex-col adm-bg", darkMode && "admin-dark")}
+        style={{ fontFamily: "Inter, system-ui, sans-serif" }}
+      >
+        <AdminPWA />
+        <button
+          type="button"
+          onClick={() => void handleLogout()}
+          className="absolute top-2 right-2 z-20 px-3 py-1.5 rounded-lg text-[11px] font-bold text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)] transition"
+          title="Odjava"
+        >
+          <LogOut size={14} className="inline -mt-0.5 mr-1" />
+          Odjava
+        </button>
+        <main className="flex-1 overflow-y-auto min-h-0">
+          <motion.div
+            key={pathname}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.2 }}
+            className="p-2 sm:p-3"
+          >
+            {children}
+          </motion.div>
+        </main>
+      </div>
+    );
   }
 
   // ─── Full admin panel with sidebar ────────────────────────

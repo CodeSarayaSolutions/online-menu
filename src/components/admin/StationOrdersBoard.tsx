@@ -28,6 +28,8 @@ type StationOrdersBoardProps = {
   mode: StationMode;
   orders: Order[];
   updateStatus: (orderId: string, status: OrderStatus) => Promise<void>;
+  /** Smaller header — more room for order cards */
+  compact?: boolean;
 };
 
 const STATUS_FLOW: OrderStatus[] = ["pending", "preparing", "ready", "served"];
@@ -261,6 +263,7 @@ export default function StationOrdersBoard({
   mode,
   orders,
   updateStatus,
+  compact = false,
 }: StationOrdersBoardProps) {
   const active = orders.filter(
     (o) => o.status !== "served" && o.status !== "cancelled"
@@ -275,27 +278,45 @@ export default function StationOrdersBoard({
   const title = mode === "kitchen" ? "Kitchen" : "Bar";
   const subtitle =
     mode === "kitchen"
-      ? "Food items only — prices hidden"
-      : "Drinks with prices — expand for full order";
+      ? "Samo jela — bez cijena"
+      : "Pića s cijenama — proširi za cijeli račun";
 
   return (
     <div>
-      <div className="flex items-center gap-3 mb-6">
+      <div className={clsx("flex items-center gap-2", compact ? "mb-2" : "gap-3 mb-6")}>
         <div
           className={clsx(
-            "w-12 h-12 rounded-2xl flex items-center justify-center",
+            "rounded-xl flex items-center justify-center shrink-0",
+            compact ? "w-8 h-8" : "w-12 h-12 rounded-2xl",
             mode === "kitchen" ? "bg-amber-500/15" : "bg-purple-500/15"
           )}
         >
-          <Icon size={24} className={mode === "kitchen" ? "text-amber-700" : "text-purple-700"} />
+          <Icon
+            size={compact ? 16 : 24}
+            className={mode === "kitchen" ? "text-amber-700" : "text-purple-700"}
+          />
         </div>
-        <div>
-          <h1 className="text-xl font-extrabold text-dark adm-text">{title} station</h1>
-          <p className="text-[13px] text-muted adm-text-muted">{subtitle}</p>
+        <div className="min-w-0">
+          <h1
+            className={clsx(
+              "font-extrabold text-dark adm-text",
+              compact ? "text-sm leading-tight" : "text-xl"
+            )}
+          >
+            {title === "Kitchen" ? "Kuhinja" : "Bar"}
+          </h1>
+          <p className={clsx("text-muted adm-text-muted", compact ? "text-[10px]" : "text-[13px]")}>
+            {subtitle}
+          </p>
         </div>
-        <div className="ml-auto flex items-center gap-2 text-[12px] font-bold text-muted adm-text-muted">
-          <MapPin size={14} />
-          {visible.length} active
+        <div
+          className={clsx(
+            "ml-auto flex items-center gap-1 font-bold text-muted adm-text-muted shrink-0",
+            compact ? "text-[10px]" : "text-[12px]"
+          )}
+        >
+          <MapPin size={compact ? 11 : 14} />
+          {visible.length}
         </div>
       </div>
 
