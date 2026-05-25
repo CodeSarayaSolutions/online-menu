@@ -90,39 +90,41 @@ export default function MenuItemCard({ product, index }: MenuItemCardProps) {
             style={{ backgroundColor: cs.cardBgColor }}
           >
             {/* Image */}
-            <div className="relative h-36 md:h-44 overflow-hidden shrink-0">
-              <img
-                src={product.image}
-                alt={tProduct(product, "name")}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent" />
+            {product.image && (
+              <div className="relative h-36 md:h-44 overflow-hidden shrink-0">
+                <img
+                  src={product.image}
+                  alt={tProduct(product, "name")}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent" />
 
-              {product.popular && (
-                <div className="absolute top-2 left-2">
-                  <span
-                    className="inline-flex items-center gap-[3px] backdrop-blur-sm text-[9px] md:text-[10px] font-bold px-2 py-[3px] rounded-full shadow-sm"
-                    style={{ backgroundColor: popularBadgeBg, color: popularBadgeColor, border: `1px solid ${popularBadgeColor}20` }}
-                  >
-                    {t(pageContent, "popularBadgeText")}
-                  </span>
-                </div>
-              )}
-
-              <AnimatePresence>
-                {!viewOnly && qtyInCart > 0 && (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    exit={{ scale: 0 }}
-                    className="absolute bottom-2 left-2 min-w-[22px] h-[22px] rounded-full flex items-center justify-center shadow-md px-1"
-                    style={{ backgroundColor: cs.cardPriceColor }}
-                  >
-                    <span className="text-white text-[10px] font-extrabold leading-none">{qtyInCart}</span>
-                  </motion.div>
+                {product.popular && (
+                  <div className="absolute top-2 left-2">
+                    <span
+                      className="inline-flex items-center gap-[3px] backdrop-blur-sm text-[9px] md:text-[10px] font-bold px-2 py-[3px] rounded-full shadow-sm"
+                      style={{ backgroundColor: popularBadgeBg, color: popularBadgeColor, border: `1px solid ${popularBadgeColor}20` }}
+                    >
+                      {t(pageContent, "popularBadgeText")}
+                    </span>
+                  </div>
                 )}
-              </AnimatePresence>
-            </div>
+
+                <AnimatePresence>
+                  {!viewOnly && qtyInCart > 0 && (
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      exit={{ scale: 0 }}
+                      className="absolute bottom-2 left-2 min-w-[22px] h-[22px] rounded-full flex items-center justify-center shadow-md px-1"
+                      style={{ backgroundColor: cs.cardPriceColor }}
+                    >
+                      <span className="text-white text-[10px] font-extrabold leading-none">{qtyInCart}</span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
 
             {/* Content */}
             <div className="p-3 md:p-4 flex-1 flex flex-col">
@@ -278,44 +280,46 @@ export default function MenuItemCard({ product, index }: MenuItemCardProps) {
           style={{ backgroundColor: cs.cardBgColor }}
         >
           {/* Image */}
-          <div className="relative w-[110px] md:w-[150px] lg:w-[170px] min-h-[120px] shrink-0 overflow-hidden self-stretch">
-            <img
-              src={product.image}
-              alt={tProduct(product, "name")}
-              className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-            />
-            <div className={clsx(
-              "absolute inset-0",
-              imgRight
-                ? "bg-gradient-to-l from-transparent via-transparent to-white/20"
-                : "bg-gradient-to-r from-transparent via-transparent to-white/20"
-            )} />
+          {product.image && (
+            <div className="relative w-[110px] md:w-[150px] lg:w-[170px] min-h-[120px] shrink-0 overflow-hidden self-stretch">
+              <img
+                src={product.image}
+                alt={tProduct(product, "name")}
+                className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              />
+              <div className={clsx(
+                "absolute inset-0",
+                imgRight
+                  ? "bg-gradient-to-l from-transparent via-transparent to-white/20"
+                  : "bg-gradient-to-r from-transparent via-transparent to-white/20"
+              )} />
 
-            {product.popular && (
-              <div className="absolute top-2 left-2">
-                <span
-                  className="inline-flex items-center gap-[3px] backdrop-blur-sm text-[9px] md:text-[10px] font-bold px-2 py-[3px] rounded-full shadow-sm"
-                  style={{ backgroundColor: popularBadgeBg, color: popularBadgeColor, border: `1px solid ${popularBadgeColor}20` }}
-                >
-                  {t(pageContent, "popularBadgeText")}
-                </span>
-              </div>
-            )}
-
-            <AnimatePresence>
-              {!viewOnly && qtyInCart > 0 && (
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  exit={{ scale: 0 }}
-                  className="absolute bottom-2 left-2 min-w-[22px] h-[22px] rounded-full flex items-center justify-center shadow-md px-1"
-                  style={{ backgroundColor: cs.cardPriceColor }}
-                >
-                  <span className="text-white text-[10px] font-extrabold leading-none">{qtyInCart}</span>
-                </motion.div>
+              {product.popular && (
+                <div className="absolute top-2 left-2">
+                  <span
+                    className="inline-flex items-center gap-[3px] backdrop-blur-sm text-[9px] md:text-[10px] font-bold px-2 py-[3px] rounded-full shadow-sm"
+                    style={{ backgroundColor: popularBadgeBg, color: popularBadgeColor, border: `1px solid ${popularBadgeColor}20` }}
+                  >
+                    {t(pageContent, "popularBadgeText")}
+                  </span>
+                </div>
               )}
-            </AnimatePresence>
-          </div>
+
+              <AnimatePresence>
+                {!viewOnly && qtyInCart > 0 && (
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    exit={{ scale: 0 }}
+                    className="absolute bottom-2 left-2 min-w-[22px] h-[22px] rounded-full flex items-center justify-center shadow-md px-1"
+                    style={{ backgroundColor: cs.cardPriceColor }}
+                  >
+                    <span className="text-white text-[10px] font-extrabold leading-none">{qtyInCart}</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
 
           {/* Content */}
           <div className="flex-1 min-w-0 p-3 md:p-4 flex flex-col">
