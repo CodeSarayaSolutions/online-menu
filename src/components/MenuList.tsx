@@ -99,22 +99,15 @@ interface MenuListProps {
   categoryName?: string;
 }
 
-const CATEGORY_ORDER = [
-  "Pizza",
-  "Pasta",
-  "Burgers",
-  "Sides",
-  "Salads",
-  "Desserts",
-  "Drinks",
-];
-
 export default function MenuList({
   products,
   grouped = false,
   categoryName,
 }: MenuListProps) {
-  const { categoryIcons, pageContent, componentStyles: cs } = useCmsData();
+  const { categoryConfig, categoryIcons, pageContent, componentStyles: cs } = useCmsData();
+  const CATEGORY_ORDER = categoryConfig
+    .filter((c) => c.id !== "all" && c.id !== "popular")
+    .map((c) => c.label);
   const { t } = useTranslation();
   const centered = cs.sectionTitleAlign === "center";
 
