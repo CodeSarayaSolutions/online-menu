@@ -96,7 +96,7 @@ export async function createProduct(product: InsertDto<'products'>, client?: DbC
   const db = client ?? supabase;
   const { data, error } = await db
     .from('products')
-    .insert(product)
+    .upsert(product, { onConflict: 'id' })
     .select()
     .single();
 
