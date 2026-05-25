@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { getSessionUserFromRequest } from '@/lib/auth/require-session';
 import { loadVenueBundle, saveVenueToCloud } from '@/lib/venue-cloud/sync';
+import { upsertInventoryItem } from '@/services/inventoryService';
 import type { CategoryInfo, ProductItem } from '@/types/cms';
 
 interface ImportPayload {
@@ -17,7 +18,7 @@ interface ImportPayload {
     popular: boolean;
     sortOrder: number;
   }>;
-  mode?: 'merge' | 'replace'; // default: merge
+  mode?: 'merge' | 'replace';
 }
 
 function toProductItems(slug: string, products: ImportPayload['products']): ProductItem[] {
@@ -55,7 +56,6 @@ export async function POST(
     return NextResponse.json({ error: 'categories and products arrays required' }, { status: 400 });
   }
 
-  // Load existing venue data
   const existing = await loadVenueBundle(slug);
   if (!existing) {
     return NextResponse.json({ error: `Venue "${slug}" not found` }, { status: 404 });
@@ -63,41 +63,34 @@ export async function POST(
 
   let finalCategories: CategoryInfo[];
   let finalProducts: ProductItem[];
+  let newProducts: ProductItem[];
 
   if (mode === 'replace') {
-    // Keep system categories (all, popular), replace everything else
     const systemCats = existing.categories.filter((c) => c.id === 'all' || c.id === 'popular');
     finalCategories = [...systemCats, ...incomingCats];
     finalProducts = toProductItems(slug, incomingProducts);
+    newProducts = finalProducts;
   } else {
-    // Merge: add categories that don't exist yet (by id)
     const existingCatIds = new Set(existing.categories.map((c) => c.id));
     const newCats = incomingCats.filter((c) => !existingCatIds.has(c.id));
     finalCategories = [...existing.categories, ...newCats];
 
-    // Merge: add products that don't exist yet (by name+category combo)
     const existingKeys = new Set(
       existing.products.map((p) => `${p.name.toLowerCase()}|${p.category.toLowerCase()}`)
     );
-    const newProducts = toProductItems(slug, incomingProducts).filter(
+    const filtered = toProductItems(slug, incomingProducts).filter(
       (p) => !existingKeys.has(`${p.name.toLowerCase()}|${p.category.toLowerCase()}`)
     );
-    // Re-assign IDs to avoid collisions with existing
     const offset = existing.products.length;
-    const remappedProducts = newProducts.map((p, i) => ({
+    newProducts = filtered.map((p, i) => ({
       ...p,
       id: `import-${Date.now()}-${offset + i}`,
       restaurantId: slug,
     }));
-    finalProducts = [...existing.products, ...remappedProducts];
+    finalProducts = [...existing.products, ...newProducts];
   }
 
-  // Build updated bundle
-  const updatedBundle = {
-    ...existing,
-    categories: finalCategories,
-    products: finalProducts,
-  };
+  const updatedBundle = { ...existing, categories: finalCategories, products: finalProducts };
 
   try {
     await saveVenueToCloud(slug, updatedBundle, supabaseAdmin);
@@ -106,21 +99,14 @@ export async function POST(
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
-  // Auto-init inventory for all new products at stock 0
-  // (fire and forget — don't block the response)
-  const newProductIds = mode === 'replace'
-    ? finalProducts.map((p) => ({ id: p.id, name: p.name }))
-    : finalProducts.slice(existing.products.length).map((p) => ({ id: p.id, name: p.name }));
-
-  void Promise.allSettled(
-    newProductIds.map(({ id, name }) =>
-      fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/inventory/adjust`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Cookie: request.headers.get('cookie') ?? '' },
-        body: JSON.stringify({ restaurantId: slug, productId: id, productName: name, delta: 0, reason: 'import-init' }),
-      })
+  // Init inventory directly — no HTTP round-trip, no auth issues
+  const inventoryResults = await Promise.allSettled(
+    newProducts.map((p) =>
+      upsertInventoryItem(slug, p.id, p.name, 0, 'kom', null, supabaseAdmin)
     )
   );
+
+  const inventoryFailed = inventoryResults.filter((r) => r.status === 'rejected').length;
 
   return NextResponse.json({
     ok: true,
@@ -128,7 +114,11 @@ export async function POST(
       categories: finalCategories.length,
       products: finalProducts.length,
       newCategories: mode === 'replace' ? incomingCats.length : finalCategories.length - existing.categories.length,
-      newProducts: mode === 'replace' ? incomingProducts.length : finalProducts.length - existing.products.length,
+      newProducts: newProducts.length,
+    },
+    inventory: {
+      initialized: newProducts.length - inventoryFailed,
+      failed: inventoryFailed,
     },
   });
 }
