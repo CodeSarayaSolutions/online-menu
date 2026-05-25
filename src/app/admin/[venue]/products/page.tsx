@@ -804,7 +804,7 @@ export default function ProductsEditor() {
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "spring", damping: 32, stiffness: 320 }}
-              className="fixed inset-y-0 right-0 z-50 flex flex-col w-full md:w-[480px] adm-surface adm-border border-l border-primary/10 shadow-elevated relative"
+              className="fixed inset-y-0 right-0 z-50 flex flex-col w-full md:w-[480px] adm-surface adm-border border-l border-primary/10 shadow-elevated"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Sticky header */}
