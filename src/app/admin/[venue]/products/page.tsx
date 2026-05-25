@@ -90,6 +90,8 @@ export default function ProductsEditor() {
   const [filterCategory, setFilterCategory] = useState("all");
   const [editingProduct, setEditingProduct] = useState<ProductItem | null>(null);
   const [isNew, setIsNew] = useState(false);
+  const [initialStock, setInitialStock] = useState(0);
+  const [stockToast, setStockToast] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
@@ -175,6 +177,8 @@ export default function ProductsEditor() {
     if (category) p.category = category;
     setEditingProduct(p);
     setIsNew(true);
+    setInitialStock(0);
+    setStockToast(null);
   };
 
   const openProductCatModal = () => {
@@ -209,7 +213,12 @@ export default function ProductsEditor() {
     });
     setIsNew(false);
   };
-  const cancelEdit = () => { setEditingProduct(null); setIsNew(false); };
+  const cancelEdit = () => {
+    setEditingProduct(null);
+    setIsNew(false);
+    setInitialStock(0);
+    setStockToast(null);
+  };
 
   const saveProduct = () => {
     if (!editingProduct || !editingProduct.name || !editingProduct.price) return;
@@ -235,6 +244,10 @@ export default function ProductsEditor() {
     }
     if (isNew) {
       addProduct(payload);
+      const stock = initialStock;
+      setTimeout(() => saveActiveToAllRestaurants(venue), 0);
+      setSaved(editingProduct.id);
+      setTimeout(() => setSaved(null), 1500);
       fetch("/api/inventory/adjust", {
         method: "POST",
         credentials: "include",
@@ -243,11 +256,26 @@ export default function ProductsEditor() {
           restaurantId: venue,
           productId: payload.id,
           productName: payload.name,
-          delta: 0,
+          delta: stock,
           reason: "init",
         }),
-      }).catch((e) => console.error("[inventory] auto-init failed", e));
-    } else updateProduct(payload.id, payload);
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error("Inventory adjust failed");
+          setStockToast(
+            stock > 0
+              ? `Stavka dodana. Zaliha postavljena na ${stock}.`
+              : "Stavka dodana. Zaliha je trenutno 0 — ažurirajte u Inventaru."
+          );
+          setTimeout(() => cancelEdit(), 2500);
+        })
+        .catch((e) => {
+          console.error("[inventory] auto-init failed", e);
+          cancelEdit();
+        });
+      return;
+    }
+    updateProduct(payload.id, payload);
     /* Sync flat state → allRestaurants so public pages & reloads see the change */
     setTimeout(() => saveActiveToAllRestaurants(venue), 0);
     setSaved(editingProduct.id);
@@ -367,8 +395,8 @@ export default function ProductsEditor() {
       {/* ───────────── Header ───────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-extrabold text-dark adm-text tracking-tight">Products</h1>
-          <p className="text-sm text-muted adm-text-muted mt-1">{products.length} items &middot; {categories.filter((c) => c.id !== "all" && c.id !== "popular").length} categories</p>
+          <h1 className="text-2xl font-extrabold text-dark adm-text tracking-tight">Stavke menija</h1>
+          <p className="text-sm text-muted adm-text-muted mt-1">{products.length} stavki &middot; {categories.filter((c) => c.id !== "all" && c.id !== "popular").length} vrste</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -379,10 +407,10 @@ export default function ProductsEditor() {
                 ? "border-primary/20 bg-primary/5 text-primary"
                 : "border-primary/10 text-dark adm-text hover:bg-[var(--adm-surface-2)]"
             )}
-            title={showPreview ? "Hide Preview" : "Show Preview"}
+            title={showPreview ? "Sakrij pregled" : "Prikaži pregled"}
           >
             {showPreview ? <PanelRightClose size={14} /> : <PanelRightOpen size={14} />}
-            <span className="hidden 2xl:inline">{showPreview ? "Hide" : "Show"} Preview</span>
+            <span className="hidden 2xl:inline">{showPreview ? "Sakrij pregled" : "Prikaži pregled"}</span>
           </button>
           <button
             onClick={() => setShowCatPanel(!showCatPanel)}
@@ -394,11 +422,11 @@ export default function ProductsEditor() {
             )}
           >
             <Tags size={15} />
-            Categories
+            Vrste
             <span className="text-[10px] font-bold adm-bg rounded-full px-2 py-0.5 text-muted adm-text-muted">{categories.filter((c) => c.id !== "all" && c.id !== "popular").length}</span>
           </button>
           <button onClick={() => startAdd()} className="flex items-center gap-2 bg-gradient-to-r from-primary to-amber-500 text-white px-5 py-2.5 rounded-2xl text-sm font-bold hover:brightness-105 transition shadow-glow shrink-0">
-            <Plus size={16} /> Add Product
+            <Plus size={16} /> Dodaj stavku
           </button>
         </div>
       </div>
@@ -423,8 +451,8 @@ export default function ProductsEditor() {
                     <Tags size={14} className="text-primary" />
                   </div>
                   <div>
-                    <h2 className="text-sm font-extrabold text-dark adm-text">Manage Categories</h2>
-                    <p className="text-[10px] text-muted adm-text-muted">{categories.length} total &middot; Reorder, edit, or add new</p>
+                    <h2 className="text-sm font-extrabold text-dark adm-text">Upravljanje vrstama</h2>
+                    <p className="text-[10px] text-muted adm-text-muted">{categories.length} ukupno &middot; Promijenite redoslijed, uredite ili dodajte</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -432,7 +460,7 @@ export default function ProductsEditor() {
                     onClick={() => setShowCatAdd(true)}
                     className="flex items-center gap-1.5 bg-gradient-to-r from-primary to-amber-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold hover:brightness-105 transition shadow-glow"
                   >
-                    <Plus size={13} /> New Category
+                    <Plus size={13} /> Nova vrsta
                   </button>
                   <button
                     onClick={() => setShowCatPanel(false)}
@@ -454,13 +482,13 @@ export default function ProductsEditor() {
                   >
                     <div className="px-5 py-5 border-b border-primary/10 bg-primary/[0.02]">
                       <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-[13px] font-extrabold text-dark adm-text">Create Category</h3>
+                        <h3 className="text-[13px] font-extrabold text-dark adm-text">Kreiraj vrstu</h3>
                         <button onClick={() => setShowCatAdd(false)} className="p-1 rounded-lg hover:bg-[var(--adm-surface-2)] text-muted adm-text-muted transition"><X size={14} /></button>
                       </div>
                       <div className="grid grid-cols-2 gap-4 mb-4">
-                        <CatField label="ID (lowercase)" value={newCat.id} onChange={(v) => setNewCat((c) => ({ ...c, id: v.toLowerCase().replace(/\s/g, "-") }))} placeholder="e.g. seafood" />
+                        <CatField label="ID (mala slova)" value={newCat.id} onChange={(v) => setNewCat((c) => ({ ...c, id: v.toLowerCase().replace(/\s/g, "-") }))} placeholder="e.g. seafood" />
                         <div>
-                          <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Display Name</label>
+                          <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Naziv za prikaz</label>
                           <div>
                             <input value={newCat.label} onChange={(e) => setNewCat((c) => ({ ...c, label: e.target.value }))} placeholder="e.g. Seafood" className="w-full px-3 py-2 adm-bg rounded-xl text-sm text-dark adm-text border border-primary/10 focus:border-primary focus:adm-surface adm-border border focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:adm-text-faint" />
                             <BsCollapse hasValue={!!((newCat as any).label_bs)}>
@@ -470,7 +498,7 @@ export default function ProductsEditor() {
                         </div>
                         <CatField label="Emoji Icon" value={newCat.icon} onChange={(v) => setNewCat((c) => ({ ...c, icon: v }))} placeholder="🍽️" />
                         <div>
-                          <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Color</label>
+                          <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Boja</label>
                           <div className="flex flex-wrap gap-1.5">
                             {colorPresets.map((color) => (
                               <button
@@ -483,8 +511,8 @@ export default function ProductsEditor() {
                         </div>
                       </div>
                       <div className="flex gap-3">
-                        <button onClick={() => setShowCatAdd(false)} className="flex-1 py-2 rounded-xl border border-primary/10 text-xs font-semibold text-dark adm-text hover:bg-[var(--adm-surface-2)] transition">Cancel</button>
-                        <button onClick={handleCatAdd} disabled={!newCat.id || !newCat.label} className="flex-1 py-2 rounded-xl bg-gradient-to-r from-primary to-amber-500 text-white text-xs font-bold hover:brightness-105 transition disabled:opacity-40 shadow-glow">Create</button>
+                        <button onClick={() => setShowCatAdd(false)} className="flex-1 py-2 rounded-xl border border-primary/10 text-xs font-semibold text-dark adm-text hover:bg-[var(--adm-surface-2)] transition">Odustani</button>
+                        <button onClick={handleCatAdd} disabled={!newCat.id || !newCat.label} className="flex-1 py-2 rounded-xl bg-gradient-to-r from-primary to-amber-500 text-white text-xs font-bold hover:brightness-105 transition disabled:opacity-40 shadow-glow">Kreiraj</button>
                       </div>
                     </div>
                   </motion.div>
@@ -507,7 +535,7 @@ export default function ProductsEditor() {
                           </div>
                           <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Display Name</label>
+                              <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Naziv za prikaz</label>
                               <div>
                                 <input value={catEditForm.label} onChange={(e) => setCatEditForm((f) => f ? { ...f, label: e.target.value } : f)} placeholder="e.g. Seafood" className="w-full px-3 py-2 adm-bg rounded-xl text-sm text-dark adm-text border border-primary/10 focus:border-primary focus:adm-surface adm-border border focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:adm-text-faint" />
                                 <BsCollapse hasValue={!!(catEditForm.label_bs)}>
@@ -518,7 +546,7 @@ export default function ProductsEditor() {
                             <CatField label="Emoji Icon" value={catEditForm.icon} onChange={(v) => setCatEditForm((f) => f ? { ...f, icon: v } : f)} />
                           </div>
                           <div>
-                            <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-1.5">Color</label>
+                            <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-1.5">Boja</label>
                             <div className="flex flex-wrap gap-1.5">
                               {colorPresets.map((color) => (
                                 <button
@@ -530,7 +558,7 @@ export default function ProductsEditor() {
                             </div>
                           </div>
                           <div className="flex gap-2 pt-1">
-                            <button onClick={cancelCatEdit} className="flex-1 py-2 rounded-xl border border-primary/10 text-xs font-semibold text-dark adm-text hover:bg-[var(--adm-surface-2)] transition">Cancel</button>
+                            <button onClick={cancelCatEdit} className="flex-1 py-2 rounded-xl border border-primary/10 text-xs font-semibold text-dark adm-text hover:bg-[var(--adm-surface-2)] transition">Odustani</button>
                             <button onClick={saveCatEdit} className="flex-1 py-2 rounded-xl bg-gradient-to-r from-primary to-amber-500 text-white text-xs font-bold hover:brightness-105 flex items-center justify-center gap-1.5 shadow-glow">
                               <Save size={12} /> Save
                             </button>
@@ -548,7 +576,7 @@ export default function ProductsEditor() {
                           <div className="flex-1 min-w-0">
                             <p className="text-[13px] font-semibold text-dark adm-text">{cat.label}</p>
                             <p className="text-[10px] text-muted adm-text-muted">
-                              {isSpecialCat(cat.id) ? <span className="text-primary font-medium">System</span> : `${productCount} product${productCount !== 1 ? "s" : ""}`}
+                              {isSpecialCat(cat.id) ? <span className="text-primary font-medium">System</span> : `${productCount} ${productCount !== 1 ? "stavki" : "stavka"}`}
                             </p>
                           </div>
                           {catSaved === cat.id && <Check size={15} className="text-accent-green shrink-0" strokeWidth={3} />}
@@ -583,7 +611,7 @@ export default function ProductsEditor() {
           <input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search products..."
+            placeholder="Pretraži stavke..."
             className="w-full pl-10 pr-9 py-2.5 adm-surface adm-border border rounded-2xl text-sm text-dark adm-text border border-primary/10 focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all shadow-soft"
           />
           {searchQuery && (
@@ -603,315 +631,13 @@ export default function ProductsEditor() {
           }}
           className="px-4 py-2.5 adm-surface adm-border border rounded-2xl text-sm text-dark adm-text border border-primary/10 focus:border-primary outline-none min-w-[180px] shadow-soft"
         >
-          <option value="all">All Categories (filter only)</option>
+          <option value="all">Sve vrste (samo filter)</option>
           {realCategories.map((c) => (
             <option key={c.id} value={c.id}>{c.icon} {c.label}</option>
           ))}
-          <option value="__create__">➕ Create category…</option>
+          <option value="__create__">➕ Kreiraj novu vrstu…</option>
         </select>
       </div>
-
-      {/* Edit form */}
-      <AnimatePresence>
-        {editingProduct && (
-          <motion.div
-            initial={{ opacity: 0, y: -12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
-            className="adm-surface adm-border border rounded-2xl border-2 border-primary/30 p-6 mb-6 shadow-card"
-          >
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-2xl bg-primary/10 flex items-center justify-center">
-                  <Package size={16} className="text-primary" />
-                </div>
-                <div>
-                  <h3 className="text-[15px] font-extrabold text-dark adm-text">{isNew ? "New Product" : "Edit Product"}</h3>
-                  {!isNew && <p className="text-[11px] text-muted adm-text-muted">{editingProduct.name}</p>}
-                </div>
-              </div>
-              <button onClick={cancelEdit} className="p-2 rounded-xl hover:bg-[var(--adm-surface-2)] text-muted adm-text-muted transition"><X size={16} /></button>
-            </div>
-
-            <div className="flex flex-col lg:flex-row gap-6">
-              <div className="lg:w-52 shrink-0">
-                <div className="w-full aspect-square lg:aspect-auto lg:h-52 rounded-2xl adm-bg overflow-hidden flex items-center justify-center border-2 border-dashed border-primary/15">
-                  {editingProduct.image ? (
-                    <img src={editingProduct.image} alt="Preview" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="text-center p-4">
-                      <ImageIcon size={28} className="adm-text-faint mx-auto mb-2" />
-                      <p className="text-[11px] text-muted adm-text-muted">Add image URL below</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex-1 space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Name *</label>
-                    <div>
-                      <input type="text" value={editingProduct.name} onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })} placeholder="e.g. Margherita Pizza" className="w-full px-3 py-2.5 adm-bg rounded-2xl text-sm text-dark adm-text border border-primary/10 focus:border-primary focus:adm-surface adm-border border focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:adm-text-faint" />
-                      <BsCollapse hasValue={!!(editingProduct.name_bs)}>
-                        <input type="text" value={editingProduct.name_bs || ""} onChange={(e) => setEditingProduct({ ...editingProduct, name_bs: e.target.value })} placeholder="npr. Margherita Pizza" className="w-full px-3 py-2.5 adm-bg rounded-2xl text-sm text-dark adm-text border border-blue-200/30 focus:border-blue-400 focus:adm-surface adm-border border focus:ring-4 focus:ring-blue-100 outline-none transition-all placeholder:adm-text-faint" />
-                      </BsCollapse>
-                    </div>
-                  </div>
-                  <Field label="Price (KM) *" type="number" value={editingProduct.price || ""} onChange={(v) => setEditingProduct({ ...editingProduct, price: parseFloat(v) || 0 })} placeholder="12.99" />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Description</label>
-                  <div>
-                    <textarea
-                      value={editingProduct.description}
-                      onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })}
-                      rows={2}
-                      placeholder="Describe the dish..."
-                      className="w-full px-3.5 py-2.5 adm-bg rounded-2xl text-sm text-dark adm-text border border-primary/10 focus:border-primary focus:adm-surface adm-border border focus:ring-4 focus:ring-primary/10 outline-none resize-none transition-all placeholder:adm-text-faint"
-                    />
-                    <BsCollapse hasValue={!!(editingProduct.description_bs)}>
-                      <textarea
-                        value={editingProduct.description_bs || ""}
-                        onChange={(e) => setEditingProduct({ ...editingProduct, description_bs: e.target.value })}
-                        rows={2}
-                        placeholder="Opišite jelo..."
-                        className="w-full px-3.5 py-2.5 adm-bg rounded-2xl text-sm text-dark adm-text border border-blue-200/30 focus:border-blue-400 focus:adm-surface adm-border border focus:ring-4 focus:ring-blue-100 outline-none resize-none transition-all placeholder:adm-text-faint"
-                      />
-                    </BsCollapse>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <ImageUploadField
-                    label="Product image"
-                    restaurantId={venue}
-                    placement="product"
-                    value={editingProduct.image}
-                    onChange={(url) => setEditingProduct({ ...editingProduct, image: url })}
-                  />
-                  <div>
-                    <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Category *</label>
-                    <select
-                      value={editingProduct.category || ""}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        if (v === "__create__") {
-                          openProductCatModal();
-                          return;
-                        }
-                        setEditingProduct({ ...editingProduct, category: v });
-                      }}
-                      className="w-full px-3.5 py-2.5 adm-bg rounded-2xl text-sm text-dark adm-text border border-primary/10 focus:border-primary outline-none transition-all"
-                    >
-                      <option value="" disabled>
-                        {realCategories.length === 0 ? "No categories yet — create one" : "Select category"}
-                      </option>
-                      {realCategories.map((c) => (
-                        <option key={c.id} value={c.label}>
-                          {c.icon} {c.label}
-                        </option>
-                      ))}
-                      {menuCategories
-                        .filter((label) => !realCategories.some((c) => c.label === label))
-                        .map((label) => (
-                          <option key={`legacy-${label}`} value={label}>
-                            {label} (from existing products)
-                          </option>
-                        ))}
-                      <option value="__create__">➕ Create new category…</option>
-                    </select>
-                    <p className="text-[10px] text-muted adm-text-muted mt-1.5">
-                      “All Categories” above is only a list filter — each product needs its own menu category.
-                    </p>
-                  </div>
-                </div>
-
-                <label className="flex items-center gap-3 py-2 cursor-pointer group">
-                  <div
-                    className={clsx("w-11 h-6 rounded-full transition-all relative cursor-pointer", editingProduct.popular ? "bg-primary" : "adm-bg border border-primary/10")}
-                    onClick={() => setEditingProduct({ ...editingProduct, popular: !editingProduct.popular })}
-                  >
-                    <div className={clsx("absolute top-0.5 w-5 h-5 adm-surface adm-border border rounded-full shadow-md transition-all", editingProduct.popular ? "left-[22px]" : "left-0.5")} />
-                  </div>
-                  <span className="text-sm font-medium text-dark adm-text flex items-center gap-1.5">
-                    <Flame size={14} className={editingProduct.popular ? "text-primary" : "adm-text-faint"} />
-                    Mark as Popular
-                  </span>
-                </label>
-              </div>
-            </div>
-
-            {/* Addons */}
-            <div className="mt-6 border-t border-bg pt-5">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Sparkles size={14} className="text-primary/50" />
-                  <h4 className="text-xs font-bold text-muted adm-text-muted uppercase tracking-wider">Add-ons / Extras</h4>
-                </div>
-                <button onClick={addAddon} className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:brightness-110 transition">
-                  <Plus size={14} /> Add Extra
-                </button>
-              </div>
-              {(editingProduct.addons || []).length === 0 ? (
-                <p className="text-xs text-muted adm-text-muted italic py-2">No add-ons yet. Add customization options for this product.</p>
-              ) : (
-                <div className="space-y-2">
-                  {(editingProduct.addons || []).map((addon) => (
-                    <div key={addon.id} className="adm-bg rounded-2xl p-3 border border-primary/5 space-y-1.5">
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1">
-                          <input
-                            value={addon.name}
-                            onChange={(e) => updateAddonField(addon.id, "name", e.target.value)}
-                            placeholder="Addon name"
-                            className="w-full px-3 py-2 adm-surface adm-border border rounded-xl text-sm text-dark adm-text border border-primary/10 focus:border-primary outline-none transition"
-                          />
-                          <BsCollapse hasValue={!!(addon.name_bs)}>
-                            <input
-                              value={addon.name_bs || ""}
-                              onChange={(e) => updateAddonField(addon.id, "name_bs", e.target.value)}
-                              placeholder="Naziv dodatka"
-                              className="w-full px-3 py-2 adm-surface adm-border border rounded-xl text-sm text-dark adm-text border border-blue-200/30 focus:border-blue-400 outline-none transition"
-                            />
-                          </BsCollapse>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <span className="text-xs text-muted adm-text-muted font-medium">KM</span>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={addon.price || ""}
-                            onChange={(e) => updateAddonField(addon.id, "price", parseFloat(e.target.value) || 0)}
-                            placeholder="0.00"
-                            className="w-20 px-3 py-2 adm-surface adm-border border rounded-xl text-sm text-dark adm-text border border-primary/10 focus:border-primary outline-none transition"
-                          />
-                        </div>
-                        <button onClick={() => removeAddon(addon.id)} className="p-1.5 rounded-xl adm-text-faint hover:text-accent-red hover:bg-red-50 transition">
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Variations */}
-            <div className="mt-6 border-t border-bg pt-5">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Package size={14} className="text-accent-blue/50" />
-                  <h4 className="text-xs font-bold text-muted adm-text-muted uppercase tracking-wider">Variations</h4>
-                  <span className="text-[10px] adm-text-muted">(e.g. Size, Flavor)</span>
-                </div>
-                <button onClick={addVariation} className="flex items-center gap-1.5 text-xs font-semibold text-accent-blue hover:brightness-110 transition">
-                  <Plus size={14} /> Add Variation
-                </button>
-              </div>
-              {(editingProduct.variations || []).length === 0 ? (
-                <p className="text-xs text-muted adm-text-muted italic py-2">No variations. Add size, flavor, or other options customers choose from.</p>
-              ) : (
-                <div className="space-y-4">
-                  {(editingProduct.variations || []).map((variation) => (
-                    <div key={variation.id} className="adm-bg rounded-2xl p-4 border border-primary/5">
-                      <div className="flex items-start gap-3 mb-3">
-                        <div className="flex-1">
-                          <input
-                            value={variation.name}
-                            onChange={(e) => updateVariationField(variation.id, "name", e.target.value)}
-                            placeholder="Variation name (e.g. Size)"
-                            className="w-full px-3 py-2 adm-surface adm-border border rounded-xl text-sm text-dark adm-text font-semibold border border-primary/10 focus:border-primary outline-none transition"
-                          />
-                          <BsCollapse hasValue={!!(variation.name_bs)}>
-                            <input
-                              value={variation.name_bs || ""}
-                              onChange={(e) => updateVariationField(variation.id, "name_bs", e.target.value)}
-                              placeholder="Naziv varijacije (npr. Veličina)"
-                              className="w-full px-3 py-2 adm-surface adm-border border rounded-xl text-sm text-dark adm-text font-semibold border border-blue-200/30 focus:border-blue-400 outline-none transition"
-                            />
-                          </BsCollapse>
-                        </div>
-                        <label className="flex items-center gap-1.5 text-xs text-muted adm-text-muted whitespace-nowrap cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={variation.required}
-                            onChange={(e) => updateVariationField(variation.id, "required", e.target.checked)}
-                            className="w-3.5 h-3.5 accent-primary"
-                          />
-                          Required
-                        </label>
-                        <button onClick={() => removeVariation(variation.id)} className="p-1.5 rounded-xl adm-text-faint hover:text-accent-red hover:bg-red-50 transition">
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                      <div className="space-y-2">
-                        {variation.options.map((opt) => (
-                          <div key={opt.id} className="flex items-start gap-2 pl-2">
-                            <span className="adm-text-faint text-xs mt-2">•</span>
-                            <div className="flex-1">
-                              <input
-                                value={opt.label}
-                                onChange={(e) => updateVariationOption(variation.id, opt.id, "label", e.target.value)}
-                                placeholder="Option label (e.g. Small)"
-                                className="w-full px-2 py-1.5 adm-surface adm-border border rounded-lg text-sm text-dark adm-text border border-primary/10 focus:border-primary outline-none transition"
-                              />
-                              <BsCollapse hasValue={!!(opt.label_bs)}>
-                                <input
-                                  value={opt.label_bs || ""}
-                                  onChange={(e) => updateVariationOption(variation.id, opt.id, "label_bs", e.target.value)}
-                                  placeholder="Oznaka opcije (npr. Malo)"
-                                  className="w-full px-2 py-1.5 adm-surface adm-border border rounded-lg text-sm text-dark adm-text border border-blue-200/30 focus:border-blue-400 outline-none transition"
-                                />
-                              </BsCollapse>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <span className="text-[10px] text-muted adm-text-muted">+KM</span>
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={opt.priceAdjustment || ""}
-                                onChange={(e) => updateVariationOption(variation.id, opt.id, "priceAdjustment", parseFloat(e.target.value) || 0)}
-                                placeholder="0.00"
-                                className="w-16 px-2 py-1.5 adm-surface adm-border border rounded-lg text-sm text-dark adm-text border border-primary/10 focus:border-primary outline-none transition"
-                              />
-                            </div>
-                            <button
-                              onClick={() => removeVariationOption(variation.id, opt.id)}
-                              disabled={variation.options.length <= 1}
-                              className={clsx("p-1 rounded-lg transition", variation.options.length <= 1 ? "adm-text-faint cursor-not-allowed" : "adm-text-faint hover:text-accent-red hover:bg-red-50")}
-                            >
-                              <X size={12} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                      <button
-                        onClick={() => addVariationOption(variation.id)}
-                        className="mt-2 ml-4 flex items-center gap-1 text-[11px] font-medium text-primary/70 hover:text-primary transition"
-                      >
-                        <Plus size={11} /> Add option
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <button onClick={cancelEdit} className="flex-1 py-3 rounded-2xl border border-primary/10 text-sm font-semibold text-dark adm-text hover:bg-[var(--adm-surface-2)] transition">Cancel</button>
-              <button
-                onClick={saveProduct}
-                disabled={!editingProduct.name || !editingProduct.price || !editingProduct.category?.trim()}
-                className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-primary to-amber-500 text-white text-sm font-bold hover:brightness-105 transition disabled:opacity-40 flex items-center justify-center gap-2 shadow-glow"
-              >
-                <Save size={15} /> {isNew ? "Add Product" : "Save Changes"}
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Products grouped by category */}
       <div className="space-y-5">
@@ -936,14 +662,14 @@ export default function ProductsEditor() {
                 />
                 {catObj?.icon && <span className="text-base">{catObj.icon}</span>}
                 <h3 className="text-sm font-extrabold text-dark adm-text">{cat}</h3>
-                <span className="text-xs text-muted adm-text-muted ml-auto">{catProducts.length} item{catProducts.length !== 1 ? "s" : ""}</span>
+                <span className="text-xs text-muted adm-text-muted ml-auto">{catProducts.length} {catProducts.length !== 1 ? "stavki" : "stavka"}</span>
               </button>
               <button
                 onClick={(e) => { e.stopPropagation(); startAdd(cat); if (collapsedCategories.has(cat)) toggleCategory(cat); }}
                 className="px-3 py-2 mr-3 my-1 flex items-center gap-1 rounded-xl text-xs font-semibold text-primary hover:bg-primary/10 transition shrink-0"
                 title={`Add product to ${cat}`}
               >
-                <Plus size={13} /> Add
+                <Plus size={13} /> Dodaj
               </button>
               </div>
               {!collapsedCategories.has(cat) && (
@@ -1044,16 +770,436 @@ export default function ProductsEditor() {
         {products.filter(matchesSearch).length === 0 && (
           <div className="text-center py-20 adm-surface adm-border border rounded-2xl shadow-soft border border-primary/5">
             <Package size={40} className="adm-text-faint mx-auto mb-3" />
-            <p className="text-muted adm-text-muted text-sm font-medium">No products found</p>
+            <p className="text-muted adm-text-muted text-sm font-medium">Nema pronađenih stavki</p>
             <p className="adm-text-faint text-xs mt-1">
               {searchQuery || filterCategory !== "all"
-                ? "Try a different search or category filter"
-                : "Add a category first, then create your first product"}
+                ? "Pokušajte drugi pretragu ili filter vrste"
+                : "Prvo dodajte vrstu, zatim kreirajte prvu stavku"}
             </p>
           </div>
         )}
       </div>
       </div>
+
+      {/* Product add/edit drawer */}
+      <AnimatePresence>
+        {editingProduct && (
+          <>
+            <motion.div
+              key="product-drawer-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-50"
+              onClick={cancelEdit}
+              aria-hidden
+            />
+            <motion.aside
+              key="product-drawer"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="product-drawer-title"
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 32, stiffness: 320 }}
+              className="fixed inset-y-0 right-0 z-50 w-full md:w-[480px] flex flex-col adm-surface adm-border border-l border-primary/10 shadow-elevated relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Sticky header */}
+              <div className="shrink-0 flex items-center justify-between gap-3 px-5 py-4 border-b border-primary/10 adm-bg/90 backdrop-blur-md">
+                <div className="min-w-0">
+                  <h2 id="product-drawer-title" className="text-[15px] font-extrabold text-dark adm-text truncate">
+                    {isNew ? "Nova stavka" : "Uredi stavku"}
+                  </h2>
+                  {!isNew && (
+                    <p className="text-[11px] text-muted adm-text-muted truncate mt-0.5">{editingProduct.name}</p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={cancelEdit}
+                  className="p-2 rounded-xl hover:bg-[var(--adm-surface-2)] text-muted adm-text-muted transition shrink-0"
+                  aria-label="Zatvori"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Scrollable body */}
+              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-5 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="sm:col-span-2">
+                    <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Naziv *</label>
+                    <div className="flex items-start gap-3">
+                      {editingProduct.image ? (
+                        <img
+                          src={editingProduct.image}
+                          alt=""
+                          className="w-12 h-12 rounded-xl object-cover shrink-0 border border-primary/10 adm-bg"
+                        />
+                      ) : null}
+                      <div className="flex-1 min-w-0">
+                        <input
+                          type="text"
+                          value={editingProduct.name}
+                          onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
+                          placeholder="e.g. Margherita Pizza"
+                          className="w-full px-3 py-2.5 adm-bg rounded-2xl text-sm text-dark adm-text border border-primary/10 focus:border-primary focus:adm-surface adm-border border focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:adm-text-faint"
+                        />
+                        <BsCollapse hasValue={!!(editingProduct.name_bs)}>
+                          <input
+                            type="text"
+                            value={editingProduct.name_bs || ""}
+                            onChange={(e) => setEditingProduct({ ...editingProduct, name_bs: e.target.value })}
+                            placeholder="npr. Margherita Pizza"
+                            className="w-full px-3 py-2.5 adm-bg rounded-2xl text-sm text-dark adm-text border border-blue-200/30 focus:border-blue-400 focus:adm-surface adm-border border focus:ring-4 focus:ring-blue-100 outline-none transition-all placeholder:adm-text-faint mt-2"
+                          />
+                        </BsCollapse>
+                      </div>
+                    </div>
+                  </div>
+                  <Field
+                    label="Cijena (KM) *"
+                    type="number"
+                    value={editingProduct.price || ""}
+                    onChange={(v) => setEditingProduct({ ...editingProduct, price: parseFloat(v) || 0 })}
+                    placeholder="12.99"
+                  />
+                  {isNew && (
+                    <div>
+                      <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">
+                        Početna zaliha
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={initialStock}
+                        onChange={(e) => {
+                          const n = parseInt(e.target.value, 10);
+                          setInitialStock(Number.isNaN(n) ? 0 : Math.max(0, n));
+                        }}
+                        placeholder="0"
+                        className="w-full px-3.5 py-2.5 adm-bg rounded-2xl text-sm text-dark adm-text border border-primary/10 focus:border-primary focus:adm-surface adm-border border focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:adm-text-faint"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Opis</label>
+                  <div>
+                    <textarea
+                      value={editingProduct.description}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })}
+                      rows={2}
+                      placeholder="Opišite jelo..."
+                      className="w-full px-3.5 py-2.5 adm-bg rounded-2xl text-sm text-dark adm-text border border-primary/10 focus:border-primary focus:adm-surface adm-border border focus:ring-4 focus:ring-primary/10 outline-none resize-none transition-all placeholder:adm-text-faint"
+                    />
+                    <BsCollapse hasValue={!!(editingProduct.description_bs)}>
+                      <textarea
+                        value={editingProduct.description_bs || ""}
+                        onChange={(e) => setEditingProduct({ ...editingProduct, description_bs: e.target.value })}
+                        rows={2}
+                        placeholder="Opišite jelo..."
+                        className="w-full px-3.5 py-2.5 adm-bg rounded-2xl text-sm text-dark adm-text border border-blue-200/30 focus:border-blue-400 focus:adm-surface adm-border border focus:ring-4 focus:ring-blue-100 outline-none resize-none transition-all placeholder:adm-text-faint mt-2"
+                      />
+                    </BsCollapse>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <ImageUploadField
+                    hidePreview
+                    label="Slika proizvoda"
+                    restaurantId={venue}
+                    placement="product"
+                    value={editingProduct.image}
+                    onChange={(url) => setEditingProduct({ ...editingProduct, image: url })}
+                    className="min-w-0"
+                  />
+                  <div>
+                    <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Vrsta *</label>
+                    <select
+                      value={editingProduct.category || ""}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (v === "__create__") {
+                          openProductCatModal();
+                          return;
+                        }
+                        setEditingProduct({ ...editingProduct, category: v });
+                      }}
+                      className="w-full px-3.5 py-2.5 adm-bg rounded-2xl text-sm text-dark adm-text border border-primary/10 focus:border-primary outline-none transition-all"
+                    >
+                      <option value="" disabled>
+                        {realCategories.length === 0 ? "Još nema vrsta — kreirajte jednu" : "Odaberite vrstu"}
+                      </option>
+                      {realCategories.map((c) => (
+                        <option key={c.id} value={c.label}>
+                          {c.icon} {c.label}
+                        </option>
+                      ))}
+                      {menuCategories
+                        .filter((label) => !realCategories.some((c) => c.label === label))
+                        .map((label) => (
+                          <option key={`legacy-${label}`} value={label}>
+                            {label} (iz postojećih stavki)
+                          </option>
+                        ))}
+                      <option value="__create__">➕ Kreiraj novu vrstu…</option>
+                    </select>
+                    <p className="text-[10px] text-muted adm-text-muted mt-1.5">
+                      Svaka stavka mora imati svoju vrstu.
+                    </p>
+                  </div>
+                </div>
+
+                <label className="flex items-center gap-3 py-2 cursor-pointer group">
+                  <div
+                    className={clsx(
+                      "w-11 h-6 rounded-full transition-all relative cursor-pointer",
+                      editingProduct.popular ? "bg-primary" : "adm-bg border border-primary/10"
+                    )}
+                    onClick={() => setEditingProduct({ ...editingProduct, popular: !editingProduct.popular })}
+                  >
+                    <div
+                      className={clsx(
+                        "absolute top-0.5 w-5 h-5 adm-surface adm-border border rounded-full shadow-md transition-all",
+                        editingProduct.popular ? "left-[22px]" : "left-0.5"
+                      )}
+                    />
+                  </div>
+                  <span className="text-sm font-medium text-dark adm-text flex items-center gap-1.5">
+                    <Flame size={14} className={editingProduct.popular ? "text-primary" : "adm-text-faint"} />
+                    Označi kao popularno
+                  </span>
+                </label>
+
+                {/* Addons */}
+                <div className="border-t border-primary/10 pt-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Sparkles size={14} className="text-primary/50" />
+                      <h4 className="text-xs font-bold text-muted adm-text-muted uppercase tracking-wider">Dodaci / Extras</h4>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={addAddon}
+                      className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:brightness-110 transition"
+                    >
+                      <Plus size={14} /> Dodaj extra
+                    </button>
+                  </div>
+                  {(editingProduct.addons || []).length === 0 ? (
+                    <p className="text-xs text-muted adm-text-muted italic py-2">Još nema dodataka. Dodajte opcije za ovu stavku.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {(editingProduct.addons || []).map((addon) => (
+                        <div key={addon.id} className="adm-bg rounded-2xl p-3 border border-primary/5 space-y-1.5">
+                          <div className="flex items-center gap-3">
+                            <div className="flex-1">
+                              <input
+                                value={addon.name}
+                                onChange={(e) => updateAddonField(addon.id, "name", e.target.value)}
+                                placeholder="Naziv dodatka"
+                                className="w-full px-3 py-2 adm-surface adm-border border rounded-xl text-sm text-dark adm-text border border-primary/10 focus:border-primary outline-none transition"
+                              />
+                              <BsCollapse hasValue={!!(addon.name_bs)}>
+                                <input
+                                  value={addon.name_bs || ""}
+                                  onChange={(e) => updateAddonField(addon.id, "name_bs", e.target.value)}
+                                  placeholder="Naziv dodatka"
+                                  className="w-full px-3 py-2 adm-surface adm-border border rounded-xl text-sm text-dark adm-text border border-blue-200/30 focus:border-blue-400 outline-none transition mt-1.5"
+                                />
+                              </BsCollapse>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs text-muted adm-text-muted font-medium">KM</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={addon.price || ""}
+                                onChange={(e) => updateAddonField(addon.id, "price", parseFloat(e.target.value) || 0)}
+                                placeholder="0.00"
+                                className="w-20 px-3 py-2 adm-surface adm-border border rounded-xl text-sm text-dark adm-text border border-primary/10 focus:border-primary outline-none transition"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeAddon(addon.id)}
+                              className="p-1.5 rounded-xl adm-text-faint hover:text-accent-red hover:bg-red-50 transition"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Variations */}
+                <div className="border-t border-primary/10 pt-5 pb-2">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Package size={14} className="text-accent-blue/50" />
+                      <h4 className="text-xs font-bold text-muted adm-text-muted uppercase tracking-wider">Varijacije</h4>
+                      <span className="text-[10px] adm-text-muted">(npr. Veličina, Okus)</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={addVariation}
+                      className="flex items-center gap-1.5 text-xs font-semibold text-accent-blue hover:brightness-110 transition shrink-0"
+                    >
+                      <Plus size={14} /> Dodaj varijaciju
+                    </button>
+                  </div>
+                  {(editingProduct.variations || []).length === 0 ? (
+                    <p className="text-xs text-muted adm-text-muted italic py-2">Nema varijacija. Dodajte veličinu, okus ili slične opcije.</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {(editingProduct.variations || []).map((variation) => (
+                        <div key={variation.id} className="adm-bg rounded-2xl p-4 border border-primary/5">
+                          <div className="flex items-start gap-3 mb-3">
+                            <div className="flex-1">
+                              <input
+                                value={variation.name}
+                                onChange={(e) => updateVariationField(variation.id, "name", e.target.value)}
+                                placeholder="Naziv varijacije (npr. Veličina)"
+                                className="w-full px-3 py-2 adm-surface adm-border border rounded-xl text-sm text-dark adm-text font-semibold border border-primary/10 focus:border-primary outline-none transition"
+                              />
+                              <BsCollapse hasValue={!!(variation.name_bs)}>
+                                <input
+                                  value={variation.name_bs || ""}
+                                  onChange={(e) => updateVariationField(variation.id, "name_bs", e.target.value)}
+                                  placeholder="Naziv varijacije (npr. Veličina)"
+                                  className="w-full px-3 py-2 adm-surface adm-border border rounded-xl text-sm text-dark adm-text font-semibold border border-blue-200/30 focus:border-blue-400 outline-none transition mt-1.5"
+                                />
+                              </BsCollapse>
+                            </div>
+                            <label className="flex items-center gap-1.5 text-xs text-muted adm-text-muted whitespace-nowrap cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={variation.required}
+                                onChange={(e) => updateVariationField(variation.id, "required", e.target.checked)}
+                                className="w-3.5 h-3.5 accent-primary"
+                              />
+                              Obavezno
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => removeVariation(variation.id)}
+                              className="p-1.5 rounded-xl adm-text-faint hover:text-accent-red hover:bg-red-50 transition"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                          <div className="space-y-2">
+                            {variation.options.map((opt) => (
+                              <div key={opt.id} className="flex items-start gap-2 pl-2">
+                                <span className="adm-text-faint text-xs mt-2">•</span>
+                                <div className="flex-1">
+                                  <input
+                                    value={opt.label}
+                                    onChange={(e) => updateVariationOption(variation.id, opt.id, "label", e.target.value)}
+                                    placeholder="Opcija (npr. Malo)"
+                                    className="w-full px-2 py-1.5 adm-surface adm-border border rounded-lg text-sm text-dark adm-text border border-primary/10 focus:border-primary outline-none transition"
+                                  />
+                                  <BsCollapse hasValue={!!(opt.label_bs)}>
+                                    <input
+                                      value={opt.label_bs || ""}
+                                      onChange={(e) => updateVariationOption(variation.id, opt.id, "label_bs", e.target.value)}
+                                      placeholder="Oznaka opcije (npr. Malo)"
+                                      className="w-full px-2 py-1.5 adm-surface adm-border border rounded-lg text-sm text-dark adm-text border border-blue-200/30 focus:border-blue-400 outline-none transition mt-1"
+                                    />
+                                  </BsCollapse>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[10px] text-muted adm-text-muted">+KM</span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={opt.priceAdjustment || ""}
+                                    onChange={(e) =>
+                                      updateVariationOption(variation.id, opt.id, "priceAdjustment", parseFloat(e.target.value) || 0)
+                                    }
+                                    placeholder="0.00"
+                                    className="w-16 px-2 py-1.5 adm-surface adm-border border rounded-lg text-sm text-dark adm-text border border-primary/10 focus:border-primary outline-none transition"
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => removeVariationOption(variation.id, opt.id)}
+                                  disabled={variation.options.length <= 1}
+                                  className={clsx(
+                                    "p-1 rounded-lg transition",
+                                    variation.options.length <= 1
+                                      ? "adm-text-faint cursor-not-allowed"
+                                      : "adm-text-faint hover:text-accent-red hover:bg-red-50"
+                                  )}
+                                >
+                                  <X size={12} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => addVariationOption(variation.id)}
+                            className="mt-2 ml-4 flex items-center gap-1 text-[11px] font-medium text-primary/70 hover:text-primary transition"
+                          >
+                            <Plus size={11} /> Dodaj opciju
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <AnimatePresence>
+                {stockToast && (
+                  <motion.div
+                    key="stock-toast"
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: 20, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="absolute bottom-[5.25rem] left-1/2 -translate-x-1/2 z-10 bg-dark text-white px-4 py-2 rounded-xl text-sm font-semibold shadow-lg max-w-[calc(100%-2.5rem)] text-center pointer-events-none"
+                  >
+                    {stockToast}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Sticky footer */}
+              <div className="shrink-0 flex gap-3 px-5 py-4 border-t border-primary/10 adm-bg/90 backdrop-blur-md">
+                <button
+                  type="button"
+                  onClick={cancelEdit}
+                  className="flex-1 py-3 rounded-2xl border border-primary/10 text-sm font-semibold text-dark adm-text hover:bg-[var(--adm-surface-2)] transition"
+                >
+                  Odustani
+                </button>
+                <button
+                  type="button"
+                  onClick={saveProduct}
+                  disabled={!editingProduct.name || !editingProduct.price || !editingProduct.category?.trim()}
+                  className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-primary to-amber-500 text-white text-sm font-bold hover:brightness-105 transition disabled:opacity-40 flex items-center justify-center gap-2 shadow-glow"
+                >
+                  <Save size={15} />
+                  {isNew ? "Dodaj stavku" : "Spremi"}
+                </button>
+              </div>
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Quick-create category modal (from product category dropdown or filter) */}
       <AnimatePresence>
@@ -1079,8 +1225,8 @@ export default function ProductsEditor() {
                     <Tags size={18} className="text-primary" />
                   </div>
                   <div>
-                    <h3 className="text-[16px] font-extrabold text-dark adm-text">New category</h3>
-                    <p className="text-[11px] text-muted adm-text-muted">Products are grouped under categories on the menu</p>
+                    <h3 className="text-[16px] font-extrabold text-dark adm-text">Nova vrsta</h3>
+                    <p className="text-[11px] text-muted adm-text-muted">Stavke su grupirane po vrstama u meniju</p>
                   </div>
                 </div>
                 <button
@@ -1104,7 +1250,7 @@ export default function ProductsEditor() {
                   placeholder="e.g. pizza"
                 />
                 <CatField
-                  label="Display name *"
+                  label="Naziv *"
                   value={quickNewCat.label}
                   onChange={(v) => {
                     setQuickNewCat((c) => ({
@@ -1127,7 +1273,7 @@ export default function ProductsEditor() {
                   placeholder="🍕"
                 />
                 <div>
-                  <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Color</label>
+                  <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Boja</label>
                   <div className="flex flex-wrap gap-1.5">
                     {colorPresets.map((color) => (
                       <button
@@ -1150,7 +1296,7 @@ export default function ProductsEditor() {
                   onClick={() => setShowProductCatModal(false)}
                   className="flex-1 py-2.5 rounded-xl border border adm-border text-[13px] font-bold text-dark adm-text hover:adm-surface adm-border border transition"
                 >
-                  Cancel
+                  Odustani
                 </button>
                 <button
                   type="button"
@@ -1158,7 +1304,7 @@ export default function ProductsEditor() {
                   disabled={!quickNewCat.label.trim()}
                   className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-primary to-amber-500 text-white text-[13px] font-bold hover:brightness-105 transition disabled:opacity-40 shadow-glow"
                 >
-                  Create &amp; use
+                  Kreiraj i koristi
                 </button>
               </div>
             </motion.div>

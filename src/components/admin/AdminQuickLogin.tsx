@@ -117,6 +117,17 @@ export default function AdminQuickLogin({ onSuccess, onShowEmail, highlightEmail
           error={pinError}
           loading={loading}
         />
+        <button
+          type="button"
+          onClick={() => {
+            onShowEmail();
+            setSelected(null);
+            setPinError(null);
+          }}
+          className="text-xs text-muted adm-text-muted underline cursor-pointer mt-2 text-center w-full"
+        >
+          Koristite lozinku
+        </button>
       </div>
     );
   }
@@ -154,9 +165,9 @@ export default function AdminQuickLogin({ onSuccess, onShowEmail, highlightEmail
       <button
         type="button"
         onClick={onShowEmail}
-        className="w-full mt-3 text-sm font-semibold text-primary min-h-[44px]"
+        className="text-xs text-muted adm-text-muted underline cursor-pointer mt-2 text-center block w-full"
       >
-        Prijava emailom
+        Prijava lozinkom / novi račun
       </button>
     </div>
   );

@@ -67,20 +67,20 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { path: "/admin", label: "Venues", icon: Building2, desc: "All restaurants, cafés & bars" },
-  { path: "restaurant", label: "Restaurant", icon: Store, desc: "Name, images, info", minRole: "manager" },
-  { path: "products", label: "Products", icon: UtensilsCrossed, desc: "Menu items & categories", minRole: "manager" },
-  { path: "page-content", label: "Page Content", icon: FileText, desc: "All frontend text", minRole: "manager" },
-  { path: "orders", label: "Orders", icon: ClipboardList, desc: "All orders & status", minRole: "employee" },
-  { path: "tables", label: "Stolovi", icon: LayoutGrid, desc: "Table layout & capacity" },
-  { path: "inventory", label: "Inventar", icon: Package, desc: "Stock & movements" },
-  { path: "waiter", label: "Konobar", icon: HandPlatter, desc: "Waiter floor & tabs" },
-  { path: "kitchen", label: "Kitchen", icon: ChefHat, desc: "Food tickets — no prices" },
-  { path: "bar", label: "Bar", icon: Wine, desc: "Drinks + full order" },
+  { path: "/admin", label: "Lokali", icon: Building2, desc: "Svi restorani, kafići i barovi" },
+  { path: "restaurant", label: "Restoran", icon: Store, desc: "Naziv, slike, info", minRole: "manager" },
+  { path: "products", label: "Proizvodi", icon: UtensilsCrossed, desc: "Stavke menija i vrste", minRole: "manager" },
+  { path: "page-content", label: "Sadržaj stranice", icon: FileText, desc: "Svi tekstovi na frontendu", minRole: "manager" },
+  { path: "orders", label: "Narudžbe", icon: ClipboardList, desc: "Sve narudžbe i status", minRole: "employee" },
+  { path: "tables", label: "Stolovi", icon: LayoutGrid, desc: "Raspored stolova i kapacitet" },
+  { path: "inventory", label: "Inventar", icon: Package, desc: "Zalihe i kretanja" },
+  { path: "waiter", label: "Konobar", icon: HandPlatter, desc: "Rad konobara i otvoreni računi" },
+  { path: "kitchen", label: "Kuhinja", icon: ChefHat, desc: "Karte jela — bez cijena" },
+  { path: "bar", label: "Bar", icon: Wine, desc: "Pića i kompletna narudžba" },
 ];
 
 const platformNavItems: NavItem[] = [
-  { path: "users", label: "Users & Roles", icon: Users, desc: "Manage access", adminOnly: true },
+  { path: "users", label: "Korisnici i uloge", icon: Users, desc: "Upravljanje pristupom", adminOnly: true },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -297,14 +297,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       return (
         <div className="fixed inset-0 z-[60] adm-bg flex items-center justify-center p-6">
           <div className="max-w-md w-full adm-surface adm-border border rounded-2xl-red-200 p-6 text-center shadow-card">
-            <p className="text-sm font-bold text-dark adm-text mb-2">Session check failed</p>
+            <p className="text-sm font-bold text-dark adm-text mb-2">Provjera sesije nije uspjela</p>
             <p className="text-[13px] text-muted adm-text-muted mb-4">{sessionError}</p>
             <button
               type="button"
               onClick={() => router.replace("/admin/login")}
               className="w-full py-3 rounded-xl bg-primary text-white font-bold text-sm"
             >
-              Go to login
+              Idi na prijavu
             </button>
           </div>
         </div>
@@ -322,7 +322,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="fixed inset-0 z-[60] adm-bg flex items-center justify-center p-6">
         <div className="text-center max-w-sm">
           <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-sm font-semibold text-dark adm-text">Loading restaurants…</p>
+          <p className="text-sm font-semibold text-dark adm-text">Učitavanje lokala…</p>
           {venuesError && (
             <p className="text-[12px] text-red-600 mt-2 bg-red-50 px-3 py-2 rounded-lg">{venuesError}</p>
           )}
@@ -447,9 +447,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   <div className="w-8 h-8 rounded-xl adm-surface adm-border border flex items-center justify-center text-base shrink-0">{currentUser.avatar || "👤"}</div>
                   <div className="flex-1 min-w-0">
                     <span className="block text-[11px] font-bold text-dark adm-text truncate">{currentUser.name}</span>
-                    <span className="block text-[9px] text-muted adm-text-muted">{currentUser.platformRole === "admin" ? "Platform Admin" : "User"}</span>
+                    <span className="block text-[9px] text-muted adm-text-muted">{currentUser.platformRole === "admin" ? "Platforma admin" : "User"}</span>
                   </div>
-                  <button onClick={handleLogout} className="text-muted adm-text-muted hover:text-accent-red transition" title="Sign Out"><LogOut size={13} /></button>
+                  <button onClick={handleLogout} className="text-muted adm-text-muted hover:text-accent-red transition" title="Odjava"><LogOut size={13} /></button>
                 </div>
               </div>
             )}
@@ -462,7 +462,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <Download size={15} /> Instaliraj aplikaciju
               </button>
             )}
-            <Link href={`/${activeRestaurantId}`} className="flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)] transition"><ArrowLeft size={15} />Back to Menu</Link>
+            <Link href={`/${activeRestaurantId}`} className="flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)] transition"><ArrowLeft size={15} />Povratak na meni</Link>
           </div>
         </aside>
 
@@ -472,7 +472,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <button className="lg:hidden p-2 -ml-1 hover:bg-[var(--adm-surface-2)] rounded-xl transition" onClick={() => setSidebarOpen(true)}><Menu size={20} className="text-dark adm-text" /></button>
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center"><Building2 size={15} className="text-primary" /></div>
-              <div className="min-w-0"><h1 className="text-[15px] font-extrabold text-dark adm-text truncate">Venues</h1></div>
+              <div className="min-w-0"><h1 className="text-[15px] font-extrabold text-dark adm-text truncate">Lokali</h1></div>
             </div>
             <div className="ml-auto flex items-center gap-3">
               <motion.button whileTap={{ scale: 0.9 }} onClick={toggleDarkMode} className={clsx("w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200", darkMode ? "bg-primary/15 text-primary" : "bg-[var(--adm-surface-2)] text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)]")} title={darkMode ? "Switch to light mode" : "Switch to dark mode"}>
@@ -484,7 +484,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   )}
                 </AnimatePresence>
               </motion.button>
-              <Link href={`/${activeRestaurantId}`} target="_blank" className="hidden md:flex items-center gap-1.5 bg-gradient-to-r from-primary to-amber-500 text-white px-3.5 py-1.5 rounded-full text-[11px] font-bold shadow-glow hover:brightness-105 transition">View Menu</Link>
+              <Link href={`/${activeRestaurantId}`} target="_blank" className="hidden md:flex items-center gap-1.5 bg-gradient-to-r from-primary to-amber-500 text-white px-3.5 py-1.5 rounded-full text-[11px] font-bold shadow-glow hover:brightness-105 transition">Pogledaj meni</Link>
             </div>
           </header>
           {bootBanner}
@@ -634,7 +634,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </div>
             </div>
           </div>
-          <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)] transition w-full"><LogOut size={15} />Sign Out</button>
+          <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)] transition w-full"><LogOut size={15} />Odjava</button>
           {canInstall && (
             <button
               type="button"
@@ -644,7 +644,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <Download size={15} /> Instaliraj aplikaciju
             </button>
           )}
-          <Link href={`/${effectiveVenueId}`} className="flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)] transition"><ArrowLeft size={15} />Back to Menu</Link>
+          <Link href={`/${effectiveVenueId}`} className="flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)] transition"><ArrowLeft size={15} />Povratak na meni</Link>
         </div>
       </aside>
 
@@ -674,7 +674,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               {currentUser.platformRole === "admin" ? <ShieldCheck size={11} className="text-primary" /> : <Shield size={11} className="text-accent-blue" />}
               <span className="text-[11px] font-semibold text-dark adm-text">{currentRestaurantRole ? restaurantRoleLabel(currentRestaurantRole) : "Viewer"}</span>
             </div>
-            <Link href={`/${effectiveVenueId}`} target="_blank" className="hidden md:flex items-center gap-1.5 bg-gradient-to-r from-primary to-amber-500 text-white px-3.5 py-1.5 rounded-full text-[11px] font-bold shadow-glow hover:brightness-105 transition">View Menu</Link>
+            <Link href={`/${effectiveVenueId}`} target="_blank" className="hidden md:flex items-center gap-1.5 bg-gradient-to-r from-primary to-amber-500 text-white px-3.5 py-1.5 rounded-full text-[11px] font-bold shadow-glow hover:brightness-105 transition">Pogledaj meni</Link>
           </div>
         </header>
         <main className="flex-1 overflow-y-auto">

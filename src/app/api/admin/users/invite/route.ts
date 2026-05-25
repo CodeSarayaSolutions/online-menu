@@ -20,6 +20,7 @@ type RestaurantRole =
  * Platform admin (or venue owner/manager) invites a user.
  * Returns a one-time OTP code to copy — no email sent.
  */
+// TODO: invite accept page should prompt user to set both password and PIN during first login
 export async function POST(request: Request) {
   const sessionUser = await getSessionUserFromRequest(request);
   if (!sessionUser) {

@@ -27,15 +27,15 @@ import clsx from "clsx";
 
 const PLATFORM_ROLE_LABELS: Record<PlatformRole, { label: string; color: string; icon: typeof Shield }> = {
   admin: { label: "Admin", color: "text-primary bg-primary/10", icon: ShieldCheck },
-  user: { label: "User", color: "text-accent-blue bg-accent-blue/10", icon: Shield },
+  user: { label: "Korisnik", color: "text-accent-blue bg-accent-blue/10", icon: Shield },
 };
 
 const RESTAURANT_ROLE_LABELS: Record<RestaurantRole, { label: string; desc: string; color: string }> = {
-  owner: { label: "Owner", desc: "Full venue + staff + invite", color: "text-amber-700 bg-amber-500/10 border-amber-500/20" },
-  manager: { label: "Manager", desc: "Meni, narudžbe i postavke", color: "text-primary bg-primary/10 border-primary/20" },
-  kitchen: { label: "Kitchen", desc: "Kitchen station only", color: "text-orange-700 bg-orange-500/10 border-orange-500/20" },
-  bar: { label: "Bar", desc: "Bar station only", color: "text-purple-700 bg-purple-500/10 border-purple-500/20" },
-  employee: { label: "Staff", desc: "Orders list", color: "text-accent-green bg-accent-green/10 border-accent-green/20" },
+  owner: { label: "Vlasnik", desc: "Pun pristup lokalu + osoblje + pozivnice", color: "text-amber-700 bg-amber-500/10 border-amber-500/20" },
+  manager: { label: "Menadžer", desc: "Meni, narudžbe i postavke", color: "text-primary bg-primary/10 border-primary/20" },
+  kitchen: { label: "Kuhinja", desc: "Samo kuhinjska stanica", color: "text-orange-700 bg-orange-500/10 border-orange-500/20" },
+  bar: { label: "Bar", desc: "Samo bar stanica", color: "text-purple-700 bg-purple-500/10 border-purple-500/20" },
+  employee: { label: "Osoblje", desc: "Lista narudžbi", color: "text-accent-green bg-accent-green/10 border-accent-green/20" },
 };
 
 const AVATARS = ["👑", "👨‍🍳", "🧑‍💼", "👩‍🍳", "🧑‍💻", "👤", "🍽️", "⭐"];
@@ -194,7 +194,7 @@ export default function UsersPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl lg:text-3xl font-extrabold text-dark adm-text tracking-tight">
-            Users & Roles
+            Korisnici i uloge
           </h1>
           <p className="text-sm text-muted adm-text-muted mt-1">
             {users.length} user{users.length !== 1 ? "s" : ""} registered

@@ -109,9 +109,9 @@ export default function AdminLoginPage() {
           <button
             type="button"
             onClick={() => setShowEmailForm(true)}
-            className="w-full mt-4 text-sm font-semibold text-primary min-h-[44px]"
+            className="w-full mt-4 text-xs text-muted adm-text-muted underline cursor-pointer text-center"
           >
-            Prijava emailom
+            Prijava lozinkom
           </button>
         )}
       </motion.div>

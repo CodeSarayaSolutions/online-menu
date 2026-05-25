@@ -12,6 +12,8 @@ type Props = {
   value: string;
   onChange: (url: string) => void;
   className?: string;
+  /** Hide built-in preview (e.g. when parent shows a small thumbnail) */
+  hidePreview?: boolean;
 };
 
 export default function ImageUploadField({
@@ -21,6 +23,7 @@ export default function ImageUploadField({
   value,
   onChange,
   className,
+  hidePreview = false,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -59,7 +62,7 @@ export default function ImageUploadField({
         {label}
       </label>
 
-      {value ? (
+      {value && !hidePreview ? (
         <div className="relative rounded-2xl overflow-hidden border border-primary/10 mb-2 h-32 adm-bg">
           <img src={value} alt="" className="w-full h-full object-cover" />
           <button
