@@ -113,7 +113,7 @@ export function useCmsData() {
     ? Object.fromEntries(
         categoryConfig
           .filter((c) => c.id !== "all" && c.id !== "popular")
-          .map((c) => [c.label, c.icon])
+          .map((c) => [c.label, c.icon ?? ""])
       )
     : fallbackCategoryIcons;
 
