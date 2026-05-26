@@ -1,4 +1,4 @@
-const CACHE_NAME = 'saraya-menu-admin-v1';
+const CACHE_NAME = 'saraya-menu-admin-v2';
 
 // Only cache admin shell assets
 const PRECACHE_URLS = [

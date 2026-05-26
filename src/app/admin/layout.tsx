@@ -117,6 +117,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => { setHydrated(true); }, []);
 
   useEffect(() => {
+    const lockOrientation = async () => {
+      try {
+        const orient = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> };
+        if (typeof orient.lock === 'function') {
+          await orient.lock('portrait');
+        }
+      } catch {
+        // Orientation lock requires fullscreen on some browsers — silent fail
+      }
+    };
+    void lockOrientation();
+  }, []);
+
+  useEffect(() => {
     const onFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", onFullscreenChange);
     onFullscreenChange();
