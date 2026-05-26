@@ -260,6 +260,12 @@ export interface Database {
           name: string;
           name_bs: string | null;
           price: number;
+          group_id: string | null;
+          group_label: string | null;
+          min_select: number | null;
+          max_select: number | null;
+          depends_on_variation_id: string | null;
+          depends_on_option_id: string | null;
         };
         Insert: {
           id: string;
@@ -267,6 +273,12 @@ export interface Database {
           name: string;
           name_bs?: string | null;
           price?: number;
+          group_id?: string | null;
+          group_label?: string | null;
+          min_select?: number | null;
+          max_select?: number | null;
+          depends_on_variation_id?: string | null;
+          depends_on_option_id?: string | null;
         };
         Update: {
           id?: string;
@@ -274,6 +286,12 @@ export interface Database {
           name?: string;
           name_bs?: string | null;
           price?: number;
+          group_id?: string | null;
+          group_label?: string | null;
+          min_select?: number | null;
+          max_select?: number | null;
+          depends_on_variation_id?: string | null;
+          depends_on_option_id?: string | null;
         };
         Relationships: [];
       };
@@ -285,6 +303,8 @@ export interface Database {
           name: string;
           name_bs: string | null;
           required: boolean;
+          min_select: number | null;
+          max_select: number | null;
         };
         Insert: {
           id: string;
@@ -292,6 +312,8 @@ export interface Database {
           name: string;
           name_bs?: string | null;
           required?: boolean;
+          min_select?: number | null;
+          max_select?: number | null;
         };
         Update: {
           id?: string;
@@ -299,6 +321,8 @@ export interface Database {
           name?: string;
           name_bs?: string | null;
           required?: boolean;
+          min_select?: number | null;
+          max_select?: number | null;
         };
         Relationships: [];
       };
@@ -310,6 +334,8 @@ export interface Database {
           label: string;
           label_bs: string | null;
           price_adjustment: number;
+          depends_on_variation_id: string | null;
+          depends_on_option_id: string | null;
         };
         Insert: {
           id: string;
@@ -317,6 +343,8 @@ export interface Database {
           label: string;
           label_bs?: string | null;
           price_adjustment?: number;
+          depends_on_variation_id?: string | null;
+          depends_on_option_id?: string | null;
         };
         Update: {
           id?: string;
@@ -324,6 +352,8 @@ export interface Database {
           label?: string;
           label_bs?: string | null;
           price_adjustment?: number;
+          depends_on_variation_id?: string | null;
+          depends_on_option_id?: string | null;
         };
         Relationships: [];
       };
@@ -555,6 +585,62 @@ export interface Database {
         Relationships: [];
       };
 
+      happy_hour_schedules: {
+        Row: {
+          id: string;
+          restaurant_id: string;
+          label: string | null;
+          start_time: string;
+          end_time: string;
+          active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          restaurant_id: string;
+          label?: string | null;
+          start_time: string;
+          end_time: string;
+          active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          restaurant_id?: string;
+          label?: string | null;
+          start_time?: string;
+          end_time?: string;
+          active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+
+      happy_hour_products: {
+        Row: {
+          id: string;
+          schedule_id: string;
+          product_id: string;
+          override_price: number;
+        };
+        Insert: {
+          id?: string;
+          schedule_id: string;
+          product_id: string;
+          override_price: number;
+        };
+        Update: {
+          id?: string;
+          schedule_id?: string;
+          product_id?: string;
+          override_price?: number;
+        };
+        Relationships: [];
+      };
+
       inventory: {
         Row: {
           id: string;
@@ -564,6 +650,7 @@ export interface Database {
           quantity: number;
           unit: string;
           low_stock_threshold: number | null;
+          tracked: boolean;
           updated_at: string;
           created_at: string;
         };
@@ -575,6 +662,7 @@ export interface Database {
           quantity?: number;
           unit?: string;
           low_stock_threshold?: number | null;
+          tracked?: boolean;
           updated_at?: string;
           created_at?: string;
         };
@@ -586,6 +674,7 @@ export interface Database {
           quantity?: number;
           unit?: string;
           low_stock_threshold?: number | null;
+          tracked?: boolean;
           updated_at?: string;
           created_at?: string;
         };
@@ -624,6 +713,46 @@ export interface Database {
           reason?: string;
           tab_id?: string | null;
           waiter_id?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+
+      inventory_audit_log: {
+        Row: {
+          id: string;
+          restaurant_id: string | null;
+          product_id: string | null;
+          product_name: string | null;
+          changed_by: string | null;
+          changed_by_name: string | null;
+          field_changed: string | null;
+          old_value: string | null;
+          new_value: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          restaurant_id?: string | null;
+          product_id?: string | null;
+          product_name?: string | null;
+          changed_by?: string | null;
+          changed_by_name?: string | null;
+          field_changed?: string | null;
+          old_value?: string | null;
+          new_value?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          restaurant_id?: string | null;
+          product_id?: string | null;
+          product_name?: string | null;
+          changed_by?: string | null;
+          changed_by_name?: string | null;
+          field_changed?: string | null;
+          old_value?: string | null;
+          new_value?: string | null;
           created_at?: string;
         };
         Relationships: [];

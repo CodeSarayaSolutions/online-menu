@@ -101,7 +101,15 @@ export default function VenueRolePicker() {
   if (!venueData) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-muted adm-text-muted text-sm">Venue not found.</p>
+        <p className="text-muted adm-text-muted text-sm">Lokal nije pronađen.</p>
+      </div>
+    );
+  }
+
+  if (currentUser && canAccessRestaurant(currentUser, venueSlug)) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -122,7 +130,7 @@ export default function VenueRolePicker() {
         <div className="w-7 h-7 rounded-lg adm-bg group-hover:bg-primary/10 flex items-center justify-center transition">
           <ArrowLeft size={14} className="group-hover:text-primary transition" />
         </div>
-        Back to venues
+        Nazad na lokale
       </motion.button>
 
       {/* Venue header card */}

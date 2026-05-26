@@ -140,6 +140,36 @@ export async function addItemToTab(
     station: 'kitchen' | 'bar' | 'both';
   }
 ): Promise<TabItemRow> {
+  const { data: existing, error: findError } = await supabase
+    .from('tab_items')
+    .select('*')
+    .eq('tab_id', tabId)
+    .eq('product_id', item.productId)
+    .maybeSingle();
+
+  if (findError) throw findError;
+
+  if (existing) {
+    const quantity = Number(existing.quantity) + item.quantity;
+    const unitPrice = Number(existing.unit_price);
+    const totalPrice = unitPrice * quantity;
+    const { data, error } = await supabase
+      .from('tab_items')
+      .update({
+        quantity,
+        total_price: totalPrice,
+        product_name: item.productName,
+        station: item.station,
+      })
+      .eq('id', existing.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    await recalcTabTotal(tabId);
+    return data;
+  }
+
   const totalPrice = item.unitPrice * item.quantity;
   const row: InsertDto<'tab_items'> = {
     tab_id: tabId,

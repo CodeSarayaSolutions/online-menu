@@ -81,6 +81,22 @@ export default function OrderItem({ item, index = 0 }: OrderItemProps) {
             </div>
           )}
 
+          {item.selectedAddons && item.selectedAddons.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {item.selectedAddons.map((addon) => (
+                <span
+                  key={addon.id}
+                  className="text-[10px] md:text-[11px] px-1.5 py-0.5 rounded-md font-medium"
+                  style={{ backgroundColor: cardSurface, color: cardMuted }}
+                >
+                  {addon.quantity > 1 ? `${addon.quantity}× ` : ""}
+                  {addon.name}
+                  {addon.price > 0 ? ` +${(addon.price * addon.quantity).toFixed(2)} ${pageContent.currencySymbol}` : ""}
+                </span>
+              ))}
+            </div>
+          )}
+
           <p className="font-extrabold text-base md:text-lg mt-1" style={{ color: accent }}>
             {(item.price * item.quantity).toFixed(2)} {pageContent.currencySymbol}
           </p>

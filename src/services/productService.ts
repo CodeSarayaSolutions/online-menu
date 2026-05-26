@@ -12,6 +12,18 @@ type DbClient = SupabaseClient<Database, 'sarayamenu'>;
 export type ProductRow = Tables<'products'>;
 export type CategoryRow = Tables<'categories'>;
 
+function isMissingOptionMetadataColumn(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes('group_id') ||
+    message.includes('group_label') ||
+    message.includes('min_select') ||
+    message.includes('max_select') ||
+    message.includes('depends_on_variation_id') ||
+    message.includes('depends_on_option_id')
+  );
+}
+
 // ─── Categories ──────────────────────────────────────────
 
 export async function getCategories(restaurantId: string, client?: DbClient): Promise<CategoryRow[]> {
@@ -152,10 +164,27 @@ export async function syncAddons(productId: string, addons: Addon[], client?: Db
     name: a.name,
     name_bs: a.name_bs ?? null,
     price: a.price,
+    group_id: a.groupId || null,
+    group_label: a.groupLabel || null,
+    min_select: a.minSelect ?? null,
+    max_select: a.maxSelect ?? null,
+    depends_on_variation_id: a.dependsOn?.variationId ?? null,
+    depends_on_option_id: a.dependsOn?.optionId ?? null,
   }));
 
   const { error } = await db.from('addons').insert(rows);
-  if (error) throw error;
+  if (!error) return;
+  if (!isMissingOptionMetadataColumn(error)) throw error;
+
+  const legacyRows = addons.map((a) => ({
+    id: a.id,
+    product_id: productId,
+    name: a.name,
+    name_bs: a.name_bs ?? null,
+    price: a.price,
+  }));
+  const { error: legacyError } = await db.from('addons').insert(legacyRows);
+  if (legacyError) throw legacyError;
 }
 
 // ─── Variations & Options ────────────────────────────────
@@ -183,6 +212,8 @@ export async function getVariationsWithOptions(productId: string, client?: DbCli
     name: v.name,
     name_bs: v.name_bs ?? undefined,
     required: v.required,
+    minSelect: v.min_select ?? undefined,
+    maxSelect: v.max_select ?? undefined,
     options: (options ?? [])
       .filter((o) => o.variation_id === v.id)
       .map((o) => ({
@@ -190,6 +221,13 @@ export async function getVariationsWithOptions(productId: string, client?: DbCli
         label: o.label,
         label_bs: o.label_bs ?? undefined,
         priceAdjustment: Number(o.price_adjustment),
+        dependsOn:
+          o.depends_on_variation_id && o.depends_on_option_id
+            ? {
+                variationId: o.depends_on_variation_id,
+                optionId: o.depends_on_option_id,
+              }
+            : undefined,
       })),
   }));
 }
@@ -216,10 +254,24 @@ export async function syncVariations(productId: string, variations: Variation[],
     name: v.name,
     name_bs: v.name_bs ?? null,
     required: v.required,
+    min_select: v.minSelect ?? null,
+    max_select: v.maxSelect ?? null,
   }));
 
   const { error: vErr } = await db.from('variations').insert(varRows);
-  if (vErr) throw vErr;
+  if (vErr) {
+    if (!isMissingOptionMetadataColumn(vErr)) throw vErr;
+
+    const legacyVarRows = variations.map((v) => ({
+      id: v.id,
+      product_id: productId,
+      name: v.name,
+      name_bs: v.name_bs ?? null,
+      required: v.required,
+    }));
+    const { error: legacyVErr } = await db.from('variations').insert(legacyVarRows);
+    if (legacyVErr) throw legacyVErr;
+  }
 
   const optionRows = variations.flatMap((v) =>
     v.options.map((o) => ({
@@ -228,12 +280,27 @@ export async function syncVariations(productId: string, variations: Variation[],
       label: o.label,
       label_bs: o.label_bs ?? null,
       price_adjustment: o.priceAdjustment,
+      depends_on_variation_id: o.dependsOn?.variationId ?? null,
+      depends_on_option_id: o.dependsOn?.optionId ?? null,
     }))
   );
 
   if (optionRows.length > 0) {
     const { error: oErr } = await db.from('variation_options').insert(optionRows);
-    if (oErr) throw oErr;
+    if (!oErr) return;
+    if (!isMissingOptionMetadataColumn(oErr)) throw oErr;
+
+    const legacyOptionRows = variations.flatMap((v) =>
+      v.options.map((o) => ({
+        id: o.id,
+        variation_id: v.id,
+        label: o.label,
+        label_bs: o.label_bs ?? null,
+        price_adjustment: o.priceAdjustment,
+      }))
+    );
+    const { error: legacyOErr } = await db.from('variation_options').insert(legacyOptionRows);
+    if (legacyOErr) throw legacyOErr;
   }
 }
 
@@ -265,6 +332,17 @@ export async function getFullProduct(productId: string, client?: DbClient): Prom
       name: a.name,
       name_bs: a.name_bs ?? undefined,
       price: Number(a.price),
+      groupId: a.group_id ?? undefined,
+      groupLabel: a.group_label ?? undefined,
+      minSelect: a.min_select ?? undefined,
+      maxSelect: a.max_select ?? undefined,
+      dependsOn:
+        a.depends_on_variation_id && a.depends_on_option_id
+          ? {
+              variationId: a.depends_on_variation_id,
+              optionId: a.depends_on_option_id,
+            }
+          : undefined,
     })),
     variations,
   };
@@ -315,6 +393,17 @@ export async function getFullMenu(restaurantId: string, client?: DbClient) {
         name: a.name,
         name_bs: a.name_bs ?? undefined,
         price: Number(a.price),
+        groupId: a.group_id ?? undefined,
+        groupLabel: a.group_label ?? undefined,
+        minSelect: a.min_select ?? undefined,
+        maxSelect: a.max_select ?? undefined,
+        dependsOn:
+          a.depends_on_variation_id && a.depends_on_option_id
+            ? {
+                variationId: a.depends_on_variation_id,
+                optionId: a.depends_on_option_id,
+              }
+            : undefined,
       })),
     variations: (allVariations ?? [])
       .filter((v) => v.product_id === p.id)
@@ -323,6 +412,8 @@ export async function getFullMenu(restaurantId: string, client?: DbClient) {
         name: v.name,
         name_bs: v.name_bs ?? undefined,
         required: v.required,
+        minSelect: v.min_select ?? undefined,
+        maxSelect: v.max_select ?? undefined,
         options: (allOptions ?? [])
           .filter((o) => o.variation_id === v.id)
           .map((o) => ({
@@ -330,6 +421,13 @@ export async function getFullMenu(restaurantId: string, client?: DbClient) {
             label: o.label,
             label_bs: o.label_bs ?? undefined,
             priceAdjustment: Number(o.price_adjustment),
+            dependsOn:
+              o.depends_on_variation_id && o.depends_on_option_id
+                ? {
+                    variationId: o.depends_on_variation_id,
+                    optionId: o.depends_on_option_id,
+                  }
+                : undefined,
           })),
       })),
   }));

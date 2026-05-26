@@ -16,7 +16,7 @@ import {
 export default function BarStationPage() {
   const params = useParams();
   const venueSlug = typeof params.venue === "string" ? params.venue : "";
-  const { orders, updateStatus } = useOrders(venueSlug);
+  const { orders, updateStatus, refreshAndReconnect } = useOrders(venueSlug);
 
   const [muted, setMuted] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
@@ -45,7 +45,10 @@ export default function BarStationPage() {
     void requestWakeLock();
 
     const handleVisibility = () => {
-      if (document.visibilityState === "visible") void requestWakeLock();
+      if (document.visibilityState === "visible") {
+        void requestWakeLock();
+        void refreshAndReconnect();
+      }
     };
     document.addEventListener("visibilitychange", handleVisibility);
 
@@ -53,7 +56,7 @@ export default function BarStationPage() {
       document.removeEventListener("visibilitychange", handleVisibility);
       void wakeLock?.release();
     };
-  }, []);
+  }, [refreshAndReconnect]);
 
   const toggleMute = () => {
     const next = !muted;
@@ -129,6 +132,14 @@ export default function BarStationPage() {
         await document.exitFullscreen();
       } else {
         await document.documentElement.requestFullscreen();
+        try {
+          const orientation = screen.orientation as ScreenOrientation & {
+            lock?: (orientation: "portrait") => Promise<void>;
+          };
+          await orientation.lock?.("portrait");
+        } catch {
+          // Orientation lock is not supported by all browsers.
+        }
       }
     } catch {
       // Fullscreen may be blocked by browser policy

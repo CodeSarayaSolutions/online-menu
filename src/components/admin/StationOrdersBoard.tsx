@@ -71,6 +71,13 @@ function ItemLines({
                 {item.selectedVariations.map((v) => v.optionLabel).join(", ")}
               </span>
             ) : null}
+            {item.selectedAddons?.length ? (
+              <span className="block text-[11px] font-normal text-muted adm-text-muted mt-0.5">
+                {item.selectedAddons
+                  .map((addon) => `${addon.quantity > 1 ? `${addon.quantity}× ` : ""}${addon.name}`)
+                  .join(", ")}
+              </span>
+            ) : null}
           </span>
           {showPrices && (
             <span className="font-bold text-dark adm-text shrink-0">

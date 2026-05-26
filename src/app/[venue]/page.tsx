@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { Search, Wifi, Clock, MapPin, X, Star, ChevronRight, QrCode } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -8,6 +8,7 @@ import clsx from "clsx";
 import { isDark, mutedText, subtleBorder, subtleSurface, hoverSurface } from "@/lib/color-utils";
 import { useCmsData } from "@/hooks/useCmsData";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useHappyHourPricing } from "@/hooks/useHappyHourPricing";
 import { MenuSectionItem } from "@/types/cms";
 import MenuList from "@/components/MenuList";
 import OrderBar from "@/components/OrderBar";
@@ -53,6 +54,7 @@ export default function MenuPage() {
   const restaurant = cmsData.restaurant;
   const categoryConfig = cmsData.categoryConfig;
   const products = cmsData.products;
+  const { prices: happyHourPrices } = useHappyHourPricing(venueSlug);
   const pageContent = cmsData.pageContent;
   const cs = cmsData.componentStyles;
   const lc = cmsData.layoutConfig;
@@ -111,7 +113,23 @@ export default function MenuPage() {
   }, [categoryConfig, searchQuery]);
 
   // ─── Derived data ──────────────────────────────────────
-  const searchFilteredProducts = products.filter((p) => {
+  const pricedProducts = useMemo(
+    () =>
+      products.map((product) => {
+        const happyHour = happyHourPrices.get(product.id);
+        if (!happyHour) return product;
+        return {
+          ...product,
+          originalPrice: product.price,
+          happyHourPrice: happyHour.overridePrice,
+          happyHourLabel: happyHour.label,
+          price: happyHour.overridePrice,
+        };
+      }),
+    [products, happyHourPrices]
+  );
+
+  const searchFilteredProducts = pricedProducts.filter((p) => {
     if (searchQuery === "") return true;
     return (
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -501,7 +519,7 @@ export default function MenuPage() {
   };
 
   const renderFeaturedSection = () => {
-    const featured = products.filter((p) => p.popular).slice(0, 5);
+    const featured = pricedProducts.filter((p) => p.popular).slice(0, 5);
     if (featured.length === 0) return null;
 
     return (
@@ -561,7 +579,7 @@ export default function MenuPage() {
           categoryName={`Results for "${searchQuery}"`}
         />
       ) : (
-        <MenuList products={products} grouped />
+        <MenuList products={pricedProducts} grouped />
       )}
     </div>
   );

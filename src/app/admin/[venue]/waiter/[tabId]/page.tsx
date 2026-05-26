@@ -6,6 +6,7 @@ import { Minus, Plus, Search, X, CreditCard, Banknote } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCmsStore } from "@/store/cmsStore";
 import { useAuthStore } from "@/store/authStore";
+import { useHappyHourPricing } from "@/hooks/useHappyHourPricing";
 import * as tabService from "@/services/tabService";
 import * as authService from "@/services/authService";
 import type { TabWithItems } from "@/services/tabService";
@@ -25,11 +26,13 @@ export default function WaiterTabPage() {
   const categories = useCmsStore((s) => s.categories);
   const currentUser = useAuthStore((s) => s.getCurrentUser());
   const logout = useAuthStore((s) => s.logout);
+  const { prices: happyHourPrices } = useHappyHourPricing(venueSlug);
 
   const [tab, setTab] = useState<TabWithItems | null>(null);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [showPay, setShowPay] = useState(false);
+  const [showEmptyExitConfirm, setShowEmptyExitConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -46,6 +49,22 @@ export default function WaiterTabPage() {
     const fromProducts = products.map((p) => p.category).filter(Boolean);
     return Array.from(new Set([...labels, ...fromProducts]));
   }, [categories, products]);
+
+  const pricedProducts = useMemo(
+    () =>
+      products.map((product) => {
+        const happyHour = happyHourPrices.get(product.id);
+        if (!happyHour) return product;
+        return {
+          ...product,
+          originalPrice: product.price,
+          happyHourPrice: happyHour.overridePrice,
+          happyHourLabel: happyHour.label,
+          price: happyHour.overridePrice,
+        };
+      }),
+    [products, happyHourPrices]
+  );
 
   const load = useCallback(async () => {
     if (!tabId) return;
@@ -76,7 +95,7 @@ export default function WaiterTabPage() {
     const q = search.toLowerCase();
     const map = new Map<string, ProductItem[]>();
     for (const cat of menuCategories) {
-      const items = products.filter(
+      const items = pricedProducts.filter(
         (p) =>
           p.category === cat &&
           (!q || p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q))
@@ -84,7 +103,7 @@ export default function WaiterTabPage() {
       if (items.length) map.set(cat, items);
     }
     return map;
-  }, [menuCategories, products, search]);
+  }, [menuCategories, pricedProducts, search]);
 
   const addProduct = async (p: ProductItem) => {
     if (!canEdit || !tab) return;
@@ -116,7 +135,7 @@ export default function WaiterTabPage() {
     }
   };
 
-  const handleGotovo = () => {
+  const signOutAndExit = () => {
     void (async () => {
       try {
         await authService.signOut();
@@ -126,6 +145,14 @@ export default function WaiterTabPage() {
       logout();
       router.replace("/admin/login");
     })();
+  };
+
+  const handleGotovo = () => {
+    if (!tab?.tab_items?.length) {
+      setShowEmptyExitConfirm(true);
+      return;
+    }
+    signOutAndExit();
   };
 
   const closeWithPayment = async (method: "cash" | "card") => {
@@ -221,7 +248,19 @@ export default function WaiterTabPage() {
                 >
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-dark adm-text text-sm truncate">{p.name}</p>
-                    <p className="text-xs text-primary font-bold">{p.price.toFixed(2)} KM</p>
+                    <p className="text-xs text-primary font-bold">
+                      {p.originalPrice !== undefined && (
+                        <span className="mr-1 text-muted adm-text-muted line-through">
+                          {p.originalPrice.toFixed(2)}
+                        </span>
+                      )}
+                      {p.price.toFixed(2)} KM
+                      {p.happyHourPrice !== undefined && (
+                        <span className="ml-2 rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] uppercase">
+                          HH
+                        </span>
+                      )}
+                    </p>
                   </div>
                   {canEdit && (
                     <button
@@ -299,6 +338,47 @@ export default function WaiterTabPage() {
       )}
 
       <AnimatePresence>
+        {showEmptyExitConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-[110] flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              className="adm-surface adm-border border rounded-3xl p-6 w-full max-w-sm"
+            >
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-lg font-extrabold">Stol nema narudžbi</h3>
+                <button type="button" onClick={() => setShowEmptyExitConfirm(false)}>
+                  <X size={20} />
+                </button>
+              </div>
+              <p className="text-sm text-muted adm-text-muted mb-5">
+                Stol nema narudžbi. Jeste li sigurni da želite izaći?
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowEmptyExitConfirm(false)}
+                  className="min-h-[48px] rounded-xl border adm-border text-sm font-bold adm-text"
+                >
+                  Ostani
+                </button>
+                <button
+                  type="button"
+                  onClick={signOutAndExit}
+                  className="min-h-[48px] rounded-xl bg-primary text-white text-sm font-bold"
+                >
+                  Izađi
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
         {showPay && (
           <motion.div
             initial={{ opacity: 0 }}

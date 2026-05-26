@@ -19,7 +19,11 @@ export function loadQrCodeScript(): Promise<void> {
     script.src = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
     script.async = true;
     script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Failed to load QR code library"));
+    script.onerror = () => {
+      loadPromise = null;
+      script.remove();
+      reject(new Error("Failed to load QR code library"));
+    };
     document.head.appendChild(script);
   });
 

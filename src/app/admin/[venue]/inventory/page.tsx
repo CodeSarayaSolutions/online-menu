@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { Plus, Trash2, X, FileText } from "lucide-react";
+import { Plus, Trash2, X, FileText, Search } from "lucide-react";
 import * as inventoryService from "@/services/inventoryService";
 import * as productService from "@/services/productService";
 import type { Tables } from "@/types/supabase";
@@ -53,6 +53,7 @@ export default function InventoryPage() {
   const [movementsOpen, setMovementsOpen] = useState(false);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [search, setSearch] = useState("");
 
   const [newProductId, setNewProductId] = useState("");
   const [newName, setNewName] = useState("");
@@ -140,9 +141,16 @@ export default function InventoryPage() {
         sold,
         current,
         unit: r.unit,
+        tracked: r.tracked !== false,
       };
     });
   }, [rows, soldTodayByProduct]);
+
+  const filteredRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((row) => row.product_name.toLowerCase().includes(q));
+  }, [rows, search]);
 
   const handleAdd = async () => {
     const name =
@@ -261,11 +269,32 @@ export default function InventoryPage() {
         </div>
       ) : (
         <>
+          <div className="relative mb-4">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted adm-text-muted" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Pretraži inventar..."
+              className="w-full min-h-[44px] pl-9 pr-10 rounded-xl adm-border border text-sm adm-bg adm-text"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg flex items-center justify-center adm-text-muted"
+                aria-label="Očisti pretragu"
+              >
+                <X size={15} />
+              </button>
+            )}
+          </div>
+
           <div className="space-y-3 mb-8">
-            {rows.map((r) => {
+            {filteredRows.map((r) => {
               const isAdjusting =
                 inlineAdjust?.rowId === r.id ? inlineAdjust.action : null;
               const isConfirmingDelete = confirmDeleteId === r.id;
+              const isTracked = r.tracked !== false;
 
               return (
                 <div
@@ -308,41 +337,60 @@ export default function InventoryPage() {
                   ) : (
                     <>
                       <p className="text-base font-extrabold text-dark adm-text pr-10">
-                        {r.product_name}
-                      </p>
-                      <p className="text-3xl font-extrabold text-primary mt-1">
-                        {Number(r.quantity)}{" "}
-                        <span className="text-lg font-semibold text-muted adm-text-muted">
-                          {r.unit}
+                        <span className="inline-flex items-center gap-2">
+                          <span
+                            className={clsx(
+                              "h-2.5 w-2.5 rounded-full",
+                              isTracked ? "bg-emerald-500" : "bg-slate-300"
+                            )}
+                          />
+                          {r.product_name}
                         </span>
                       </p>
+                      {isTracked ? (
+                        <p className="text-3xl font-extrabold text-primary mt-1">
+                          {Number(r.quantity)}{" "}
+                          <span className="text-lg font-semibold text-muted adm-text-muted">
+                            {r.unit}
+                          </span>
+                        </p>
+                      ) : (
+                        <p className="text-sm font-bold text-muted adm-text-muted mt-2">
+                          Nije praćeno
+                          <span className="ml-2 font-medium">
+                            ({Number(r.quantity)} {r.unit})
+                          </span>
+                        </p>
+                      )}
 
-                      <div className="grid grid-cols-2 gap-2 mt-4">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setInlineAdjust({ rowId: r.id, action: "remove" });
-                            setAdjustQty("");
-                          }}
-                          disabled={adjustBusy}
-                          className="min-h-[44px] rounded-xl adm-border border font-bold text-sm adm-text"
-                        >
-                          − Skini
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setInlineAdjust({ rowId: r.id, action: "add" });
-                            setAdjustQty("");
-                          }}
-                          disabled={adjustBusy}
-                          className="min-h-[44px] rounded-xl bg-primary text-white font-bold text-sm"
-                        >
-                          + Dodaj
-                        </button>
-                      </div>
+                      {isTracked && (
+                        <div className="grid grid-cols-2 gap-2 mt-4">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setInlineAdjust({ rowId: r.id, action: "remove" });
+                              setAdjustQty("");
+                            }}
+                            disabled={adjustBusy}
+                            className="min-h-[44px] rounded-xl adm-border border font-bold text-sm adm-text"
+                          >
+                            − Skini
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setInlineAdjust({ rowId: r.id, action: "add" });
+                              setAdjustQty("");
+                            }}
+                            disabled={adjustBusy}
+                            className="min-h-[44px] rounded-xl bg-primary text-white font-bold text-sm"
+                          >
+                            + Dodaj
+                          </button>
+                        </div>
+                      )}
 
-                      {isAdjusting && (
+                      {isTracked && isAdjusting && (
                         <div className="mt-3 pt-3 border-t adm-border space-y-2">
                           <input
                             type="number"
@@ -383,6 +431,11 @@ export default function InventoryPage() {
             {rows.length === 0 && (
               <p className="text-center text-muted adm-text-muted py-10 text-sm">
                 Inventar je prazan
+              </p>
+            )}
+            {rows.length > 0 && filteredRows.length === 0 && (
+              <p className="text-center text-muted adm-text-muted py-10 text-sm">
+                Nema artikala za ovu pretragu
               </p>
             )}
           </div>
@@ -567,7 +620,7 @@ export default function InventoryPage() {
                         {r.sold} {r.unit}
                       </td>
                       <td className="py-2 pr-2">
-                        {r.current} {r.unit}
+                        {r.tracked ? `${r.current} ${r.unit}` : "Nije praćeno"}
                       </td>
                       <td className="py-2 text-muted adm-text-muted">—</td>
                     </tr>

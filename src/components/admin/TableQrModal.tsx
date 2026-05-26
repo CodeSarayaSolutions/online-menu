@@ -31,12 +31,12 @@ export default function TableQrModal({ table, venueSlug, onClose }: Props) {
         await loadQrCodeScript();
         if (cancelled || !qrRef.current) return;
         renderQrCode(qrRef.current, menuUrl, 240);
-        setLoading(false);
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : "QR kod nije učitan");
-          setLoading(false);
         }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
 
@@ -103,15 +103,17 @@ export default function TableQrModal({ table, venueSlug, onClose }: Props) {
         </div>
 
         <div className="flex justify-center mb-4">
-          {loading ? (
-            <div className="w-[240px] h-[240px] flex items-center justify-center">
+          <div className="relative w-[256px] min-h-[256px] flex items-center justify-center">
+            <div
+              ref={qrRef}
+              className={`rounded-xl overflow-hidden bg-white p-2 ${loading || error ? "invisible absolute inset-0" : ""}`}
+            />
+            {loading ? (
               <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : error ? (
-            <p className="text-sm text-red-600">{error}</p>
-          ) : (
-            <div ref={qrRef} className="rounded-xl overflow-hidden bg-white p-2" />
-          )}
+            ) : error ? (
+              <p className="text-sm text-red-600 text-center px-3">{error}</p>
+            ) : null}
+          </div>
         </div>
 
         <p className="text-[11px] text-muted adm-text-muted break-all text-center mb-4 px-2">{url}</p>

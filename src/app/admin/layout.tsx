@@ -149,8 +149,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   // Determine page type from URL segments
   const urlSegments = useMemo(() => pathname.split("/").filter(Boolean), [pathname]);
-  // /admin → venue grid, /admin/[venue] → role picker (both use "venue page" layout)
-  const isOnVenuePage = pathname === "/admin" || (urlSegments.length === 2 && urlSegments[0] === "admin");
+  // /admin is the platform/local list. /admin/[venue] is only a transient entry route.
+  const isOnVenuePage = pathname === "/admin";
 
   // Extract venue slug from URL: /admin/[venue]/... → second segment
   const venueSlug = useMemo(() => {
@@ -243,7 +243,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     if (!currentUser || !effectiveVenueId) return [];
     return platformNavItems.filter((item) => {
       if (item.adminOnly) {
-        return isPlatformAdmin(currentUser) || canManageVenueStaff(currentUser, effectiveVenueId);
+        return isPlatformAdmin(currentUser);
       }
       return true;
     });
@@ -420,22 +420,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
           <div className="px-5 mb-1"><div className="h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" /></div>
 
-          {/* Navigation — Venues active, others greyed out */}
+          {/* Navigation */}
           <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto">
-            <p className="px-3 text-[10px] font-bold adm-text-faint uppercase tracking-[0.15em] mb-2">Navigation</p>
-            {navItems.map((item) => {
+            <p className="px-3 text-[10px] font-bold adm-text-faint uppercase tracking-[0.15em] mb-2">Platforma</p>
+            {[navItems[0]].map((item) => {
               const isActive = item.path === "/admin";
-              const isDisabled = item.path !== "/admin";
-              return isDisabled ? (
-                <div key={item.path} className="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-sm font-medium opacity-30 cursor-not-allowed">
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[var(--adm-surface-2)] text-muted adm-text-muted"><item.icon size={16} /></div>
-                  <div className="flex-1 min-w-0">
-                    <span className="block text-[13px] font-semibold leading-tight text-muted adm-text-muted">{item.label}</span>
-                    <span className="block text-[10px] mt-0.5 adm-text-faint">{item.desc}</span>
-                  </div>
-                </div>
-              ) : (
-                <Link key={item.path} href="/admin" onClick={() => setSidebarOpen(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-sm font-medium bg-primary/10 text-dark adm-text shadow-sm relative">
+              return (
+                <Link key={item.path} href="/admin" onClick={() => setSidebarOpen(false)} className={clsx("flex items-center gap-3 px-3 py-2.5 rounded-2xl text-sm font-medium transition relative", isActive ? "bg-primary/10 text-dark adm-text shadow-sm" : "text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)]")}>
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-primary rounded-r-full" />
                   <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-gradient-to-br from-primary to-amber-500 text-white shadow-sm"><item.icon size={16} /></div>
                   <div className="flex-1 min-w-0">
@@ -446,6 +437,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 </Link>
               );
             })}
+            {currentUser && isPlatformAdmin(currentUser) && accessibleRestaurants.length > 0 && (
+              <Link
+                href={`/admin/${activeRestaurantId || accessibleRestaurants[0]}/users`}
+                onClick={() => setSidebarOpen(false)}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-sm font-medium text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)] transition"
+              >
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[var(--adm-surface-2)] text-muted adm-text-muted"><Users size={16} /></div>
+                <div className="flex-1 min-w-0">
+                  <span className="block text-[13px] font-semibold leading-tight">Korisnici i uloge</span>
+                  <span className="block text-[10px] mt-0.5 adm-text-faint">Upravljanje pristupom</span>
+                </div>
+              </Link>
+            )}
           </nav>
 
           {/* Sidebar footer */}
@@ -472,7 +476,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <Download size={15} /> Instaliraj aplikaciju
               </button>
             )}
-            <Link href={`/${activeRestaurantId}`} className="flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)] transition"><ArrowLeft size={15} />Povratak na meni</Link>
+            {(activeRestaurantId || accessibleRestaurants[0]) && (
+              <Link href={`/${activeRestaurantId || accessibleRestaurants[0]}`} className="flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)] transition"><ArrowLeft size={15} />Povratak na meni</Link>
+            )}
           </div>
         </aside>
 
@@ -494,7 +500,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   )}
                 </AnimatePresence>
               </motion.button>
-              <Link href={`/${activeRestaurantId}`} target="_blank" className="hidden md:flex items-center gap-1.5 bg-gradient-to-r from-primary to-amber-500 text-white px-3.5 py-1.5 rounded-full text-[11px] font-bold shadow-glow hover:brightness-105 transition">Pogledaj meni</Link>
+              {(activeRestaurantId || accessibleRestaurants[0]) && (
+                <Link href={`/${activeRestaurantId || accessibleRestaurants[0]}`} target="_blank" className="hidden md:flex items-center gap-1.5 bg-gradient-to-r from-primary to-amber-500 text-white px-3.5 py-1.5 rounded-full text-[11px] font-bold shadow-glow hover:brightness-105 transition">Pogledaj meni</Link>
+              )}
             </div>
           </header>
           {bootBanner}

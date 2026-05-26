@@ -74,6 +74,35 @@ export default function MenuItemCard({ product, index }: MenuItemCardProps) {
   const customizeBadgeColor = cs.cardPriceColor || "#F4B400";
   const customizeBadgeBorder = (cs.cardPriceColor || "#F4B400") + "30";
   const viewOnly = cs.viewOnlyMode;
+  const hasHappyHour = product.happyHourPrice !== undefined && product.originalPrice !== undefined;
+  const priceBlock = (
+    <div>
+      <div className="flex items-baseline gap-1.5 flex-wrap">
+        {hasPriceRange && (
+          <span className="text-[9px] md:text-[10px] font-medium" style={{ color: cs.cardDescriptionColor }}>from</span>
+        )}
+        {hasHappyHour && (
+          <span className="text-[10px] md:text-[11px] line-through font-semibold" style={{ color: cs.cardDescriptionColor }}>
+            {product.originalPrice!.toFixed(2)}
+          </span>
+        )}
+        <span
+          className="font-extrabold text-[16px] md:text-[17px] tracking-tight"
+          style={{ color: cs.cardPriceColor }}
+        >
+          {product.price.toFixed(2)} {pageContent.currencySymbol}
+        </span>
+      </div>
+      {hasHappyHour && (
+        <span
+          className="mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide"
+          style={{ backgroundColor: `${cs.cardPriceColor || "#F4B400"}1A`, color: cs.cardPriceColor || "#F4B400" }}
+        >
+          Happy Hour
+        </span>
+      )}
+    </div>
+  );
 
   // ─── VERTICAL CARD ────────────────────────────────────
   if (isVertical) {
@@ -156,17 +185,7 @@ export default function MenuItemCard({ product, index }: MenuItemCardProps) {
               </p>
 
               <div className="flex items-center justify-between mt-auto pt-2">
-                <div>
-                  {hasPriceRange && (
-                    <span className="text-[9px] md:text-[10px] font-medium mr-1" style={{ color: cs.cardDescriptionColor }}>from</span>
-                  )}
-                  <span
-                    className="font-extrabold text-[16px] md:text-[17px] tracking-tight"
-                    style={{ color: cs.cardPriceColor }}
-                  >
-                    {product.price.toFixed(2)} {pageContent.currencySymbol}
-                  </span>
-                </div>
+                {priceBlock}
 
                 {!viewOnly && !hasRequiredVariation && (
                 <motion.button
@@ -353,17 +372,7 @@ export default function MenuItemCard({ product, index }: MenuItemCardProps) {
             </div>
 
             <div className="flex items-center justify-between mt-auto pt-1.5">
-              <div>
-                {hasPriceRange && (
-                  <span className="text-[9px] md:text-[10px] font-medium mr-1" style={{ color: cs.cardDescriptionColor }}>from</span>
-                )}
-                <span
-                  className="font-extrabold text-[17px] md:text-lg lg:text-xl tracking-tight"
-                  style={{ color: cs.cardPriceColor }}
-                >
-                  {product.price.toFixed(2)} {pageContent.currencySymbol}
-                </span>
-              </div>
+              {priceBlock}
 
               {!viewOnly && !hasRequiredVariation && (
               <motion.button

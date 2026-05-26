@@ -38,6 +38,14 @@ export interface Addon {
   name: string;
   name_bs?: string;
   price: number;
+  groupId?: string;
+  groupLabel?: string;
+  minSelect?: number;
+  maxSelect?: number;
+  dependsOn?: {
+    variationId: string;
+    optionId: string;
+  };
 }
 
 export interface VariationOption {
@@ -45,6 +53,10 @@ export interface VariationOption {
   label: string;          // e.g. "Small", "Medium", "Large"
   label_bs?: string;
   priceAdjustment: number; // added to base price (0 = no change)
+  dependsOn?: {
+    variationId: string;
+    optionId: string;
+  };
 }
 
 export interface Variation {
@@ -52,6 +64,8 @@ export interface Variation {
   name: string;            // e.g. "Size", "Crust"
   name_bs?: string;
   required: boolean;
+  minSelect?: number;
+  maxSelect?: number;
   options: VariationOption[];
 }
 
@@ -63,6 +77,9 @@ export interface ProductItem {
   description: string;
   description_bs?: string;
   price: number;
+  originalPrice?: number;
+  happyHourPrice?: number;
+  happyHourLabel?: string;
   image: string;
   category: string;
   station?: 'kitchen' | 'bar' | 'both';

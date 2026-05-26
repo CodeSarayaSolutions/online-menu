@@ -1,19 +1,24 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import {
   Plus, Trash2, Save, Search, X, Pencil, Flame,
   Image as ImageIcon, Package, Check, Sparkles,
   ArrowUp, ArrowDown, ChevronDown, ChevronUp, Tags,
-  PanelRightClose, PanelRightOpen,
+  PanelRightClose, PanelRightOpen, Clock,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCmsStore } from "@/store/cmsStore";
+import { useAuthStore } from "@/store/authStore";
 import { ProductItem, Addon, Variation, VariationOption, CategoryInfo } from "@/types/cms";
 import LivePreview from "@/components/admin/LivePreview";
 import BsCollapse from "@/components/admin/BsCollapse";
 import ImageUploadField from "@/components/admin/ImageUploadField";
+import * as happyHourService from "@/services/happyHourService";
+import * as inventoryService from "@/services/inventoryService";
+import type { HappyHourSchedule, HappyHourScheduleInput } from "@/services/happyHourService";
+import type { Tables } from "@/types/supabase";
 import clsx from "clsx";
 
 /* ─── Color presets for categories ──────────────────────── */
@@ -68,14 +73,48 @@ const blankVariation = (): Variation => ({
   id: `v${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
   name: "",
   required: true,
+  minSelect: 1,
+  maxSelect: 1,
   options: [blankVariationOption()],
 });
+
+type InventoryRow = Tables<"inventory">;
+
+type HappyHourForm = {
+  id?: string;
+  label: string;
+  startTime: string;
+  endTime: string;
+  active: boolean;
+  products: Record<string, string>;
+};
+
+const blankHappyHourForm = (): HappyHourForm => ({
+  label: "",
+  startTime: "08:00",
+  endTime: "10:00",
+  active: false,
+  products: {},
+});
+
+const scheduleProductMap = (schedules: HappyHourSchedule[]) => {
+  const map = new Map<string, HappyHourSchedule[]>();
+  for (const schedule of schedules) {
+    for (const product of schedule.products) {
+      const rows = map.get(product.product_id) ?? [];
+      rows.push(schedule);
+      map.set(product.product_id, rows);
+    }
+  }
+  return map;
+};
 
 /* ════════════════════════════════════════════════════════════
    MAIN COMPONENT
    ════════════════════════════════════════════════════════════ */
 export default function ProductsEditor() {
   const { venue } = useParams<{ venue: string }>();
+  const currentUser = useAuthStore((s) => s.getCurrentUser());
   /* ─── CMS store ─────────────────────────────────────────── */
   const products = useCmsStore((s) => s.products);
   const categories = useCmsStore((s) => s.categories);
@@ -98,10 +137,23 @@ export default function ProductsEditor() {
   const [editingProduct, setEditingProduct] = useState<ProductItem | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [initialStock, setInitialStock] = useState(0);
+  const [pendingInventoryTracked, setPendingInventoryTracked] = useState(true);
+  const [inventoryRows, setInventoryRows] = useState<InventoryRow[]>([]);
+  const [trackingConfirm, setTrackingConfirm] = useState<{
+    productId: string;
+    productName: string;
+    nextTracked: boolean;
+  } | null>(null);
   const [stockToast, setStockToast] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
+
+  const [happyHourSchedules, setHappyHourSchedules] = useState<HappyHourSchedule[]>([]);
+  const [showHappyHourPanel, setShowHappyHourPanel] = useState(false);
+  const [happyHourForm, setHappyHourForm] = useState<HappyHourForm | null>(null);
+  const [happyHourToast, setHappyHourToast] = useState<string | null>(null);
+  const [happyHourBusy, setHappyHourBusy] = useState(false);
 
   /* ─── Category state ────────────────────────────────────── */
   const [showCatPanel, setShowCatPanel] = useState(false);
@@ -172,6 +224,39 @@ export default function ProductsEditor() {
   };
 
   const realCategories = categories.filter((c) => c.id !== "all" && c.id !== "popular");
+  const productHappyHourMap = useMemo(() => scheduleProductMap(happyHourSchedules), [happyHourSchedules]);
+  const currentInventoryRow = editingProduct
+    ? inventoryRows.find((row) => row.product_id === editingProduct.id)
+    : undefined;
+  const currentInventoryTracked = isNew
+    ? pendingInventoryTracked
+    : currentInventoryRow?.tracked !== false;
+
+  const loadInventoryRows = async () => {
+    if (!venue) return;
+    try {
+      const rows = await inventoryService.getInventory(venue);
+      setInventoryRows(rows);
+    } catch (err) {
+      console.error("[inventory] failed to load rows", err);
+    }
+  };
+
+  const loadHappyHours = async () => {
+    if (!venue) return;
+    try {
+      const schedules = await happyHourService.getHappyHourSchedules(venue);
+      setHappyHourSchedules(schedules);
+    } catch (err) {
+      console.error("[happy-hour] failed to load schedules", err);
+      setHappyHourToast(err instanceof Error ? err.message : "Happy hour nije učitan");
+    }
+  };
+
+  useEffect(() => {
+    void loadInventoryRows();
+    void loadHappyHours();
+  }, [venue]);
   /** Labels used in product.category — includes DB categories + any product bucket not in the list */
   const menuCategories = useMemo(() => {
     const fromCats = realCategories.map((c) => c.label);
@@ -185,6 +270,7 @@ export default function ProductsEditor() {
     setEditingProduct(p);
     setIsNew(true);
     setInitialStock(0);
+    setPendingInventoryTracked(true);
     setStockToast(null);
   };
 
@@ -219,6 +305,7 @@ export default function ProductsEditor() {
       variations: p.variations ? p.variations.map((v) => ({ ...v, options: v.options.map((o) => ({ ...o })) })) : [],
     });
     setIsNew(false);
+    setPendingInventoryTracked(true);
   };
   const cancelEdit = () => {
     setEditingProduct(null);
@@ -234,7 +321,16 @@ export default function ProductsEditor() {
       openProductCatModal();
       return;
     }
-    const payload = { ...editingProduct, restaurantId: venue, category: catLabel };
+    const payload = {
+      ...editingProduct,
+      restaurantId: venue,
+      category: catLabel,
+      variations: (editingProduct.variations || []).map((variation) => ({
+        ...variation,
+        minSelect: variation.minSelect ?? (variation.required ? 1 : 0),
+        maxSelect: Math.max(variation.maxSelect ?? 1, variation.minSelect ?? 0, 1),
+      })),
+    };
     if (catLabel) {
       const catId = catLabel.toLowerCase().replace(/\s+/g, "-");
       const hasCat = categories.some(
@@ -265,6 +361,7 @@ export default function ProductsEditor() {
           productName: payload.name,
           delta: stock,
           reason: "init",
+          tracked: pendingInventoryTracked,
         }),
       })
         .then((res) => {
@@ -275,6 +372,7 @@ export default function ProductsEditor() {
               : "Stavka dodana. Zaliha je trenutno 0 — ažurirajte u Inventaru."
           );
           setTimeout(() => cancelEdit(), 2500);
+          void loadInventoryRows();
         })
         .catch((e) => {
           console.error("[inventory] auto-init failed", e);
@@ -290,6 +388,110 @@ export default function ProductsEditor() {
     cancelEdit();
   };
 
+  const openHappyHourForm = (schedule?: HappyHourSchedule) => {
+    if (!schedule) {
+      setHappyHourForm(blankHappyHourForm());
+      setShowHappyHourPanel(true);
+      return;
+    }
+    setHappyHourForm({
+      id: schedule.id,
+      label: schedule.label ?? "",
+      startTime: schedule.start_time.slice(0, 5),
+      endTime: schedule.end_time.slice(0, 5),
+      active: schedule.active,
+      products: Object.fromEntries(
+        schedule.products.map((product) => [
+          product.product_id,
+          String(Number(product.override_price)),
+        ])
+      ),
+    });
+    setShowHappyHourPanel(true);
+  };
+
+  const saveHappyHour = async () => {
+    if (!happyHourForm || !venue) return;
+    const selectedProducts = Object.entries(happyHourForm.products)
+      .map(([productId, value]) => ({ productId, overridePrice: Number(value) }))
+      .filter((product) => product.overridePrice > 0);
+
+    const input: HappyHourScheduleInput = {
+      id: happyHourForm.id,
+      label: happyHourForm.label,
+      startTime: happyHourForm.startTime,
+      endTime: happyHourForm.endTime,
+      active: happyHourForm.active,
+      products: selectedProducts,
+    };
+
+    if (happyHourForm.startTime >= happyHourForm.endTime) {
+      setHappyHourToast("Vrijeme početka mora biti prije vremena završetka.");
+      return;
+    }
+    if (Object.keys(happyHourForm.products).length !== selectedProducts.length) {
+      setHappyHourToast("Happy hour cijena mora biti veća od 0 za svaki odabrani proizvod.");
+      return;
+    }
+
+    setHappyHourBusy(true);
+    try {
+      await happyHourService.saveHappyHourSchedule(venue, input);
+      await loadHappyHours();
+      setHappyHourForm(null);
+      setHappyHourToast("Happy hour je spremljen.");
+    } catch (err) {
+      setHappyHourToast(err instanceof Error ? err.message : "Spremanje happy houra nije uspjelo");
+    } finally {
+      setHappyHourBusy(false);
+    }
+  };
+
+  const deleteHappyHour = async (scheduleId: string) => {
+    setHappyHourBusy(true);
+    try {
+      await happyHourService.deleteHappyHourSchedule(scheduleId);
+      await loadHappyHours();
+      setHappyHourToast("Happy hour je obrisan.");
+      if (happyHourForm?.id === scheduleId) setHappyHourForm(null);
+    } catch (err) {
+      setHappyHourToast(err instanceof Error ? err.message : "Brisanje happy houra nije uspjelo");
+    } finally {
+      setHappyHourBusy(false);
+    }
+  };
+
+  const confirmTrackingChange = async () => {
+    if (!trackingConfirm || !currentUser) return;
+    if (isNew) {
+      setPendingInventoryTracked(trackingConfirm.nextTracked);
+      setTrackingConfirm(null);
+      return;
+    }
+    setStockToast(null);
+    try {
+      const result = await inventoryService.setInventoryTracked(
+        trackingConfirm.productId,
+        venue,
+        trackingConfirm.nextTracked,
+        { id: currentUser.id, name: currentUser.name }
+      );
+      setInventoryRows((rows) =>
+        rows.map((row) => (row.product_id === trackingConfirm.productId ? result.row : row))
+      );
+      setStockToast(
+        result.auditWarning ??
+          (trackingConfirm.nextTracked
+            ? "Stavka će se opet oduzimati iz inventara."
+            : "Stavka se više neće oduzimati iz inventara.")
+      );
+    } catch (err) {
+      setStockToast(err instanceof Error ? err.message : "Promjena praćenja nije uspjela");
+    } finally {
+      setTrackingConfirm(null);
+    }
+  };
+
   const handleDelete = (id: string) => {
     removeProduct(id);
     setTimeout(() => saveActiveToAllRestaurants(venue), 0);
@@ -302,7 +504,7 @@ export default function ProductsEditor() {
     setEditingProduct({ ...editingProduct, addons: [...(editingProduct.addons || []), blankAddon()] });
   };
 
-  const updateAddonField = (addonId: string, field: keyof Addon, value: string | number) => {
+  const updateAddonField = (addonId: string, field: keyof Addon, value: Addon[keyof Addon]) => {
     if (!editingProduct) return;
     setEditingProduct({
       ...editingProduct,
@@ -313,6 +515,24 @@ export default function ProductsEditor() {
   const removeAddon = (addonId: string) => {
     if (!editingProduct) return;
     setEditingProduct({ ...editingProduct, addons: (editingProduct.addons || []).filter((a) => a.id !== addonId) });
+  };
+
+  const dependencyOptions = (editingProduct?.variations || []).flatMap((variation) =>
+    variation.options.map((option) => ({
+      value: `${variation.id}|${option.id}`,
+      label: `${variation.name || "Varijacija"}: ${option.label || "Opcija"}`,
+      variationId: variation.id,
+      optionId: option.id,
+    }))
+  );
+
+  const dependencyValue = (dependsOn?: { variationId: string; optionId: string }) =>
+    dependsOn ? `${dependsOn.variationId}|${dependsOn.optionId}` : "";
+
+  const parseDependency = (value: string) => {
+    if (!value) return undefined;
+    const [variationId, optionId] = value.split("|");
+    return variationId && optionId ? { variationId, optionId } : undefined;
   };
 
   /* ---- Variation helpers ---- */
@@ -611,6 +831,199 @@ export default function ProductsEditor() {
         )}
       </AnimatePresence>
 
+      <div className="mb-6 adm-surface adm-border border rounded-2xl shadow-soft overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setShowHappyHourPanel((open) => !open)}
+          className="w-full px-5 py-4 flex items-center gap-3 text-left hover:bg-[var(--adm-surface-2)] transition"
+        >
+          <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+            <Clock size={16} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-sm font-extrabold text-dark adm-text">Happy Hour</h2>
+            <p className="text-[11px] text-muted adm-text-muted">
+              {happyHourSchedules.length} raspored(a) · ručno aktivirajte popuste po vremenu
+            </p>
+          </div>
+          <ChevronDown
+            size={16}
+            className={clsx("adm-text-faint transition-transform", showHappyHourPanel && "rotate-180")}
+          />
+        </button>
+
+        <AnimatePresence>
+          {showHappyHourPanel && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden border-t adm-border"
+            >
+              <div className="p-5 space-y-4">
+                {happyHourToast && (
+                  <p className="rounded-xl bg-primary/10 px-3 py-2 text-xs font-semibold text-primary">
+                    {happyHourToast}
+                  </p>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  {happyHourSchedules.map((schedule) => (
+                    <div key={schedule.id} className="rounded-2xl adm-bg adm-border border p-3 min-w-[220px] flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-extrabold text-dark adm-text">
+                            {schedule.label || "Happy Hour"}
+                          </p>
+                          <p className="text-xs text-muted adm-text-muted">
+                            {schedule.start_time.slice(0, 5)} - {schedule.end_time.slice(0, 5)} · {schedule.products.length} stavki
+                          </p>
+                        </div>
+                        <span
+                          className={clsx(
+                            "rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase",
+                            schedule.active ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"
+                          )}
+                        >
+                          {schedule.active ? "Aktivno" : "Ugašeno"}
+                        </span>
+                      </div>
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openHappyHourForm(schedule)}
+                          className="flex-1 rounded-xl adm-surface adm-border border px-3 py-2 text-xs font-bold adm-text"
+                        >
+                          Uredi
+                        </button>
+                        <button
+                          type="button"
+                          disabled={happyHourBusy}
+                          onClick={() => void deleteHappyHour(schedule.id)}
+                          className="rounded-xl px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 disabled:opacity-40"
+                        >
+                          Obriši
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {happyHourSchedules.length === 0 && (
+                    <p className="text-xs text-muted adm-text-muted py-2">
+                      Nema happy hour rasporeda.
+                    </p>
+                  )}
+                </div>
+
+                {happyHourForm ? (
+                  <div className="rounded-2xl border adm-border adm-bg p-4 space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <Field
+                        label="Naziv"
+                        value={happyHourForm.label}
+                        onChange={(v) => setHappyHourForm((form) => form ? { ...form, label: v } : form)}
+                        placeholder="Jutarnji happy hour"
+                      />
+                      <Field
+                        label="Početak"
+                        type="time"
+                        value={happyHourForm.startTime}
+                        onChange={(v) => setHappyHourForm((form) => form ? { ...form, startTime: v } : form)}
+                      />
+                      <Field
+                        label="Kraj"
+                        type="time"
+                        value={happyHourForm.endTime}
+                        onChange={(v) => setHappyHourForm((form) => form ? { ...form, endTime: v } : form)}
+                      />
+                    </div>
+
+                    <label className="inline-flex items-center gap-2 text-sm font-bold adm-text">
+                      <input
+                        type="checkbox"
+                        checked={happyHourForm.active}
+                        onChange={(e) => setHappyHourForm((form) => form ? { ...form, active: e.target.checked } : form)}
+                        className="h-4 w-4 accent-primary"
+                      />
+                      Aktivno
+                    </label>
+
+                    <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+                      <p className="text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider">
+                        Proizvodi i happy hour cijene
+                      </p>
+                      {products.map((product) => {
+                        const selected = Object.prototype.hasOwnProperty.call(happyHourForm.products, product.id);
+                        return (
+                          <div key={product.id} className="flex items-center gap-3 rounded-xl adm-surface adm-border border p-3">
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              onChange={(e) =>
+                                setHappyHourForm((form) => {
+                                  if (!form) return form;
+                                  const next = { ...form.products };
+                                  if (e.target.checked) next[product.id] = product.price.toFixed(2);
+                                  else delete next[product.id];
+                                  return { ...form, products: next };
+                                })
+                              }
+                              className="h-4 w-4 accent-primary"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-bold adm-text truncate">{product.name}</p>
+                              <p className="text-[11px] text-muted adm-text-muted">{product.price.toFixed(2)} KM</p>
+                            </div>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0.01"
+                              disabled={!selected}
+                              value={happyHourForm.products[product.id] ?? ""}
+                              onChange={(e) =>
+                                setHappyHourForm((form) =>
+                                  form ? { ...form, products: { ...form.products, [product.id]: e.target.value } } : form
+                                )
+                              }
+                              placeholder="HH cijena"
+                              className="w-28 rounded-xl adm-bg adm-border border px-3 py-2 text-sm adm-text disabled:opacity-40"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setHappyHourForm(null)}
+                        className="flex-1 rounded-xl adm-surface adm-border border px-4 py-2.5 text-sm font-bold adm-text"
+                      >
+                        Odustani
+                      </button>
+                      <button
+                        type="button"
+                        disabled={happyHourBusy}
+                        onClick={() => void saveHappyHour()}
+                        className="flex-1 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white disabled:opacity-40"
+                      >
+                        Spremi Happy Hour
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => openHappyHourForm()}
+                    className="min-h-[44px] rounded-xl bg-primary text-white px-4 text-sm font-bold"
+                  >
+                    + Novi Happy Hour
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
       {/* Search & filter */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
@@ -706,6 +1119,24 @@ export default function ProductsEditor() {
                             <Flame size={8} /> Popular
                           </span>
                         )}
+                        {productHappyHourMap.has(product.id) && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const names = productHappyHourMap
+                                .get(product.id)
+                                ?.map((schedule) => schedule.label || "Happy Hour")
+                                .join(", ");
+                              setHappyHourToast(`${product.name}: ${names}`);
+                              setShowHappyHourPanel(true);
+                            }}
+                            className="shrink-0 bg-primary/10 text-primary text-[9px] font-extrabold px-1.5 py-0.5 rounded-full flex items-center gap-0.5"
+                            title="Happy hour rasporedi"
+                          >
+                            <Clock size={8} /> HH
+                          </button>
+                        )}
                         {saved === product.id && (
                           <Check size={14} className="text-accent-green shrink-0" strokeWidth={3} />
                         )}
@@ -722,10 +1153,11 @@ export default function ProductsEditor() {
                     <div className="flex items-center gap-0.5 shrink-0">
                       <button
                         onClick={() => startEdit(product)}
-                        className="p-1.5 rounded-lg text-muted adm-text-muted hover:text-primary hover:bg-primary/10 transition"
+                        className="w-10 h-10 p-2 rounded-xl text-muted adm-text-muted hover:text-primary hover:bg-primary/10 transition flex items-center justify-center"
                         title="Edit"
+                        aria-label={`Uredi ${product.name}`}
                       >
-                        <Pencil size={14} />
+                        <Pencil size={18} />
                       </button>
                       {confirmDelete === product.id ? (
                         <div className="flex items-center gap-1">
@@ -988,6 +1420,43 @@ export default function ProductsEditor() {
                   </span>
                 </label>
 
+                {(isNew || currentInventoryRow) && (
+                  <div className="rounded-2xl adm-bg adm-border border p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-extrabold adm-text">Prati stanje zaliha</p>
+                        <p className="text-[11px] text-muted adm-text-muted mt-0.5">
+                          {currentInventoryTracked
+                            ? "Narudžbe će skidati količinu iz inventara."
+                            : "Stavka ostaje u inventaru, ali se količina ne skida."}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setTrackingConfirm({
+                            productId: editingProduct.id,
+                            productName: editingProduct.name || "Stavka",
+                            nextTracked: !currentInventoryTracked,
+                          })
+                        }
+                        className={clsx(
+                          "relative h-7 w-12 rounded-full transition shrink-0",
+                          currentInventoryTracked ? "bg-primary" : "bg-slate-300"
+                        )}
+                        aria-pressed={currentInventoryTracked}
+                      >
+                        <span
+                          className={clsx(
+                            "absolute top-1 h-5 w-5 rounded-full bg-white shadow transition",
+                            currentInventoryTracked ? "left-6" : "left-1"
+                          )}
+                        />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Addons */}
                 <div className="border-t border-primary/10 pt-5">
                   <div className="flex items-center justify-between mb-3">
@@ -1046,6 +1515,50 @@ export default function ProductsEditor() {
                               <Trash2 size={14} />
                             </button>
                           </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 pt-2">
+                            <input
+                              value={addon.groupId || ""}
+                              onChange={(e) => updateAddonField(addon.id, "groupId", e.target.value)}
+                              placeholder="ID grupe"
+                              className="px-3 py-2 adm-surface adm-border border rounded-xl text-xs text-dark adm-text border border-primary/10 focus:border-primary outline-none transition"
+                            />
+                            <input
+                              value={addon.groupLabel || ""}
+                              onChange={(e) => updateAddonField(addon.id, "groupLabel", e.target.value)}
+                              placeholder="Naziv grupe"
+                              className="px-3 py-2 adm-surface adm-border border rounded-xl text-xs text-dark adm-text border border-primary/10 focus:border-primary outline-none transition"
+                            />
+                            <input
+                              type="number"
+                              min="0"
+                              value={addon.minSelect ?? ""}
+                              onChange={(e) => updateAddonField(addon.id, "minSelect", e.target.value === "" ? undefined : Math.max(0, Number(e.target.value)))}
+                              placeholder="Min"
+                              className="px-3 py-2 adm-surface adm-border border rounded-xl text-xs text-dark adm-text border border-primary/10 focus:border-primary outline-none transition"
+                            />
+                            <input
+                              type="number"
+                              min="0"
+                              value={addon.maxSelect ?? ""}
+                              onChange={(e) => updateAddonField(addon.id, "maxSelect", e.target.value === "" ? undefined : Math.max(0, Number(e.target.value)))}
+                              placeholder="Max"
+                              className="px-3 py-2 adm-surface adm-border border rounded-xl text-xs text-dark adm-text border border-primary/10 focus:border-primary outline-none transition"
+                            />
+                          </div>
+                          {dependencyOptions.length > 0 && (
+                            <select
+                              value={dependencyValue(addon.dependsOn)}
+                              onChange={(e) => updateAddonField(addon.id, "dependsOn", parseDependency(e.target.value))}
+                              className="w-full px-3 py-2 adm-surface adm-border border rounded-xl text-xs text-dark adm-text border border-primary/10 focus:border-primary outline-none transition"
+                            >
+                              <option value="">Uvijek prikaži dodatak</option>
+                              {dependencyOptions.map((option) => (
+                                <option key={`${addon.id}-${option.value}`} value={option.value}>
+                                  Prikaži ako je odabrano: {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -1100,6 +1613,24 @@ export default function ProductsEditor() {
                               />
                               Obavezno
                             </label>
+                            <div className="hidden sm:flex items-center gap-1">
+                              <input
+                                type="number"
+                                min="0"
+                                value={variation.minSelect ?? ""}
+                                onChange={(e) => updateVariationField(variation.id, "minSelect", e.target.value === "" ? undefined : Math.max(0, Number(e.target.value)))}
+                                placeholder="Min"
+                                className="w-16 px-2 py-1.5 adm-surface adm-border border rounded-lg text-xs text-dark adm-text border border-primary/10 focus:border-primary outline-none transition"
+                              />
+                              <input
+                                type="number"
+                                min="1"
+                                value={variation.maxSelect ?? ""}
+                                onChange={(e) => updateVariationField(variation.id, "maxSelect", e.target.value === "" ? undefined : Math.max(1, Number(e.target.value)))}
+                                placeholder="Max"
+                                className="w-16 px-2 py-1.5 adm-surface adm-border border rounded-lg text-xs text-dark adm-text border border-primary/10 focus:border-primary outline-none transition"
+                              />
+                            </div>
                             <button
                               type="button"
                               onClick={() => removeVariation(variation.id)}
@@ -1107,6 +1638,24 @@ export default function ProductsEditor() {
                             >
                               <Trash2 size={14} />
                             </button>
+                          </div>
+                          <div className="sm:hidden grid grid-cols-2 gap-2 mb-3">
+                            <input
+                              type="number"
+                              min="0"
+                              value={variation.minSelect ?? ""}
+                              onChange={(e) => updateVariationField(variation.id, "minSelect", e.target.value === "" ? undefined : Math.max(0, Number(e.target.value)))}
+                              placeholder="Min odabira"
+                              className="px-3 py-2 adm-surface adm-border border rounded-xl text-xs text-dark adm-text border border-primary/10 focus:border-primary outline-none transition"
+                            />
+                            <input
+                              type="number"
+                              min="1"
+                              value={variation.maxSelect ?? ""}
+                              onChange={(e) => updateVariationField(variation.id, "maxSelect", e.target.value === "" ? undefined : Math.max(1, Number(e.target.value)))}
+                              placeholder="Max odabira"
+                              className="px-3 py-2 adm-surface adm-border border rounded-xl text-xs text-dark adm-text border border-primary/10 focus:border-primary outline-none transition"
+                            />
                           </div>
                           <div className="space-y-2">
                             {variation.options.map((opt) => (
@@ -1127,6 +1676,22 @@ export default function ProductsEditor() {
                                       className="w-full px-2 py-1.5 adm-surface adm-border border rounded-lg text-sm text-dark adm-text border border-blue-200/30 focus:border-blue-400 outline-none transition mt-1"
                                     />
                                   </BsCollapse>
+                                  {dependencyOptions.length > 0 && (
+                                    <select
+                                      value={dependencyValue(opt.dependsOn)}
+                                      onChange={(e) => updateVariationOption(variation.id, opt.id, "dependsOn", parseDependency(e.target.value))}
+                                      className="w-full px-2 py-1.5 adm-surface adm-border border rounded-lg text-xs text-dark adm-text border border-primary/10 focus:border-primary outline-none transition mt-1"
+                                    >
+                                      <option value="">Uvijek prikaži opciju</option>
+                                      {dependencyOptions
+                                        .filter((dependency) => dependency.optionId !== opt.id)
+                                        .map((dependency) => (
+                                          <option key={`${opt.id}-${dependency.value}`} value={dependency.value}>
+                                            Prikaži ako je odabrano: {dependency.label}
+                                          </option>
+                                        ))}
+                                    </select>
+                                  )}
                                 </div>
                                 <div className="flex items-center gap-1">
                                   <span className="text-[10px] text-muted adm-text-muted">+KM</span>
@@ -1208,6 +1773,50 @@ export default function ProductsEditor() {
               </div>
             </motion.aside>
           </>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {trackingConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/55 backdrop-blur-sm z-[120] flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.94, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 12 }}
+              className="adm-surface adm-border border rounded-3xl w-full max-w-[420px] shadow-elevated overflow-hidden"
+            >
+              <div className="p-6">
+                <h3 className="text-lg font-extrabold adm-text">Jeste li sigurni?</h3>
+                <p className="mt-2 text-sm text-muted adm-text-muted leading-relaxed">
+                  {trackingConfirm.nextTracked
+                    ? "Ova stavka će se ponovo oduzimati iz inventara pri narudžbi."
+                    : "Ova stavka neće više biti oduzimana iz inventara pri narudžbi."}
+                </p>
+                <p className="mt-3 text-sm font-bold adm-text">{trackingConfirm.productName}</p>
+              </div>
+              <div className="px-6 py-4 border-t adm-border flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setTrackingConfirm(null)}
+                  className="flex-1 rounded-xl adm-border border py-2.5 text-sm font-bold adm-text"
+                >
+                  Otkaži
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void confirmTrackingChange()}
+                  className="flex-1 rounded-xl bg-primary py-2.5 text-sm font-bold text-white"
+                >
+                  Potvrdi
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
 

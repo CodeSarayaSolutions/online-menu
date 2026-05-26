@@ -3,6 +3,14 @@ export interface Addon {
   name: string;
   name_bs?: string;
   price: number;
+  groupId?: string;
+  groupLabel?: string;
+  minSelect?: number;
+  maxSelect?: number;
+  dependsOn?: {
+    variationId: string;
+    optionId: string;
+  };
 }
 
 export interface VariationOption {
@@ -10,6 +18,10 @@ export interface VariationOption {
   label: string;
   label_bs?: string;
   priceAdjustment: number;
+  dependsOn?: {
+    variationId: string;
+    optionId: string;
+  };
 }
 
 export interface Variation {
@@ -17,6 +29,8 @@ export interface Variation {
   name: string;
   name_bs?: string;
   required: boolean;
+  minSelect?: number;
+  maxSelect?: number;
   options: VariationOption[];
 }
 
@@ -30,6 +44,9 @@ export interface Product {
   description: string;
   description_bs?: string;
   price: number;
+  originalPrice?: number;
+  happyHourPrice?: number;
+  happyHourLabel?: string;
   image: string;
   category: string;
   /** Which station screen shows this item (default kitchen) */

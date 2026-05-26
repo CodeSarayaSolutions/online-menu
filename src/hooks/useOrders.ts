@@ -9,6 +9,7 @@ export function useOrders(restaurantId: string | null) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [subscriptionKey, setSubscriptionKey] = useState(0);
 
   const refresh = useCallback(async () => {
     if (!restaurantId) {
@@ -26,7 +27,16 @@ export function useOrders(restaurantId: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [restaurantId]);
+  }, [restaurantId, subscriptionKey]);
+
+  const reconnect = useCallback(() => {
+    setSubscriptionKey((key) => key + 1);
+  }, []);
+
+  const refreshAndReconnect = useCallback(async () => {
+    await refresh();
+    reconnect();
+  }, [refresh, reconnect]);
 
   useEffect(() => {
     refresh();
@@ -73,6 +83,8 @@ export function useOrders(restaurantId: string | null) {
     loading,
     error,
     refresh,
+    reconnect,
+    refreshAndReconnect,
     updateStatus,
     removeOrder,
     clearAllOrders,

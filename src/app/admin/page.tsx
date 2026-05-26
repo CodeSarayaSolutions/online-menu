@@ -38,6 +38,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useCmsStore, VenueType } from "@/store/cmsStore";
 import { useAuthStore } from "@/store/authStore";
 import * as authService from "@/services/authService";
+import { getDefaultVenuePath } from "@/lib/permissions";
 import clsx from "clsx";
 
 // ─── Venue type config ──────────────────────────────────
@@ -70,6 +71,7 @@ export default function AdminDashboard() {
   const createRestaurant = useCmsStore((s) => s.createRestaurant);
   const deleteRestaurant = useCmsStore((s) => s.deleteRestaurant);
   const switchRestaurant = useCmsStore((s) => s.switchRestaurant);
+  const loadVenuePublic = useCmsStore((s) => s.loadVenuePublic);
 
   const currentUser = useAuthStore((s) => s.getCurrentUser());
   const activeRestaurantId = useAuthStore((s) => s.activeRestaurantId);
@@ -80,9 +82,18 @@ export default function AdminDashboard() {
   const login = useAuthStore((s) => s.login);
   const isLoggedIn = !!currentUser;
 
-  // Step flow: click a venue → navigate to /admin/[venue] for role picker
   const handleClickVenue = (id: string) => {
-    router.push(`/admin/${id}`);
+    if (!currentUser) {
+      router.push(`/admin/${id}`);
+      return;
+    }
+    if (activeRestaurantId && activeRestaurantId !== id) {
+      switchRestaurant(activeRestaurantId, id);
+    } else {
+      loadVenuePublic(id);
+    }
+    setActiveRestaurant(id);
+    router.push(getDefaultVenuePath(currentUser, id));
   };
 
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -189,9 +200,6 @@ export default function AdminDashboard() {
     setDeleteTarget(null);
   };
 
-  // Step 1: User clicks a venue → navigate to /admin/[venue] for role picker
-  // (handleClickVenue is defined above)
-
   // Helper: format date nicely
   const formatDate = (iso: string) => {
     try {
@@ -230,9 +238,9 @@ export default function AdminDashboard() {
         className="flex items-center justify-between mb-6"
       >
         <div>
-          <h1 className="text-xl lg:text-2xl font-extrabold text-dark adm-text tracking-tight">All Venues</h1>
+          <h1 className="text-xl lg:text-2xl font-extrabold text-dark adm-text tracking-tight">Lokali</h1>
           <p className="text-[13px] text-muted adm-text-muted mt-1">
-            Manage your restaurants, cafés, and more
+            Upravljajte restoranima, kafićima i barovima
           </p>
         </div>
         <motion.button
@@ -242,7 +250,7 @@ export default function AdminDashboard() {
           className="flex items-center gap-2 bg-gradient-to-r from-primary to-amber-500 text-white px-5 py-2.5 rounded-2xl text-[13px] font-bold shadow-glow hover:brightness-105 transition"
         >
           <Plus size={15} />
-          New Venue
+          Novi lokal
         </motion.button>
       </motion.div>
 
@@ -261,7 +269,7 @@ export default function AdminDashboard() {
             </div>
             <div>
               <p className="text-lg font-extrabold text-dark adm-text leading-none">{restaurantIds.length}</p>
-              <p className="text-[11px] text-muted adm-text-muted mt-0.5">Total Venues</p>
+              <p className="text-[11px] text-muted adm-text-muted mt-0.5">Lokala</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -270,7 +278,7 @@ export default function AdminDashboard() {
             </div>
             <div>
               <p className="text-lg font-extrabold text-dark adm-text leading-none">{globalStats.totalProducts}</p>
-              <p className="text-[11px] text-muted adm-text-muted mt-0.5">Total Products</p>
+              <p className="text-[11px] text-muted adm-text-muted mt-0.5">Proizvoda</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -279,7 +287,7 @@ export default function AdminDashboard() {
             </div>
             <div>
               <p className="text-lg font-extrabold text-dark adm-text leading-none">{globalStats.totalUsers}</p>
-              <p className="text-[11px] text-muted adm-text-muted mt-0.5">Total Users</p>
+              <p className="text-[11px] text-muted adm-text-muted mt-0.5">Korisnika</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -288,7 +296,7 @@ export default function AdminDashboard() {
             </div>
             <div>
               <p className="text-lg font-extrabold text-dark adm-text leading-none">{globalStats.totalPopular}</p>
-              <p className="text-[11px] text-muted adm-text-muted mt-0.5">Popular Items</p>
+              <p className="text-[11px] text-muted adm-text-muted mt-0.5">Popularnih stavki</p>
             </div>
           </div>
         </div>
@@ -300,7 +308,7 @@ export default function AdminDashboard() {
         <div className="flex flex-wrap gap-x-6 gap-y-2">
           {/* Venue type chips */}
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider">By Type:</span>
+            <span className="text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider">Po tipu:</span>
             {Object.entries(globalStats.venueTypeCounts).map(([type, count]) => {
               const vConf = VENUE_TYPES.find((v) => v.value === type);
               const vColor = VENUE_COLORS[type as VenueType];
@@ -317,7 +325,7 @@ export default function AdminDashboard() {
 
           {/* User role chips */}
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider">Staff:</span>
+            <span className="text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider">Osoblje:</span>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-700">
               <Crown size={10} /> {globalStats.platformAdmins} Admin{globalStats.platformAdmins !== 1 ? "s" : ""}
             </span>
@@ -331,7 +339,7 @@ export default function AdminDashboard() {
 
           {/* Total categories */}
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider">Categories:</span>
+            <span className="text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider">Vrste:</span>
             <span className="text-[11px] font-bold text-dark adm-text">{globalStats.totalCategories}</span>
           </div>
         </div>
@@ -525,7 +533,7 @@ export default function AdminDashboard() {
                     )}
                   >
                     <Store size={14} />
-                    Enter Venue
+                    Uđi u lokal
                   </button>
                   {restaurantIds.length > 1 && (
                     <button
@@ -551,14 +559,14 @@ export default function AdminDashboard() {
           <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
             <Building2 size={28} className="text-primary/40" />
           </div>
-          <p className="text-[14px] font-semibold text-dark adm-text">No venues yet</p>
-          <p className="text-[12px] text-muted adm-text-muted mt-1.5">Create your first restaurant, café, or bar to get started</p>
+          <p className="text-[14px] font-semibold text-dark adm-text">Nema lokala</p>
+          <p className="text-[12px] text-muted adm-text-muted mt-1.5">Kreirajte prvi restoran, kafić ili bar</p>
           <button
             onClick={() => setShowCreateModal(true)}
             className="mt-5 inline-flex items-center gap-2 bg-gradient-to-r from-primary to-amber-500 text-white px-5 py-2.5 rounded-2xl text-[13px] font-bold shadow-glow hover:brightness-105 transition"
           >
             <Plus size={15} />
-            Create Venue
+            Kreiraj lokal
           </button>
         </motion.div>
       )}
@@ -589,8 +597,8 @@ export default function AdminDashboard() {
                       <Sparkles size={18} className="text-primary" />
                     </div>
                     <div>
-                      <h3 className="text-[16px] font-extrabold text-dark adm-text tracking-tight">Create New Venue</h3>
-                      <p className="text-[11px] text-muted adm-text-muted mt-0.5">Choose a type and give it a name</p>
+                      <h3 className="text-[16px] font-extrabold text-dark adm-text tracking-tight">Novi lokal</h3>
+                      <p className="text-[11px] text-muted adm-text-muted mt-0.5">Odaberite tip i unesite naziv</p>
                     </div>
                   </div>
                   <button
@@ -606,7 +614,7 @@ export default function AdminDashboard() {
               <div className="px-6 py-5 space-y-5 max-h-[calc(100vh-220px)] overflow-y-auto">
                 {/* Venue type selector — 2x4 grid */}
                 <div>
-                  <label className="block text-[11px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2.5">Venue Type</label>
+                  <label className="block text-[11px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2.5">Tip lokala</label>
                   <div className="grid grid-cols-4 gap-2">
                     {VENUE_TYPES.map((vt) => {
                       const isSelected = newVenueType === vt.value;
@@ -656,7 +664,7 @@ export default function AdminDashboard() {
 
                 {/* Name */}
                 <div>
-                  <label className="block text-[11px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-1.5">Venue Name</label>
+                  <label className="block text-[11px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-1.5">Naziv lokala</label>
                   <input
                     type="text"
                     value={newName}
@@ -685,7 +693,7 @@ export default function AdminDashboard() {
 
                 {/* Slug */}
                 <div>
-                  <label className="block text-[11px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-1.5">Venue ID (slug)</label>
+                  <label className="block text-[11px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-1.5">ID lokala (slug)</label>
                   <div className="relative">
                     <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[11px] adm-text-faint font-mono">/</div>
                     <input

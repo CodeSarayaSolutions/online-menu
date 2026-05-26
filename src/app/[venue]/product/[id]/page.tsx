@@ -7,7 +7,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";
 import { useCmsData } from "@/hooks/useCmsData";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useHappyHourPricing } from "@/hooks/useHappyHourPricing";
 import { useCartStore } from "@/store/cartStore";
+import type { Addon, Variation, VariationOption } from "@/types/cms";
 
 // ─── Font & layout maps (same as main page for consistency) ────
 const HEADING_FONT_MAP: Record<string, string> = {
@@ -63,43 +65,96 @@ export default function ProductPage() {
     layoutConfig: lc,
   } = useCmsData();
   const { t, tProduct, tAddon, tVariation, tVariationOption } = useTranslation();
+  const { prices: happyHourPrices } = useHappyHourPricing(venueSlug);
   const addItem = useCartStore((s) => s.addItem);
   const items = useCartStore((s) => s.items);
 
-  const product = products.find((p) => p.id === id);
+  const pricedProducts = useMemo(
+    () =>
+      products.map((item) => {
+        const happyHour = happyHourPrices.get(item.id);
+        if (!happyHour) return item;
+        return {
+          ...item,
+          originalPrice: item.price,
+          happyHourPrice: happyHour.overridePrice,
+          happyHourLabel: happyHour.label,
+          price: happyHour.overridePrice,
+        };
+      }),
+    [products, happyHourPrices]
+  );
+
+  const product = pricedProducts.find((p) => p.id === id);
   const [quantity, setQuantity] = useState(1);
-  const [selectedAddons, setSelectedAddons] = useState<string[]>([]);
-  const [selectedVariations, setSelectedVariations] = useState<Record<string, string>>({});
+  const [selectedAddons, setSelectedAddons] = useState<Record<string, number>>({});
+  const [selectedVariations, setSelectedVariations] = useState<Record<string, string[]>>({});
   const [added, setAdded] = useState(false);
 
   // Related items from same category
   const relatedItems = product
-    ? products
+    ? pricedProducts
         .filter((p) => p.category === product.category && p.id !== product.id)
         .slice(0, 4)
     : [];
 
-  const toggleAddon = (addonId: string) => {
-    setSelectedAddons((prev) =>
-      prev.includes(addonId)
-        ? prev.filter((a) => a !== addonId)
-        : [...prev, addonId]
-    );
+  const hasSelectedDependency = (dependsOn?: { variationId: string; optionId: string }) => {
+    if (!dependsOn) return true;
+    return selectedVariations[dependsOn.variationId]?.includes(dependsOn.optionId) ?? false;
+  };
+
+  const visibleVariationOptions = (variation: Variation): VariationOption[] =>
+    variation.options.filter((option) => hasSelectedDependency(option.dependsOn));
+
+  const visibleAddons = (product?.addons ?? []).filter((addon) => hasSelectedDependency(addon.dependsOn));
+
+  const addonGroupKey = (addon: Addon) => addon.groupId || "__default__";
+  const addonGroupLabel = (addon: Addon) => addon.groupLabel || "Extras";
+  const addonGroupLimit = (addon: Addon) => addon.maxSelect ?? 0;
+  const addonGroupMin = (addon: Addon) => addon.minSelect ?? 0;
+
+  const selectedAddonCountForGroup = (groupId: string) =>
+    visibleAddons.filter((addon) => addonGroupKey(addon) === groupId && (selectedAddons[addon.id] ?? 0) > 0).length;
+
+  const setAddonQuantity = (addon: Addon, nextQty: number) => {
+    setSelectedAddons((prev) => {
+      const currentQty = prev[addon.id] ?? 0;
+      const normalizedQty = Math.max(0, nextQty);
+      const groupId = addonGroupKey(addon);
+      const maxSelect = addonGroupLimit(addon);
+      const selectedInGroup = visibleAddons.filter(
+        (a) => addonGroupKey(a) === groupId && (prev[a.id] ?? 0) > 0 && a.id !== addon.id
+      ).length;
+
+      if (currentQty === 0 && normalizedQty > 0 && maxSelect > 0 && selectedInGroup >= maxSelect) {
+        return prev;
+      }
+
+      const next = { ...prev };
+      if (normalizedQty <= 0) delete next[addon.id];
+      else next[addon.id] = normalizedQty;
+      return next;
+    });
+  };
+
+  const toggleAddon = (addon: Addon) => {
+    const qty = selectedAddons[addon.id] ?? 0;
+    setAddonQuantity(addon, qty > 0 ? 0 : 1);
   };
 
   const addonsTotal = useMemo(() => {
     if (!product?.addons) return 0;
     return product.addons
-      .filter((a) => selectedAddons.includes(a.id))
-      .reduce((sum, a) => sum + a.price, 0);
-  }, [selectedAddons, product]);
+      .filter((a) => hasSelectedDependency(a.dependsOn))
+      .reduce((sum, a) => sum + a.price * (selectedAddons[a.id] ?? 0), 0);
+  }, [selectedAddons, selectedVariations, product]);
 
   const variationsTotal = useMemo(() => {
     if (!product?.variations) return 0;
     return product.variations.reduce((sum, v) => {
-      const selectedOptId = selectedVariations[v.id];
-      const opt = v.options.find((o) => o.id === selectedOptId);
-      return sum + (opt?.priceAdjustment || 0);
+      const selectedOptIds = selectedVariations[v.id] ?? [];
+      const selectedOptions = v.options.filter((o) => selectedOptIds.includes(o.id) && hasSelectedDependency(o.dependsOn));
+      return sum + selectedOptions.reduce((optionSum, opt) => optionSum + (opt.priceAdjustment || 0), 0);
     }, 0);
   }, [selectedVariations, product]);
 
@@ -108,8 +163,22 @@ export default function ProductPage() {
 
   // Check if all required variations are selected
   const allRequiredSelected = product?.variations
-    ? product.variations.filter((v) => v.required).every((v) => selectedVariations[v.id])
+    ? product.variations.every((v) => {
+        const min = v.minSelect ?? (v.required ? 1 : 0);
+        const max = v.maxSelect ?? 1;
+        const visibleSelected = (selectedVariations[v.id] ?? []).filter((optionId) =>
+          visibleVariationOptions(v).some((option) => option.id === optionId)
+        );
+        return visibleSelected.length >= min && visibleSelected.length <= max;
+      })
     : true;
+
+  const allAddonGroupsValid = visibleAddons.every((addon) => {
+    const min = addonGroupMin(addon);
+    if (min <= 0) return true;
+    return selectedAddonCountForGroup(addonGroupKey(addon)) >= min;
+  });
+  const canAddToOrder = allRequiredSelected && allAddonGroupsValid;
 
   // ─── Theme-aware helpers ────────────────────────────────
   const variant = lc.productPageVariant || "classic";
@@ -201,24 +270,50 @@ export default function ProductPage() {
   }
 
   const handleAddToOrder = () => {
-    if (!allRequiredSelected) return;
+    if (!canAddToOrder) return;
     // Build a unique cart key from product id + selected variation options
     const varKey = product.variations && product.variations.length > 0
-      ? product.variations.map((v) => selectedVariations[v.id] || "none").join("-")
+      ? product.variations
+          .map((v) => {
+            const visibleOptionIds = new Set(visibleVariationOptions(v).map((option) => option.id));
+            return (selectedVariations[v.id] ?? []).filter((optionId) => visibleOptionIds.has(optionId)).join(".") || "none";
+          })
+          .join("-")
       : "";
-    const cartKey = varKey ? `${product.id}__${varKey}` : product.id;
+    const addonKey = Object.entries(selectedAddons)
+      .filter(([, qty]) => qty > 0)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([addonId, qty]) => `${addonId}:${qty}`)
+      .join("-");
+    const cartKeyParts = [product.id, varKey, addonKey].filter(Boolean);
+    const cartKey = cartKeyParts.join("__");
 
     // Build selected variation labels for display
     const selectedVarLabels = product.variations
       ? product.variations
-          .filter((v) => selectedVariations[v.id])
-          .map((v) => {
-            const opt = v.options.find((o) => o.id === selectedVariations[v.id])!;
-            return { variationName: v.name, optionLabel: opt.label, priceAdjustment: opt.priceAdjustment };
-          })
+          .flatMap((v) =>
+            (selectedVariations[v.id] ?? [])
+              .map((optionId) => v.options.find((o) => o.id === optionId))
+              .filter((opt): opt is VariationOption => !!opt && hasSelectedDependency(opt.dependsOn))
+              .map((opt) => ({
+                variationName: v.name,
+                optionLabel: opt.label,
+                priceAdjustment: opt.priceAdjustment,
+              }))
+          )
       : [];
 
     const varDesc = selectedVarLabels.length > 0 ? ` (${selectedVarLabels.map((v) => v.optionLabel).join(", ")})` : "";
+    const selectedAddonLabels = visibleAddons
+      .filter((addon) => (selectedAddons[addon.id] ?? 0) > 0)
+      .map((addon) => ({
+        id: addon.id,
+        name: addon.name,
+        quantity: selectedAddons[addon.id] ?? 0,
+        price: addon.price,
+        groupId: addon.groupId,
+        groupLabel: addon.groupLabel,
+      }));
 
     addItem({
       id: product.id,
@@ -229,6 +324,8 @@ export default function ProductPage() {
       image: product.image,
       station: product.station ?? 'kitchen',
       selectedVariations: selectedVarLabels,
+      selectedAddons: selectedAddonLabels,
+      addonQuantities: selectedAddons,
     });
     setAdded(true);
     setTimeout(() => router.back(), 800);
@@ -345,8 +442,18 @@ export default function ProductPage() {
             )}
             style={{ color: cs.productPriceColor }}
           >
+            {product.happyHourPrice !== undefined && product.originalPrice !== undefined && (
+              <span className="mr-2 text-sm line-through text-white/60">
+                {product.originalPrice.toFixed(2)}
+              </span>
+            )}
             {product.price.toFixed(2)}
             {" "}{pageContent.currencySymbol}
+            {product.happyHourPrice !== undefined && (
+              <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-[10px] uppercase">
+                Happy Hour
+              </span>
+            )}
           </p>
         </div>
       </motion.div>
@@ -425,6 +532,14 @@ export default function ProductPage() {
 
             {/* Price — hidden on mobile, visible on desktop */}
             <div className="hidden lg:flex items-baseline gap-2 mt-2">
+              {product.happyHourPrice !== undefined && product.originalPrice !== undefined && (
+                <span
+                  className="text-sm font-semibold line-through"
+                  style={{ color: cardMutedColor }}
+                >
+                  {product.originalPrice.toFixed(2)}
+                </span>
+              )}
               <span
                 className={clsx(
                   "font-extrabold",
@@ -439,7 +554,7 @@ export default function ProductPage() {
                 className="text-xs font-medium"
                 style={{ color: cardMutedColor }}
               >
-                {t(pageContent, "basePriceLabel")}
+                {product.happyHourPrice !== undefined ? "Happy Hour" : t(pageContent, "basePriceLabel")}
               </span>
             </div>
 
@@ -509,12 +624,39 @@ export default function ProductPage() {
     const addonDark = isDark(addonBg);
     const activeBorder = cs.productAddonActiveBorderColor || cs.productButtonBgColor;
 
+    const selectionBounds = (variation: Variation) => ({
+      min: variation.minSelect ?? (variation.required ? 1 : 0),
+      max: Math.max(1, variation.maxSelect ?? 1),
+    });
+
+    const renderLimitLabel = (variation: Variation) => {
+      const { min, max } = selectionBounds(variation);
+      if (min === 0 && max === 1) return null;
+      const label = min === max ? `Choose ${max}` : `Choose ${min}-${max}`;
+      return (
+        <span className="text-[10px] font-semibold" style={{ color: cardMutedColor }}>
+          {label}
+        </span>
+      );
+    };
+
     // Shared: toggle handler
-    const toggle = (variationId: string, optionId: string, isSelected: boolean) =>
-      setSelectedVariations((prev) => ({
-        ...prev,
-        [variationId]: isSelected ? "" : optionId,
-      }));
+    const toggle = (variation: Variation, optionId: string, isSelected: boolean) =>
+      setSelectedVariations((prev) => {
+        const current = prev[variation.id] ?? [];
+        const { max } = selectionBounds(variation);
+        const nextSelected = isSelected
+          ? current.filter((id) => id !== optionId)
+          : max === 1
+          ? [optionId]
+          : current.length >= max
+          ? current
+          : [...current, optionId];
+        return {
+          ...prev,
+          [variation.id]: nextSelected,
+        };
+      });
 
     // Shared: required / optional badge
     const renderBadge = (required: boolean, size: "sm" | "md") => {
@@ -569,15 +711,16 @@ export default function ProductPage() {
                     {tVariation(variation)}
                   </span>
                   {renderBadge(variation.required, "md")}
+                  {renderLimitLabel(variation)}
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
-                  {variation.options.map((option) => {
-                    const isSelected = selectedVariations[variation.id] === option.id;
+                  {visibleVariationOptions(variation).map((option) => {
+                    const isSelected = (selectedVariations[variation.id] ?? []).includes(option.id);
                     return (
                       <motion.button
                         key={option.id}
                         whileTap={{ scale: 0.97 }}
-                        onClick={() => toggle(variation.id, option.id, isSelected)}
+                        onClick={() => toggle(variation, option.id, isSelected)}
                         className={clsx("relative flex items-center gap-3 p-3.5 transition-all duration-200", radius)}
                         style={{
                           backgroundColor: isSelected ? activeBorder + "10" : addonBg,
@@ -642,15 +785,16 @@ export default function ProductPage() {
                     {tVariation(variation)}
                   </span>
                   {renderBadge(variation.required, "sm")}
+                  {renderLimitLabel(variation)}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {variation.options.map((option) => {
-                    const isSelected = selectedVariations[variation.id] === option.id;
+                  {visibleVariationOptions(variation).map((option) => {
+                    const isSelected = (selectedVariations[variation.id] ?? []).includes(option.id);
                     return (
                       <motion.button
                         key={option.id}
                         whileTap={{ scale: 0.95 }}
-                        onClick={() => toggle(variation.id, option.id, isSelected)}
+                        onClick={() => toggle(variation, option.id, isSelected)}
                         className="relative flex items-center gap-1.5 px-4 py-2 rounded-full transition-all duration-200"
                         style={{
                           backgroundColor: isSelected ? activeBorder : addonBg,
@@ -701,15 +845,16 @@ export default function ProductPage() {
                     {tVariation(variation)}
                   </span>
                   {renderBadge(variation.required, "sm")}
+                  {renderLimitLabel(variation)}
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  {variation.options.map((option) => {
-                    const isSelected = selectedVariations[variation.id] === option.id;
+                  {visibleVariationOptions(variation).map((option) => {
+                    const isSelected = (selectedVariations[variation.id] ?? []).includes(option.id);
                     return (
                       <motion.button
                         key={option.id}
                         whileTap={{ scale: 0.93 }}
-                        onClick={() => toggle(variation.id, option.id, isSelected)}
+                        onClick={() => toggle(variation, option.id, isSelected)}
                         className="relative flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition-all duration-150"
                         style={{
                           backgroundColor: isSelected ? activeBorder + "15" : addonBg,
@@ -767,15 +912,16 @@ export default function ProductPage() {
                     {tVariation(variation)}
                   </span>
                   {renderBadge(variation.required, "md")}
+                  {renderLimitLabel(variation)}
                 </div>
                 <div className="space-y-2">
-                  {variation.options.map((option) => {
-                    const isSelected = selectedVariations[variation.id] === option.id;
+                  {visibleVariationOptions(variation).map((option) => {
+                    const isSelected = (selectedVariations[variation.id] ?? []).includes(option.id);
                     return (
                       <motion.button
                         key={option.id}
                         whileTap={{ scale: 0.98 }}
-                        onClick={() => toggle(variation.id, option.id, isSelected)}
+                        onClick={() => toggle(variation, option.id, isSelected)}
                         className={clsx(
                           "relative w-full flex items-center justify-between p-4 transition-all duration-250",
                           radius
@@ -848,19 +994,20 @@ export default function ProductPage() {
                   {tVariation(variation)}
                 </span>
                 {renderBadge(variation.required, "md")}
+                  {renderLimitLabel(variation)}
               </div>
               <div className="space-y-0">
-                {variation.options.map((option, oi) => {
-                  const isSelected = selectedVariations[variation.id] === option.id;
+                {visibleVariationOptions(variation).map((option, oi) => {
+                  const isSelected = (selectedVariations[variation.id] ?? []).includes(option.id);
                   return (
                     <motion.button
                       key={option.id}
                       whileTap={{ scale: 0.995 }}
-                      onClick={() => toggle(variation.id, option.id, isSelected)}
+                      onClick={() => toggle(variation, option.id, isSelected)}
                       className={clsx(
                         "relative w-full flex items-center justify-between py-3.5 px-3 transition-all duration-200",
                         oi === 0 && "rounded-t-xl",
-                        oi === variation.options.length - 1 && "rounded-b-xl"
+                        oi === visibleVariationOptions(variation).length - 1 && "rounded-b-xl"
                       )}
                       style={{
                         backgroundColor: isSelected ? activeBorder + "08" : "transparent",
@@ -910,12 +1057,22 @@ export default function ProductPage() {
   // ── ADDONS ─────────────────────────────────────────────
   const renderAddons = () => {
     if (!product.addons || product.addons.length === 0) return null;
+    if (visibleAddons.length === 0) return null;
     const compactMode = variant === "compact";
     const elegantMode = variant === "elegant";
 
     const addonBg = cs.productAddonBgColor || cardBg;
     const addonDark = isDark(addonBg);
     const activeBorder = cs.productAddonActiveBorderColor || cs.productButtonBgColor;
+    const addonGroups = Array.from(
+      visibleAddons.reduce((groups, addon) => {
+        const key = addonGroupKey(addon);
+        const current = groups.get(key) ?? [];
+        current.push(addon);
+        groups.set(key, current);
+        return groups;
+      }, new Map<string, Addon[]>())
+    );
 
     return (
       <motion.div
@@ -959,85 +1116,151 @@ export default function ProductPage() {
               </span>
             </div>
 
-            <div className="space-y-2">
-              {product.addons.map((addon) => {
-                const isSelected = selectedAddons.includes(addon.id);
+            <div className="space-y-4">
+              {addonGroups.map(([groupId, addons]) => {
+                const firstAddon = addons[0];
+                const maxSelect = addonGroupLimit(firstAddon);
+                const minSelect = addonGroupMin(firstAddon);
+                const selectedInGroup = selectedAddonCountForGroup(groupId);
+                const limitLabel =
+                  minSelect > 0 || maxSelect > 0
+                    ? minSelect === maxSelect && maxSelect > 0
+                      ? `Choose ${maxSelect}`
+                      : `Choose ${minSelect}-${maxSelect || addons.length}`
+                    : null;
 
                 return (
-                  <button
-                    key={addon.id}
-                    onClick={() => toggleAddon(addon.id)}
-                    className={clsx(
-                      "w-full flex items-center justify-between p-3 transition-all duration-200",
-                      compactMode ? "rounded-xl" : radius
-                    )}
-                    style={{
-                      backgroundColor: isSelected
-                        ? activeBorder + "12"
-                        : addonBg,
-                      border: `2px solid ${
-                        isSelected ? activeBorder : cardBorderColor
-                      }`,
-                    }}
-                  >
-                    <div className="flex items-center gap-3">
-                      {/* Checkbox */}
-                      <div
-                        className={clsx(
-                          "w-5 h-5 rounded-md flex items-center justify-center transition-colors",
-                          "border-2"
-                        )}
-                        style={{
-                          backgroundColor: isSelected
-                            ? activeBorder
-                            : "transparent",
-                          borderColor: isSelected
-                            ? activeBorder
-                            : cardMutedColor,
-                        }}
-                      >
-                        {isSelected && (
-                          <motion.div
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
+                  <div key={groupId} className="space-y-2">
+                    {groupId !== "__default__" && (
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-bold" style={{ color: cardDark ? "#F5F5F5" : cs.productTitleColor }}>
+                          {addonGroupLabel(firstAddon)}
+                        </p>
+                        {limitLabel && (
+                          <span
+                            className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                            style={{ backgroundColor: subtleBg, color: cardMutedColor }}
                           >
-                            <Check
-                              size={12}
-                              strokeWidth={3}
-                              color="#FFFFFF"
-                            />
-                          </motion.div>
+                            {limitLabel}
+                          </span>
                         )}
                       </div>
-                      <span
-                        className={clsx(
-                          "font-semibold",
-                          compactMode ? "text-xs" : "text-sm"
-                        )}
-                        style={{
-                          color: isSelected
-                            ? activeBorder
-                            : addonDark
-                            ? "#F5F5F5"
-                            : cs.productTitleColor,
-                        }}
-                      >
-                        {tAddon(addon)}
-                      </span>
+                    )}
+                    {addons.map((addon) => {
+                      const qty = selectedAddons[addon.id] ?? 0;
+                      const isSelected = qty > 0;
+                      const limitReached = maxSelect > 0 && selectedInGroup >= maxSelect && !isSelected;
+
+                      return (
+                        <div
+                          key={addon.id}
+                          role="button"
+                          tabIndex={limitReached ? -1 : 0}
+                          onClick={() => { if (!limitReached) toggleAddon(addon); }}
+                          onKeyDown={(e) => { if (!limitReached && (e.key === "Enter" || e.key === " ")) toggleAddon(addon); }}
+                          aria-disabled={limitReached}
+                          className={clsx(
+                            "w-full flex items-center justify-between p-3 transition-all duration-200",
+                            limitReached && "opacity-45 cursor-not-allowed",
+                            compactMode ? "rounded-xl" : radius
+                          )}
+                          style={{
+                            backgroundColor: isSelected
+                              ? activeBorder + "12"
+                              : addonBg,
+                            border: `2px solid ${
+                              isSelected ? activeBorder : cardBorderColor
+                            }`,
+                          }}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            {/* Checkbox */}
+                            <div
+                              className={clsx(
+                                "w-5 h-5 rounded-md flex items-center justify-center transition-colors shrink-0",
+                                "border-2"
+                              )}
+                              style={{
+                                backgroundColor: isSelected
+                                  ? activeBorder
+                                  : "transparent",
+                                borderColor: isSelected
+                                  ? activeBorder
+                                  : cardMutedColor,
+                              }}
+                            >
+                              {isSelected && (
+                                <motion.div
+                                  initial={{ scale: 0 }}
+                                  animate={{ scale: 1 }}
+                                >
+                                  <Check
+                                    size={12}
+                                    strokeWidth={3}
+                                    color="#FFFFFF"
+                                  />
+                                </motion.div>
+                              )}
+                            </div>
+                            <span
+                              className={clsx(
+                                "font-semibold truncate",
+                                compactMode ? "text-xs" : "text-sm"
+                              )}
+                              style={{
+                                color: isSelected
+                                  ? activeBorder
+                                  : addonDark
+                                  ? "#F5F5F5"
+                                  : cs.productTitleColor,
+                              }}
+                            >
+                              {tAddon(addon)}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {isSelected && (
+                              <span className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  type="button"
+                                  onClick={() => setAddonQuantity(addon, qty - 1)}
+                                  className="w-8 h-8 rounded-lg flex items-center justify-center"
+                                  style={{ backgroundColor: subtleBg, color: activeBorder }}
+                                  aria-label={`Decrease ${addon.name}`}
+                                >
+                                  <Minus size={14} />
+                                </button>
+                                <span className="w-5 text-center text-sm font-bold" style={{ color: activeBorder }}>
+                                  {qty}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setAddonQuantity(addon, qty + 1)}
+                                  className="w-8 h-8 rounded-lg flex items-center justify-center"
+                                  style={{ backgroundColor: activeBorder, color: "#FFFFFF" }}
+                                  aria-label={`Increase ${addon.name}`}
+                                >
+                                  <Plus size={14} />
+                                </button>
+                              </span>
+                            )}
+                            <span
+                              className={clsx(
+                                "font-bold",
+                                compactMode ? "text-xs" : "text-sm"
+                              )}
+                              style={{
+                                color: isSelected ? activeBorder : cs.productPriceColor,
+                              }}
+                            >
+                              +{addon.price.toFixed(2)}
+                              {" "}{pageContent.currencySymbol}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
                     </div>
-                    <span
-                      className={clsx(
-                        "font-bold",
-                        compactMode ? "text-xs" : "text-sm"
-                      )}
-                      style={{
-                        color: isSelected ? activeBorder : cs.productPriceColor,
-                      }}
-                    >
-                      +{addon.price.toFixed(2)}
-                      {" "}{pageContent.currencySymbol}
-                    </span>
-                  </button>
                 );
               })}
             </div>
@@ -1313,14 +1536,14 @@ export default function ProductPage() {
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={handleAddToOrder}
-            disabled={added || !allRequiredSelected}
+            disabled={added || !canAddToOrder}
             className={clsx(
               "w-full flex items-center justify-center gap-2 font-extrabold transition-all duration-300",
               compactMode
                 ? "py-3 text-sm"
                 : "py-4 md:py-5 text-base md:text-lg",
               btnRadius,
-              !allRequiredSelected && "opacity-50 cursor-not-allowed"
+              !canAddToOrder && "opacity-50 cursor-not-allowed"
             )}
             style={{
               backgroundColor: added

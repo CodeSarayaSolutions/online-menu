@@ -23,7 +23,7 @@ import { useCmsStore } from "@/store/cmsStore";
 import { AppUser, PlatformRole, RestaurantRole } from "@/types/auth";
 import * as authService from "@/services/authService";
 import { mapApiUserToAppUser } from "@/lib/auth/map-user";
-import { canManageVenueStaff, isPlatformAdmin } from "@/lib/permissions";
+import { isPlatformAdmin } from "@/lib/permissions";
 import clsx from "clsx";
 
 const PLATFORM_ROLE_LABELS: Record<PlatformRole, { label: string; color: string; icon: typeof Shield }> = {
@@ -84,8 +84,7 @@ export default function UsersPage() {
   } | null>(null);
 
   const isAdmin = currentUser?.platformRole === "admin";
-  const canManageStaff =
-    !!venueSlug && !!currentUser && (isPlatformAdmin(currentUser) || canManageVenueStaff(currentUser, venueSlug));
+  const canManageStaff = !!venueSlug && !!currentUser && isPlatformAdmin(currentUser);
 
   const handleInvite = async () => {
     if (!newName.trim() || !newEmail.trim()) return;
@@ -216,6 +215,19 @@ export default function UsersPage() {
     }
     setDeleteTarget(null);
   };
+
+  if (!isAdmin) {
+    return (
+      <div className="p-6 lg:p-8">
+        <div className="adm-surface adm-border border rounded-2xl p-6 max-w-lg">
+          <h1 className="text-lg font-extrabold text-dark adm-text">Nema pristupa</h1>
+          <p className="text-sm text-muted adm-text-muted mt-2">
+            Korisnike i uloge može uređivati samo platforma admin.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>

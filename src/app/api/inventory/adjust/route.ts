@@ -15,6 +15,7 @@ export async function POST(request: Request) {
     productName?: string;
     delta?: number;
     reason?: string;
+    tracked?: boolean;
   };
   try {
     body = await request.json();
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { restaurantId, productId, productName, delta, reason } = body;
+  const { restaurantId, productId, productName, delta, reason, tracked } = body;
   if (
     !restaurantId ||
     !productId ||
@@ -47,7 +48,8 @@ export async function POST(request: Request) {
         0,
         'kom',
         null,
-        supabaseAdmin
+        supabaseAdmin,
+        tracked ?? true
       );
       return NextResponse.json({ ok: true }, { status: 200 });
     } catch (err) {
@@ -69,7 +71,8 @@ export async function POST(request: Request) {
       reason,
       null,
       null,
-      supabaseAdmin
+      supabaseAdmin,
+      tracked ?? true
     );
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (err) {
