@@ -57,10 +57,7 @@ export default function AdminLoginForm({
     try {
       const result = await authService.checkLoginMode(email.trim());
       if (result.mode === "not_found") {
-        setError(
-          result.hint ??
-            "No account found for this email. If you created the user in Table Editor, expose schema sarayamenu to PostgREST (PGRST_DB_SCHEMAS) and restart the API."
-        );
+        setError("Račun za ovaj email nije registrovan.");
         return;
       }
       setDisplayName(result.name ?? "");

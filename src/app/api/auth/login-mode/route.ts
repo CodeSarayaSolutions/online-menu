@@ -25,16 +25,12 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (error) {
-    const isSchemaNotExposed =
-      error.code === 'PGRST106' || error.message?.includes('Invalid schema');
     return NextResponse.json(
       {
         mode: 'not_found' as const,
-        hint: isSchemaNotExposed
-          ? 'API cannot see schema "sarayamenu". Add it to PostgREST exposed schemas (PGRST_DB_SCHEMAS) and restart the API.'
-          : error.message,
+        error: 'Account lookup failed',
       },
-      { status: isSchemaNotExposed ? 503 : 500 }
+      { status: 500 }
     );
   }
 
@@ -65,6 +61,5 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     mode: 'not_found' as const,
-    hint: 'No account or invite expired. Ask your admin for a new code.',
   });
 }

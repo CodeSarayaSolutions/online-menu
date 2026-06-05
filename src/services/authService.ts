@@ -28,7 +28,7 @@ export type SessionPayload = {
 export type LoginModeResult =
   | { mode: 'password'; name?: string }
   | { mode: 'invite'; name?: string }
-  | { mode: 'not_found'; hint?: string };
+  | { mode: 'not_found' };
 
 export async function checkLoginMode(email: string): Promise<LoginModeResult> {
   const res = await fetch('/api/auth/login-mode', {
@@ -38,7 +38,6 @@ export async function checkLoginMode(email: string): Promise<LoginModeResult> {
     credentials: 'include',
   });
   const body = await res.json();
-  // Route may return 503 with { mode, hint } when PostgREST does not expose sarayamenu
   if (body.mode === 'password' || body.mode === 'invite' || body.mode === 'not_found') {
     return body as LoginModeResult;
   }
