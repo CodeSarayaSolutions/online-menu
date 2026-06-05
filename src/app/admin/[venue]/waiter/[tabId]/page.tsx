@@ -147,6 +147,38 @@ export default function WaiterTabPage() {
     })();
   };
 
+  const discardEmptyAndExit = () => {
+    void (async () => {
+      if (!tab || !currentUser) return;
+      setBusy(true);
+      setError("");
+      try {
+        const res = await fetch("/api/tabs/discard-empty", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tabId: tab.id }),
+        });
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        if (!res.ok) {
+          throw new Error(data?.error ?? "Prazna kartica nije odbačena");
+        }
+        try {
+          await authService.signOut();
+        } catch {
+          /* ignore */
+        }
+        logout();
+        router.replace("/admin/login");
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Prazna kartica nije odbačena");
+      } finally {
+        setBusy(false);
+        setShowEmptyExitConfirm(false);
+      }
+    })();
+  };
+
   const handleGotovo = () => {
     if (!tab?.tab_items?.length) {
       setShowEmptyExitConfirm(true);
@@ -369,8 +401,9 @@ export default function WaiterTabPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={signOutAndExit}
-                  className="min-h-[48px] rounded-xl bg-primary text-white text-sm font-bold"
+                  disabled={busy}
+                  onClick={discardEmptyAndExit}
+                  className="min-h-[48px] rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-50"
                 >
                   Izađi
                 </button>

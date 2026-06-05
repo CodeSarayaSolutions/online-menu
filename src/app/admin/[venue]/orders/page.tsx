@@ -28,6 +28,7 @@ import { useOrders } from "@/hooks/useOrders";
 import { Order, OrderStatus } from "@/types/order";
 import * as tabService from "@/services/tabService";
 import type { OpenTabRow } from "@/services/tabService";
+import { useAuthStore } from "@/store/authStore";
 import clsx from "clsx";
 
 type DateRangeKey = "today" | "week" | "custom";
@@ -146,6 +147,7 @@ export default function AdminOrdersPage() {
   const venueSlug = typeof params.venue === "string" ? params.venue : "";
   const { orders, updateStatus, removeOrder, clearAllOrders, loading, refresh } =
     useOrders(venueSlug);
+  const users = useAuthStore((s) => s.users);
 
   const [filter, setFilter] = useState<OrderStatus | "all">("all");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -183,6 +185,19 @@ export default function AdminOrdersPage() {
     [orders, rangeFrom, rangeTo]
   );
 
+  const userNameById = useMemo(
+    () => new Map(users.map((user) => [user.id, user.name])),
+    [users]
+  );
+
+  const waiterNameForTab = useCallback(
+    (tab: OpenTabRow) => {
+      if (tab.waiter_name && tab.waiter_name !== "—") return tab.waiter_name;
+      return userNameById.get(tab.waiter_id) ?? "Nepoznat konobar";
+    },
+    [userNameById]
+  );
+
   const filtered =
     filter === "all"
       ? ordersInRange
@@ -197,7 +212,7 @@ export default function AdminOrdersPage() {
       ...ordersInRange.map((o) => ({ total: o.total, items: o.items, at: o.createdAt })),
       ...closedTabs.map((t) => ({
         total: Number(t.total),
-        items: [] as Order["items"],
+        items: t.tab_items ?? [],
         at: t.closed_at ?? t.created_at,
       })),
     ];
@@ -212,7 +227,10 @@ export default function AdminOrdersPage() {
       }
     }
     for (const tab of closedTabs) {
-      void tab;
+      for (const item of tab.tab_items ?? []) {
+        const name = item.product_name;
+        productCounts.set(name, (productCounts.get(name) ?? 0) + Number(item.quantity));
+      }
     }
     let topProduct = "—";
     let topQty = 0;
@@ -234,7 +252,7 @@ export default function AdminOrdersPage() {
       ),
       ...closedTabs.map(
         (t) =>
-          `tab,${t.id},${t.closed_at ?? t.created_at},${t.table_label},${t.waiter_name},${t.payment_method ?? ""},${Number(t.total).toFixed(2)},closed`
+          `tab,${t.id},${t.closed_at ?? t.created_at},${t.table_label},${waiterNameForTab(t)},${t.payment_method ?? ""},${Number(t.total).toFixed(2)},closed`
       ),
     ];
     const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
@@ -450,7 +468,7 @@ export default function AdminOrdersPage() {
             {closedTabs.map((tab) => (
               <div
                 key={tab.id}
-                className="adm-surface adm-border border rounded-2xl-purple-100 shadow-soft p-4 flex flex-wrap items-center gap-3"
+                className="adm-surface adm-border border rounded-2xl border-purple-100 shadow-soft p-4 flex flex-wrap items-center gap-3"
               >
                 <div className="flex-1 min-w-0">
                   <span className="text-[10px] font-bold uppercase text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
@@ -461,7 +479,7 @@ export default function AdminOrdersPage() {
                   </p>
                   <div className="flex flex-wrap gap-3 text-[11px] text-muted adm-text-muted mt-1">
                     <span className="flex items-center gap-1">
-                      <User size={10} /> {tab.waiter_name}
+                      <User size={10} /> {waiterNameForTab(tab)}
                     </span>
                     <span className="flex items-center gap-1">
                       {isTabCardPayment(tab.payment_method) ? (

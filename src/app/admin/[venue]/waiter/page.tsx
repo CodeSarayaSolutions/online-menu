@@ -32,6 +32,22 @@ export default function WaiterFloorPage() {
   const refresh = useCallback(async () => {
     if (!venueSlug) return;
     try {
+      if (currentUser) {
+        try {
+          const cleanup = await fetch("/api/tabs/discard-empty", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ restaurantId: venueSlug }),
+          });
+          if (!cleanup.ok) {
+            const data = (await cleanup.json().catch(() => null)) as { error?: string } | null;
+            console.warn("[waiter] stale empty tab cleanup failed", data?.error ?? cleanup.status);
+          }
+        } catch (cleanupError) {
+          console.warn("[waiter] stale empty tab cleanup failed", cleanupError);
+        }
+      }
       const [t, tabs] = await Promise.all([
         tableService.getTables(venueSlug),
         tabService.getOpenTabs(venueSlug),
@@ -44,7 +60,7 @@ export default function WaiterFloorPage() {
     } finally {
       setLoading(false);
     }
-  }, [venueSlug]);
+  }, [venueSlug, currentUser]);
 
   useEffect(() => {
     void refresh();

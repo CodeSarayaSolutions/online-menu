@@ -7,6 +7,7 @@ type DbClient = SupabaseClient<Database, 'sarayamenu'>;
 import { deductTabFromInventory } from '@/services/inventoryService';
 
 const realtimeSchema = supabasePostgrestSchema;
+const TAB_ITEMS_BATCH_SIZE = 75;
 
 export type TableTabRow = Tables<'table_tabs'>;
 export type TabItemRow = Tables<'tab_items'>;
@@ -15,6 +16,8 @@ export type OpenTabRow = TableTabRow & {
   table_label: string;
   table_capacity: number;
   waiter_name: string;
+  tab_items?: TabItemRow[];
+  item_count?: number;
 };
 
 export type TabWithItems = TableTabRow & {
@@ -50,6 +53,45 @@ async function enrichTabs(tabs: TableTabRow[], client?: DbClient): Promise<OpenT
   });
 }
 
+async function attachItemsToTabs<T extends OpenTabRow>(
+  tabs: T[],
+  client?: DbClient
+): Promise<T[]> {
+  if (tabs.length === 0) return tabs;
+
+  const db = client ?? supabase;
+  const tabIds = tabs.map((t) => t.id);
+  const items: TabItemRow[] = [];
+
+  for (let i = 0; i < tabIds.length; i += TAB_ITEMS_BATCH_SIZE) {
+    const chunk = tabIds.slice(i, i + TAB_ITEMS_BATCH_SIZE);
+    const { data, error } = await db
+      .from('tab_items')
+      .select('*')
+      .in('tab_id', chunk)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    items.push(...(data ?? []));
+  }
+
+  const byTab = new Map<string, TabItemRow[]>();
+  for (const item of items) {
+    const list = byTab.get(item.tab_id) ?? [];
+    list.push(item);
+    byTab.set(item.tab_id, list);
+  }
+
+  return tabs.map((tab) => {
+    const tabItems = byTab.get(tab.id) ?? [];
+    return {
+      ...tab,
+      tab_items: tabItems,
+      item_count: tabItems.length,
+    };
+  });
+}
+
 async function recalcTabTotal(tabId: string): Promise<number> {
   const { data: items, error } = await supabase
     .from('tab_items')
@@ -72,7 +114,7 @@ export async function getOpenTabs(restaurantId: string): Promise<OpenTabRow[]> {
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  return enrichTabs(data ?? []);
+  return attachItemsToTabs(await enrichTabs(data ?? []));
 }
 
 export async function getClosedTabs(
@@ -92,7 +134,7 @@ export async function getClosedTabs(
 
   const { data, error } = await q;
   if (error) throw error;
-  return enrichTabs(data ?? []);
+  return attachItemsToTabs(await enrichTabs(data ?? []));
 }
 
 export async function getOpenTabForTable(tableId: string): Promise<TableTabRow | null> {
@@ -193,6 +235,66 @@ export async function removeItemFromTab(tabItemId: string, tabId: string): Promi
   await recalcTabTotal(tabId);
 }
 
+export async function discardEmptyTab(
+  tabId: string,
+  waiterId?: string,
+  client?: DbClient
+): Promise<void> {
+  const db = client ?? supabase;
+  const tab = await getTabWithItems(tabId, client);
+  if (!tab || tab.status !== 'open') {
+    throw new Error('Kartica nije otvorena.');
+  }
+  if (waiterId && tab.waiter_id !== waiterId) {
+    throw new Error('Nemate dozvolu zatvoriti ovu karticu.');
+  }
+  if ((tab.tab_items ?? []).length > 0) {
+    throw new Error('Kartica ima stavke i ne može se odbaciti kao prazna.');
+  }
+
+  const { error } = await db.from('table_tabs').delete().eq('id', tabId);
+  if (error) throw error;
+}
+
+export async function discardStaleEmptyOpenTabs(
+  restaurantId: string,
+  options: { waiterId?: string; olderThanMs?: number } = {},
+  client?: DbClient
+): Promise<number> {
+  const db = client ?? supabase;
+  const olderThanMs = options.olderThanMs ?? 2 * 60 * 1000;
+  const cutoff = new Date(Date.now() - olderThanMs).toISOString();
+
+  let query = db
+    .from('table_tabs')
+    .select('*')
+    .eq('restaurant_id', restaurantId)
+    .eq('status', 'open')
+    .lt('created_at', cutoff);
+
+  if (options.waiterId) {
+    query = query.eq('waiter_id', options.waiterId);
+  }
+
+  const { data: tabs, error } = await query;
+  if (error) throw error;
+  if (!tabs?.length) return 0;
+
+  const enriched = await attachItemsToTabs(await enrichTabs(tabs, client), client);
+  const emptyIds = enriched
+    .filter((tab) => (tab.tab_items ?? []).length === 0)
+    .map((tab) => tab.id);
+
+  if (emptyIds.length === 0) return 0;
+
+  for (let i = 0; i < emptyIds.length; i += TAB_ITEMS_BATCH_SIZE) {
+    const chunk = emptyIds.slice(i, i + TAB_ITEMS_BATCH_SIZE);
+    const { error: deleteError } = await db.from('table_tabs').delete().in('id', chunk);
+    if (deleteError) throw deleteError;
+  }
+  return emptyIds.length;
+}
+
 export async function closeTab(
   tabId: string,
   paymentMethod: 'cash' | 'card',
@@ -241,10 +343,12 @@ export async function getTabWithItems(tabId: string, client?: DbClient): Promise
   if (error) throw error;
   if (!tab) return null;
 
-  const [{ data: items }, enriched] = await Promise.all([
+  const [{ data: items, error: itemsError }, enriched] = await Promise.all([
     db.from('tab_items').select('*').eq('tab_id', tabId).order('created_at'),
     enrichTabs([tab], client),
   ]);
+
+  if (itemsError) throw itemsError;
 
   const meta = enriched[0];
   return {
