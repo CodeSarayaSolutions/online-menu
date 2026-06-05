@@ -120,9 +120,11 @@ export async function getOpenTabs(restaurantId: string): Promise<OpenTabRow[]> {
 export async function getClosedTabs(
   restaurantId: string,
   from?: string,
-  to?: string
+  to?: string,
+  client?: DbClient
 ): Promise<OpenTabRow[]> {
-  let q = supabase
+  const db = client ?? supabase;
+  let q = db
     .from('table_tabs')
     .select('*')
     .eq('restaurant_id', restaurantId)
@@ -134,7 +136,7 @@ export async function getClosedTabs(
 
   const { data, error } = await q;
   if (error) throw error;
-  return attachItemsToTabs(await enrichTabs(data ?? []));
+  return attachItemsToTabs(await enrichTabs(data ?? [], client), client);
 }
 
 export async function getOpenTabForTable(tableId: string): Promise<TableTabRow | null> {

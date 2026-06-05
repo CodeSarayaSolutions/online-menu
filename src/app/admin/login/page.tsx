@@ -97,42 +97,22 @@ export default function AdminLoginPage() {
             />
 
             {(showEmailForm || !hasHistory) && (
-          <div
-            className={clsx(
-              hasHistory && !showEmailForm && "hidden",
-              highlightEmail && "ring-2 ring-primary/40 rounded-xl p-1 -m-1"
-            )}
-          >
-            <AdminLoginForm
-              onSuccess={onSuccess}
-              title={hasHistory ? undefined : BRAND_NAME}
-              subtitle={
-                hasHistory
-                  ? LOGIN_EMAIL_SUBTITLE
-                  : `${ADMIN_PANEL_TITLE} · ${LOGIN_EMAIL_SUBTITLE}`
-              }
-            />
-          </div>
-            )}
-
-            {hasHistory && !showEmailForm && (
-              <button
-                type="button"
-                onClick={() => setShowEmailForm(true)}
-                className="w-full mt-4 text-xs text-muted adm-text-muted underline cursor-pointer text-center"
+              <div
+                className={clsx(
+                  hasHistory && !showEmailForm && "hidden",
+                  highlightEmail && "ring-2 ring-primary/40 rounded-xl p-1 -m-1"
+                )}
               >
-                Prijava lozinkom
-              </button>
-            )}
-
-            {hasHistory && (
-              <button
-                type="button"
-                onClick={() => setShowPinReset(true)}
-                className="w-full mt-2 text-xs text-primary font-semibold underline cursor-pointer text-center"
-              >
-                Promijeni PIN (kod od administratora)
-              </button>
+                <AdminLoginForm
+                  onSuccess={onSuccess}
+                  title={hasHistory ? undefined : BRAND_NAME}
+                  subtitle={
+                    hasHistory
+                      ? LOGIN_EMAIL_SUBTITLE
+                      : `${ADMIN_PANEL_TITLE} · ${LOGIN_EMAIL_SUBTITLE}`
+                  }
+                />
+              </div>
             )}
           </>
         )}

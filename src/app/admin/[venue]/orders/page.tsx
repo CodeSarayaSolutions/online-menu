@@ -26,7 +26,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useParams } from "next/navigation";
 import { useOrders } from "@/hooks/useOrders";
 import { Order, OrderStatus } from "@/types/order";
-import * as tabService from "@/services/tabService";
 import type { OpenTabRow } from "@/services/tabService";
 import { useAuthStore } from "@/store/authStore";
 import clsx from "clsx";
@@ -165,13 +164,23 @@ export default function AdminOrdersPage() {
   const loadTabs = useCallback(async () => {
     if (!venueSlug) return;
     try {
-      const tabs = await tabService.getClosedTabs(
-        venueSlug,
-        rangeFrom.toISOString(),
-        rangeTo.toISOString()
-      );
-      setClosedTabs(tabs);
-    } catch {
+      const params = new URLSearchParams({
+        restaurantId: venueSlug,
+        from: rangeFrom.toISOString(),
+        to: rangeTo.toISOString(),
+      });
+      const res = await fetch(`/api/tabs/closed?${params.toString()}`, {
+        credentials: "include",
+      });
+      const data = (await res.json().catch(() => null)) as
+        | { tabs?: OpenTabRow[]; error?: string }
+        | null;
+      if (!res.ok) {
+        throw new Error(data?.error ?? "Učitavanje konobarskih kartica nije uspjelo");
+      }
+      setClosedTabs(data?.tabs ?? []);
+    } catch (error) {
+      console.warn("[orders] closed waiter tabs failed", error);
       setClosedTabs([]);
     }
   }, [venueSlug, rangeFrom, rangeTo]);
