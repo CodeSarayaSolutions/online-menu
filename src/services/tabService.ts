@@ -11,6 +11,7 @@ const TAB_ITEMS_BATCH_SIZE = 75;
 
 export type TableTabRow = Tables<'table_tabs'>;
 export type TabItemRow = Tables<'tab_items'>;
+export type TabItemFireStatus = TabItemRow['fire_status'];
 
 export type OpenTabRow = TableTabRow & {
   table_label: string;
@@ -24,6 +25,11 @@ export type TabWithItems = TableTabRow & {
   tab_items: TabItemRow[];
   table_label: string;
   waiter_name: string;
+};
+
+export type WaiterBacklogTab = OpenTabRow & {
+  tab_items: TabItemRow[];
+  item_count: number;
 };
 
 async function enrichTabs(tabs: TableTabRow[], client?: DbClient): Promise<OpenTabRow[]> {
@@ -182,13 +188,16 @@ export async function addItemToTab(
     unitPrice: number;
     quantity: number;
     station: 'kitchen' | 'bar' | 'both';
+    fireStatus?: TabItemFireStatus;
   }
 ): Promise<TabItemRow> {
+  const fireStatus = item.fireStatus ?? 'fired';
   const { data: existing, error: findError } = await supabase
     .from('tab_items')
     .select('*')
     .eq('tab_id', tabId)
     .eq('product_id', item.productId)
+    .eq('fire_status', fireStatus)
     .maybeSingle();
 
   if (findError) throw findError;
@@ -204,6 +213,7 @@ export async function addItemToTab(
         total_price: totalPrice,
         product_name: item.productName,
         station: item.station,
+        ...(fireStatus === 'fired' ? { fired_at: existing.fired_at ?? new Date().toISOString() } : {}),
       })
       .eq('id', existing.id)
       .select()
@@ -223,12 +233,50 @@ export async function addItemToTab(
     unit_price: item.unitPrice,
     total_price: totalPrice,
     station: item.station,
+    fire_status: fireStatus,
+    fired_at: fireStatus === 'fired' ? new Date().toISOString() : null,
   };
 
   const { data, error } = await supabase.from('tab_items').insert(row).select().single();
   if (error) throw error;
   await recalcTabTotal(tabId);
   return data;
+}
+
+export async function activateTabItems(itemIds: string[]): Promise<void> {
+  const ids = Array.from(new Set(itemIds.filter(Boolean)));
+  if (ids.length === 0) return;
+
+  for (let i = 0; i < ids.length; i += TAB_ITEMS_BATCH_SIZE) {
+    const chunk = ids.slice(i, i + TAB_ITEMS_BATCH_SIZE);
+    const { error } = await supabase
+      .from('tab_items')
+      .update({
+        fire_status: 'fired',
+        fired_at: new Date().toISOString(),
+      })
+      .in('id', chunk);
+
+    if (error) throw error;
+  }
+}
+
+export async function getBacklogForWaiter(
+  restaurantId: string,
+  waiterId: string
+): Promise<WaiterBacklogTab[]> {
+  const tabs = await getOpenTabs(restaurantId);
+  return tabs
+    .filter((tab) => tab.waiter_id === waiterId)
+    .map((tab) => {
+      const backlogItems = (tab.tab_items ?? []).filter((item) => item.fire_status === 'backlog');
+      return {
+        ...tab,
+        tab_items: backlogItems,
+        item_count: backlogItems.length,
+      };
+    })
+    .filter((tab) => tab.tab_items.length > 0);
 }
 
 export async function removeItemFromTab(tabItemId: string, tabId: string): Promise<void> {

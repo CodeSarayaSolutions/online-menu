@@ -63,7 +63,9 @@ export default function BarActiveTabs({ restaurantId }: { restaurantId: string }
       if (cleared.has(tab.id)) return false;
       const detail = itemsByTab[tab.id];
       const items = detail?.tab_items ?? [];
-      return items.some((i) => i.station === "bar" || i.station === "both");
+      return items.some(
+        (i) => i.fire_status === "fired" && (i.station === "bar" || i.station === "both")
+      );
     });
   }, [tabs, itemsByTab, cleared]);
 
@@ -98,14 +100,14 @@ export default function BarActiveTabs({ restaurantId }: { restaurantId: string }
           {barTabs.map((tab) => {
             const detail = itemsByTab[tab.id];
             const barItems = (detail?.tab_items ?? []).filter(
-              (i) => i.station === "bar" || i.station === "both"
+              (i) => i.fire_status === "fired" && (i.station === "bar" || i.station === "both")
             );
             const tableLabel = tab.table_label;
 
             return (
               <div
                 key={tab.id}
-                className="adm-surface adm-border border rounded-2xl-purple-100 shadow-soft p-4"
+                className="adm-surface adm-border border rounded-2xl border-purple-100 shadow-soft p-4"
               >
                 <div className="flex justify-between items-start mb-3">
                   <div>

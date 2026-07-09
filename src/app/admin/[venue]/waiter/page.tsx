@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { LayoutGrid, HandPlatter } from "lucide-react";
 import * as tableService from "@/services/tableService";
 import * as tabService from "@/services/tabService";
 import * as authService from "@/services/authService";
-import type { OpenTabRow } from "@/services/tabService";
+import type { OpenTabRow, WaiterBacklogTab } from "@/services/tabService";
 import type { Tables } from "@/types/supabase";
 import { useAuthStore } from "@/store/authStore";
 import clsx from "clsx";
@@ -23,9 +23,12 @@ export default function WaiterFloorPage() {
 
   const [tables, setTables] = useState<TableRow[]>([]);
   const [openTabs, setOpenTabs] = useState<OpenTabRow[]>([]);
+  const [backlogTabs, setBacklogTabs] = useState<WaiterBacklogTab[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmTable, setConfirmTable] = useState<TableRow | null>(null);
   const [confirmEndShift, setConfirmEndShift] = useState(false);
+  const [showBacklogSheet, setShowBacklogSheet] = useState(false);
+  const [selectedBacklogIds, setSelectedBacklogIds] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -48,12 +51,16 @@ export default function WaiterFloorPage() {
           console.warn("[waiter] stale empty tab cleanup failed", cleanupError);
         }
       }
-      const [t, tabs] = await Promise.all([
+      const [t, tabs, backlog] = await Promise.all([
         tableService.getTables(venueSlug),
         tabService.getOpenTabs(venueSlug),
+        currentUser
+          ? tabService.getBacklogForWaiter(venueSlug, currentUser.id)
+          : Promise.resolve([]),
       ]);
       setTables(t);
       setOpenTabs(tabs);
+      setBacklogTabs(backlog);
       setError("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Učitavanje nije uspjelo");
@@ -102,6 +109,67 @@ export default function WaiterFloorPage() {
 
   const tabForTable = (tableId: string) =>
     openTabs.find((tab) => tab.table_id === tableId);
+
+  const allBacklogItems = useMemo(
+    () =>
+      backlogTabs.flatMap((tab) =>
+        tab.tab_items.map((item) => ({
+          ...item,
+          table_label: tab.table_label,
+          tab_id: tab.id,
+        }))
+      ),
+    [backlogTabs]
+  );
+
+  const allBacklogIds = useMemo(
+    () => allBacklogItems.map((item) => item.id),
+    [allBacklogItems]
+  );
+
+  const groupedBacklog = useMemo(
+    () =>
+      backlogTabs.map((tab) => ({
+        tabId: tab.id,
+        tableLabel: tab.table_label,
+        items: tab.tab_items,
+      })),
+    [backlogTabs]
+  );
+
+  const openBacklogSheet = () => {
+    setSelectedBacklogIds(new Set(allBacklogIds));
+    setShowBacklogSheet(true);
+  };
+
+  const toggleBacklogItem = (itemId: string) => {
+    setSelectedBacklogIds((current) => {
+      const next = new Set(current);
+      if (next.has(itemId)) {
+        next.delete(itemId);
+      } else {
+        next.add(itemId);
+      }
+      return next;
+    });
+  };
+
+  const activateSelectedBacklog = async () => {
+    const ids = Array.from(selectedBacklogIds);
+    if (ids.length === 0) return;
+    setBusy(true);
+    setError("");
+    try {
+      await tabService.activateTabItems(ids);
+      setShowBacklogSheet(false);
+      setSelectedBacklogIds(new Set());
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Aktiviranje nije uspjelo");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const handleTableTap = (table: TableRow) => {
     if (!currentUser) return;
@@ -290,6 +358,96 @@ export default function WaiterFloorPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {allBacklogItems.length > 0 && (
+        <div className="fixed left-0 right-0 bottom-0 lg:left-[272px] z-50 p-4 adm-bg border-t adm-border">
+          <button
+            type="button"
+            onClick={openBacklogSheet}
+            className="w-full min-h-[54px] rounded-2xl bg-amber-500 text-white text-sm font-extrabold shadow-elevated"
+          >
+            Na čekanju: {allBacklogItems.length} stavki — Aktiviraj
+          </button>
+        </div>
+      )}
+
+      {showBacklogSheet && (
+        <div className="fixed inset-0 bg-black/50 z-[110] flex items-end justify-center p-0 sm:p-4">
+          <motion.div
+            initial={{ y: 40, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="adm-surface adm-border border rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[82vh] flex flex-col shadow-elevated"
+          >
+            <div className="px-5 py-4 border-b adm-border">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-extrabold text-dark adm-text">Na čekanju</h3>
+                  <p className="text-xs text-muted adm-text-muted">
+                    Odaberite stavke koje šaljete na bar.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowBacklogSheet(false)}
+                  className="text-sm font-bold adm-text-muted min-h-[36px] px-2"
+                >
+                  Zatvori
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-y-auto flex-1 px-5 py-4 space-y-5">
+              {groupedBacklog.map((group) => (
+                <section key={group.tabId}>
+                  <h4 className="text-xs font-extrabold uppercase tracking-wider adm-text-muted mb-2">
+                    {group.tableLabel}
+                  </h4>
+                  <div className="space-y-2">
+                    {group.items.map((item) => {
+                      const checked = selectedBacklogIds.has(item.id);
+                      return (
+                        <label
+                          key={item.id}
+                          className={clsx(
+                            "flex items-center gap-3 rounded-xl border adm-border p-3 cursor-pointer",
+                            checked ? "bg-amber-50 border-amber-200" : "adm-surface"
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleBacklogItem(item.id)}
+                            className="h-5 w-5 accent-amber-500"
+                          />
+                          <span className="flex-1 min-w-0">
+                            <span className="block text-sm font-bold text-dark adm-text truncate">
+                              {item.quantity}× {item.product_name}
+                            </span>
+                            <span className="block text-[11px] text-muted adm-text-muted">
+                              {Number(item.total_price).toFixed(2)} KM
+                            </span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))}
+            </div>
+
+            <div className="p-5 border-t adm-border">
+              <button
+                type="button"
+                disabled={busy || selectedBacklogIds.size === 0}
+                onClick={() => void activateSelectedBacklog()}
+                className="w-full min-h-[52px] rounded-2xl bg-gradient-to-r from-primary to-amber-500 text-white text-sm font-extrabold disabled:opacity-50"
+              >
+                Pošalji na bar ({selectedBacklogIds.size})
+              </button>
+            </div>
+          </motion.div>
         </div>
       )}
     </div>

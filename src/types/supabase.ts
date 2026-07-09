@@ -558,6 +558,8 @@ export interface Database {
           unit_price: number;
           total_price: number;
           station: 'kitchen' | 'bar' | 'both';
+          fire_status: 'backlog' | 'fired';
+          fired_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -569,6 +571,8 @@ export interface Database {
           unit_price?: number;
           total_price?: number;
           station?: 'kitchen' | 'bar' | 'both';
+          fire_status?: 'backlog' | 'fired';
+          fired_at?: string | null;
           created_at?: string;
         };
         Update: {
@@ -580,6 +584,8 @@ export interface Database {
           unit_price?: number;
           total_price?: number;
           station?: 'kitchen' | 'bar' | 'both';
+          fire_status?: 'backlog' | 'fired';
+          fired_at?: string | null;
           created_at?: string;
         };
         Relationships: [];

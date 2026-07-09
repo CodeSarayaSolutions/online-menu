@@ -35,6 +35,7 @@ export default function WaiterTabPage() {
   const [showEmptyExitConfirm, setShowEmptyExitConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [fireMode, setFireMode] = useState<"fired" | "backlog">("fired");
 
   const canEdit =
     !readonly &&
@@ -116,6 +117,7 @@ export default function WaiterTabPage() {
         unitPrice: p.price,
         quantity: 1,
         station: station === "kitchen" ? "kitchen" : station === "both" ? "both" : "bar",
+        fireStatus: fireMode,
       });
       await load();
     } catch (e) {
@@ -132,6 +134,20 @@ export default function WaiterTabPage() {
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Uklanjanje nije uspjelo");
+    }
+  };
+
+  const activateBacklogItems = async (itemIds: string[]) => {
+    if (!canEdit || itemIds.length === 0) return;
+    setBusy(true);
+    setError("");
+    try {
+      await tabService.activateTabItems(itemIds);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Aktiviranje nije uspjelo");
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -236,8 +252,10 @@ export default function WaiterTabPage() {
 
   const tableLabel = tab.table_label;
   const items = tab.tab_items ?? [];
+  const backlogItems = items.filter((item) => item.fire_status === "backlog");
+  const backlogItemIds = backlogItems.map((item) => item.id);
 
-  const actionBarHeight = canEdit ? 88 : 0;
+  const actionBarHeight = canEdit ? (backlogItems.length > 0 ? 152 : 88) : 0;
 
   return (
     <div
@@ -253,6 +271,37 @@ export default function WaiterTabPage() {
 
       {error && (
         <p className="mx-4 mt-2 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>
+      )}
+
+      {canEdit && (
+        <div className="px-4 pt-3">
+          <div className="grid grid-cols-2 rounded-xl adm-surface adm-border border p-1 text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => setFireMode("fired")}
+              className={clsx(
+                "min-h-[40px] rounded-lg transition",
+                fireMode === "fired"
+                  ? "bg-primary text-white shadow-soft"
+                  : "text-muted adm-text-muted"
+              )}
+            >
+              Pošalji odmah
+            </button>
+            <button
+              type="button"
+              onClick={() => setFireMode("backlog")}
+              className={clsx(
+                "min-h-[40px] rounded-lg transition",
+                fireMode === "backlog"
+                  ? "bg-amber-500 text-white shadow-soft"
+                  : "text-muted adm-text-muted"
+              )}
+            >
+              Odgodi
+            </button>
+          </div>
+        </div>
       )}
 
       <div className="px-4 py-3">
@@ -312,10 +361,8 @@ export default function WaiterTabPage() {
       </div>
 
       <div
-        className={clsx(
-          "fixed left-0 right-0 lg:left-[272px] adm-surface adm-border border border-t shadow-elevated z-30 max-h-[40vh] flex flex-col",
-          canEdit ? "bottom-[88px]" : "bottom-0"
-        )}
+        className="fixed left-0 right-0 lg:left-[272px] adm-surface adm-border border border-t shadow-elevated z-30 max-h-[40vh] flex flex-col"
+        style={{ bottom: `${actionBarHeight}px` }}
       >
         <div className="px-4 py-2 border-b flex justify-between items-center">
           <span className="text-xs font-bold text-muted adm-text-muted uppercase">Stavke na kartici</span>
@@ -332,6 +379,11 @@ export default function WaiterTabPage() {
                   <p className="text-[11px] text-muted adm-text-muted">
                     {item.quantity}× {Number(item.unit_price).toFixed(2)} KM
                   </p>
+                  {item.fire_status === "backlog" && (
+                    <span className="inline-flex mt-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                      Na čekanju
+                    </span>
+                  )}
                 </div>
                 <span className="text-sm font-bold">{Number(item.total_price).toFixed(2)}</span>
                 {canEdit && (
@@ -350,22 +402,34 @@ export default function WaiterTabPage() {
       </div>
 
       {canEdit && (
-        <div className="fixed bottom-0 left-0 right-0 lg:left-[272px] z-40 p-4 adm-bg border-t adm-border flex gap-3">
-          <button
-            type="button"
-            onClick={handleGotovo}
-            className="flex-1 min-h-[56px] rounded-xl border-2 border-primary text-primary bg-transparent text-base font-bold"
-          >
-            GOTOVO
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowPay(true)}
-            disabled={items.length === 0 || busy}
-            className="flex-1 min-h-[56px] rounded-xl bg-gradient-to-r from-primary to-amber-500 text-white text-base font-bold disabled:opacity-40"
-          >
-            Naplati
-          </button>
+        <div className="fixed bottom-0 left-0 right-0 lg:left-[272px] z-40 p-4 adm-bg border-t adm-border space-y-3">
+          {backlogItems.length > 0 && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void activateBacklogItems(backlogItemIds)}
+              className="w-full min-h-[48px] rounded-xl bg-amber-500 text-white text-sm font-extrabold disabled:opacity-50"
+            >
+              Aktiviraj sve na čekanju ({backlogItems.length})
+            </button>
+          )}
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={handleGotovo}
+              className="flex-1 min-h-[56px] rounded-xl border-2 border-primary text-primary bg-transparent text-base font-bold"
+            >
+              GOTOVO
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowPay(true)}
+              disabled={items.length === 0 || busy}
+              className="flex-1 min-h-[56px] rounded-xl bg-gradient-to-r from-primary to-amber-500 text-white text-base font-bold disabled:opacity-40"
+            >
+              Naplati
+            </button>
+          </div>
         </div>
       )}
 
