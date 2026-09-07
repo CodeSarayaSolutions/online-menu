@@ -131,6 +131,10 @@ function formatDate(iso: string) {
   return d.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
+function formatDateTime(iso: string) {
+  return `${formatDate(iso)} ${formatTime(iso)}`;
+}
+
 function timeAgo(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60000);
@@ -155,6 +159,7 @@ export default function AdminOrdersPage() {
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [closedTabs, setClosedTabs] = useState<OpenTabRow[]>([]);
+  const [selectedClosedTab, setSelectedClosedTab] = useState<OpenTabRow | null>(null);
 
   const { from: rangeFrom, to: rangeTo } = useMemo(
     () => rangeBounds(dateRange, customFrom, customTo),
@@ -475,9 +480,11 @@ export default function AdminOrdersPage() {
           <h2 className="text-sm font-extrabold text-dark adm-text mb-3">Zatvorene kartice (konobar)</h2>
           <div className="space-y-3">
             {closedTabs.map((tab) => (
-              <div
+              <button
+                type="button"
                 key={tab.id}
-                className="adm-surface adm-border border rounded-2xl border-purple-100 shadow-soft p-4 flex flex-wrap items-center gap-3"
+                onClick={() => setSelectedClosedTab(tab)}
+                className="adm-surface adm-border border rounded-2xl border-purple-100 shadow-soft p-4 flex flex-wrap items-center gap-3 w-full text-left cursor-pointer hover:shadow-card hover:border-purple-200 transition"
               >
                 <div className="flex-1 min-w-0">
                   <span className="text-[10px] font-bold uppercase text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
@@ -504,7 +511,7 @@ export default function AdminOrdersPage() {
                     </span>
                   </div>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -686,6 +693,128 @@ export default function AdminOrdersPage() {
           })}
         </div>
       )}
+
+      {/* ── Closed tab detail modal ── */}
+      <AnimatePresence>
+        {selectedClosedTab && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
+            onClick={() => setSelectedClosedTab(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 20 }}
+              transition={{ type: "spring", damping: 25 }}
+              className="adm-surface adm-border border rounded-3xl max-w-lg w-full max-h-[85vh] overflow-y-auto shadow-elevated"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="sticky top-0 adm-header backdrop-blur-md rounded-t-3xl border-b border adm-border px-6 py-4 flex items-center justify-between z-10">
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
+                    Konobar
+                  </span>
+                  <h2 className="text-lg font-extrabold text-dark adm-text mt-1">
+                    {selectedClosedTab.table_label}
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedClosedTab(null)}
+                  className="w-9 h-9 rounded-xl hover:bg-[var(--adm-surface-2)] flex items-center justify-center text-muted adm-text-muted hover:adm-text transition"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="p-3 rounded-xl adm-bg">
+                    <p className="text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider">
+                      Konobar
+                    </p>
+                    <p className="text-[13px] font-bold text-dark adm-text mt-0.5 flex items-center gap-1.5">
+                      <User size={13} className="text-purple-500" />
+                      {waiterNameForTab(selectedClosedTab)}
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-xl adm-bg">
+                    <p className="text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider">
+                      Plaćanje
+                    </p>
+                    <p className="text-[13px] font-bold text-dark adm-text mt-0.5 flex items-center gap-1.5">
+                      {isTabCardPayment(selectedClosedTab.payment_method) ? (
+                        <CreditCard size={13} className="text-purple-500" />
+                      ) : (
+                        <Banknote size={13} className="text-purple-500" />
+                      )}
+                      {tabPaymentLabel(selectedClosedTab.payment_method)}
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-xl adm-bg">
+                    <p className="text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider">
+                      Otvoreno
+                    </p>
+                    <p className="text-[13px] font-semibold text-dark adm-text mt-0.5 flex items-center gap-1.5">
+                      <Clock size={13} className="text-purple-500" />
+                      {formatDateTime(selectedClosedTab.created_at)}
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-xl adm-bg">
+                    <p className="text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider">
+                      Račun zatvoren
+                    </p>
+                    <p className="text-[13px] font-semibold text-dark adm-text mt-0.5 flex items-center gap-1.5">
+                      <CheckCircle2 size={13} className="text-purple-500" />
+                      {selectedClosedTab.closed_at
+                        ? formatDateTime(selectedClosedTab.closed_at)
+                        : "—"}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-[11px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">
+                    Stavke
+                  </p>
+                  {(selectedClosedTab.tab_items ?? []).length === 0 ? (
+                    <p className="text-[13px] text-muted adm-text-muted italic">
+                      Nema stavki na kartici.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {(selectedClosedTab.tab_items ?? []).map((item) => (
+                        <div
+                          key={item.id}
+                          className="flex items-center justify-between gap-3 p-3 rounded-xl adm-bg"
+                        >
+                          <p className="text-[13px] font-semibold text-dark adm-text">
+                            {item.quantity > 1 ? `${item.quantity}× ` : ""}
+                            {item.product_name}
+                          </p>
+                          <p className="text-[14px] font-extrabold text-dark adm-text shrink-0">
+                            {Number(item.total_price).toFixed(2)} KM
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-gradient-to-r from-purple-50 to-purple-100/50 border border-purple-100">
+                  <span className="text-[13px] font-bold text-dark adm-text">Ukupno</span>
+                  <span className="text-xl font-extrabold text-purple-700">
+                    {Number(selectedClosedTab.total).toFixed(2)} KM
+                  </span>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Order detail modal ── */}
       <AnimatePresence>

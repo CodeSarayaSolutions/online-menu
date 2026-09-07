@@ -1,0 +1,7 @@
+-- DEPRECATED: use scripts/shift-weekly-schedule.sql
+--
+-- The original one-off datetime shift tables are replaced by a weekly schedule:
+--   restaurant_day_hours, day_shift_segments, day_shift_segment_assignments
+--
+-- If you already applied an older version of this file, run shift-weekly-schedule.sql
+-- in the Supabase SQL editor (it drops shifts + shift_assignments).

@@ -27,6 +27,8 @@ import {
   LayoutGrid,
   Package,
   HandPlatter,
+  Settings,
+  CalendarClock,
 } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -41,6 +43,7 @@ import {
   canViewOrdersList,
   canManageTables,
   canManageInventory,
+  canManageShifts,
   canViewWaiterMode,
   canManageVenueStaff,
   isPlatformAdmin,
@@ -73,7 +76,9 @@ const navItems: NavItem[] = [
   { path: "restaurant", label: "Restoran", icon: Store, desc: "Naziv, slike, info", minRole: "manager" },
   { path: "products", label: "Proizvodi", icon: UtensilsCrossed, desc: "Stavke menija i vrste", minRole: "manager" },
   { path: "page-content", label: "Sadržaj stranice", icon: FileText, desc: "Svi tekstovi na frontendu", minRole: "manager" },
+  { path: "settings", label: "Postavke", icon: Settings, desc: "Online narudžbe i opcije", minRole: "manager" },
   { path: "orders", label: "Narudžbe", icon: ClipboardList, desc: "Sve narudžbe i status", minRole: "employee" },
+  { path: "shifts", label: "Smjene", icon: CalendarClock, desc: "Raspored osoblja i sažetci", minRole: "manager" },
   { path: "tables", label: "Stolovi", icon: LayoutGrid, desc: "Raspored stolova i kapacitet" },
   { path: "inventory", label: "Inventar", icon: Package, desc: "Zalihe i kretanja" },
   { path: "waiter", label: "Konobar", icon: HandPlatter, desc: "Rad konobara i otvoreni računi" },
@@ -240,10 +245,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     if (!currentUser || !effectiveVenueId) return [];
     return navItems.filter((item) => {
       if (item.path === "/admin") return isPlatformAdmin(currentUser);
-      if (item.path === "restaurant" || item.path === "products" || item.path === "page-content") {
+      if (item.path === "restaurant" || item.path === "products" || item.path === "page-content" || item.path === "settings") {
         return canManageVenueCms(currentUser, effectiveVenueId);
       }
       if (item.path === "orders") return canViewOrdersList(currentUser, effectiveVenueId);
+      if (item.path === "shifts") return canManageShifts(currentUser, effectiveVenueId);
       if (item.path === "tables") return canManageTables(currentUser, effectiveVenueId);
       if (item.path === "inventory") return canManageInventory(currentUser, effectiveVenueId);
       if (item.path === "waiter") return canViewWaiterMode(currentUser, effectiveVenueId);

@@ -763,6 +763,157 @@ export interface Database {
         };
         Relationships: [];
       };
+
+      shifts: {
+        Row: never;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+
+      shift_assignments: {
+        Row: never;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+
+      restaurant_day_hours: {
+        Row: {
+          restaurant_id: string;
+          day_of_week: number;
+          opens_at: string;
+          closes_at: string;
+          is_closed: boolean;
+          updated_at: string;
+        };
+        Insert: {
+          restaurant_id: string;
+          day_of_week: number;
+          opens_at: string;
+          closes_at: string;
+          is_closed?: boolean;
+          updated_at?: string;
+        };
+        Update: {
+          restaurant_id?: string;
+          day_of_week?: number;
+          opens_at?: string;
+          closes_at?: string;
+          is_closed?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+
+      day_shift_segments: {
+        Row: {
+          id: string;
+          restaurant_id: string;
+          day_of_week: number;
+          label: string;
+          starts_at: string;
+          ends_at: string;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          restaurant_id: string;
+          day_of_week: number;
+          label?: string;
+          starts_at: string;
+          ends_at: string;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          restaurant_id?: string;
+          day_of_week?: number;
+          label?: string;
+          starts_at?: string;
+          ends_at?: string;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+
+      day_shift_segment_assignments: {
+        Row: {
+          id: string;
+          segment_id: string;
+          user_id: string;
+          restaurant_role: 'manager' | 'kitchen' | 'bar' | 'employee';
+          assigned_at: string;
+        };
+        Insert: {
+          id?: string;
+          segment_id: string;
+          user_id: string;
+          restaurant_role: 'manager' | 'kitchen' | 'bar' | 'employee';
+          assigned_at?: string;
+        };
+        Update: {
+          id?: string;
+          segment_id?: string;
+          user_id?: string;
+          restaurant_role?: 'manager' | 'kitchen' | 'bar' | 'employee';
+          assigned_at?: string;
+        };
+        Relationships: [];
+      };
+
+      shift_date_assignments: {
+        Row: {
+          id: string;
+          restaurant_id: string;
+          roster_date: string;
+          segment_id: string;
+          user_id: string;
+          restaurant_role: 'manager' | 'kitchen' | 'bar' | 'employee';
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          restaurant_id: string;
+          roster_date: string;
+          segment_id: string;
+          user_id: string;
+          restaurant_role: 'manager' | 'kitchen' | 'bar' | 'employee';
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          restaurant_id?: string;
+          roster_date?: string;
+          segment_id?: string;
+          user_id?: string;
+          restaurant_role?: 'manager' | 'kitchen' | 'bar' | 'employee';
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+
+      shift_daily_roster: {
+        Row: {
+          restaurant_id: string;
+          roster_date: string;
+          saved_at: string;
+        };
+        Insert: {
+          restaurant_id: string;
+          roster_date: string;
+          saved_at?: string;
+        };
+        Update: {
+          restaurant_id?: string;
+          roster_date?: string;
+          saved_at?: string;
+        };
+        Relationships: [];
+      };
     };
 
     Views: Record<string, never>;

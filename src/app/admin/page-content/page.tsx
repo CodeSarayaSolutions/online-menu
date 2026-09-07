@@ -564,7 +564,6 @@ export default function PageContentEditor() {
       case "general":
         return (
           <div className="space-y-5">
-            <ToggleSwitch label="View-Only Mode" value={styles.viewOnlyMode} onChange={(v) => handleStyleChange("viewOnlyMode", v)} hint="Hide all ordering features (&quot;Add to Cart&quot; buttons, cart, checkout). Customers can only browse the menu." />
             <ColorPicker label="Menu Page Background" value={styles.menuPageBgColor} onChange={(v) => handleStyleChange("menuPageBgColor", v)} palette={BG_COLORS} />
             <ColorPicker label="Cart Page Background" value={styles.cartPageBgColor} onChange={(v) => handleStyleChange("cartPageBgColor", v)} palette={BG_COLORS} />
             <ColorPicker label="Checkout Page Background" value={styles.checkoutPageBgColor} onChange={(v) => handleStyleChange("checkoutPageBgColor", v)} palette={BG_COLORS} />

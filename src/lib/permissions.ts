@@ -5,7 +5,9 @@ export type AdminNavId =
   | 'restaurant'
   | 'products'
   | 'page-content'
+  | 'settings'
   | 'orders'
+  | 'shifts'
   | 'kitchen'
   | 'bar'
   | 'tables'
@@ -108,6 +110,17 @@ export function canManageInventory(user: AppUser | null, restaurantId: string): 
   return isPlatformAdmin(user) || role === 'owner';
 }
 
+/** Shift scheduling — manager + owner */
+export function canManageShifts(user: AppUser | null, restaurantId: string): boolean {
+  const role = getRestaurantRole(user, restaurantId);
+  return isPlatformAdmin(user) || role === 'owner' || role === 'manager';
+}
+
+/** Shift activity summary — manager + owner */
+export function canViewShiftSummary(user: AppUser | null, restaurantId: string): boolean {
+  return canManageShifts(user, restaurantId);
+}
+
 /** Default landing after venue login */
 export function isStationRoute(pathname: string): boolean {
   return /\/admin\/[^/]+\/(bar|kitchen)(\/|$)/.test(pathname);
@@ -141,9 +154,10 @@ export function visibleVenueNavItems(
   const items: AdminNavId[] = [];
   if (isPlatformAdmin(user)) items.push('venues');
   if (canManageVenueCms(user, restaurantId)) {
-    items.push('restaurant', 'products', 'page-content');
+    items.push('restaurant', 'products', 'page-content', 'settings');
   }
   if (canViewOrdersList(user, restaurantId)) items.push('orders');
+  if (canManageShifts(user, restaurantId)) items.push('shifts');
   if (canManageTables(user, restaurantId)) items.push('tables');
   if (canManageInventory(user, restaurantId)) items.push('inventory');
   if (canViewWaiterMode(user, restaurantId)) items.push('waiter');
