@@ -15,7 +15,6 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useCartStore } from "@/store/cartStore";
 import { useTableSessionStore } from "@/store/tableSessionStore";
-import * as orderService from "@/services/orderService";
 import { useCmsData } from "@/hooks/useCmsData";
 import { useTranslation } from "@/hooks/useTranslation";
 import { isDark, mutedText, subtleBorder, subtleSurface, contrastText } from "@/lib/color-utils";
@@ -48,6 +47,7 @@ export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [isPlaced, setIsPlaced] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [sendError, setSendError] = useState("");
 
   const total = getTotal();
   const count = getItemCount();
@@ -83,23 +83,31 @@ export default function CheckoutPage() {
   const handleConfirm = async () => {
     if (!venueSlug || !tableValid || !tableNumber) return;
     setIsSending(true);
+    setSendError("");
     try {
       const id = `ORD-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-      await orderService.createOrder({
-        id,
-        restaurantId: venueSlug,
-        items: [...items],
-        tableNumber,
-        kitchenNote: note.trim(),
-        paymentMethod,
-        total,
-        itemCount: count,
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id,
+          restaurantId: venueSlug,
+          items: [...items],
+          tableNumber,
+          kitchenNote: note.trim(),
+          paymentMethod,
+        }),
       });
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+      if (!res.ok) {
+        throw new Error(data?.error ?? "Narudžba nije poslana");
+      }
       setConfirmedTable(tableNumber);
       setIsPlaced(true);
       clearCart();
       clearTable();
-    } catch {
+    } catch (e) {
+      setSendError(e instanceof Error ? e.message : "Narudžba nije poslana");
       setIsSending(false);
       return;
     }
@@ -516,6 +524,12 @@ export default function CheckoutPage() {
             </span>
           </button>
         </div>
+
+        {sendError ? (
+          <p className="text-sm font-semibold text-center mb-3" style={{ color: "#DC2626" }}>
+            {sendError}
+          </p>
+        ) : null}
 
         <motion.button
           whileTap={{ scale: 0.97 }}

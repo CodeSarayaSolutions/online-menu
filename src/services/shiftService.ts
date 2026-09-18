@@ -20,6 +20,7 @@ import type {
 } from '@/types/shift';
 import { DAY_LABELS } from '@/types/shift';
 import { USER_PUBLIC_COLUMNS } from '@/lib/auth/constants';
+import { isCloneSale } from '@/lib/orders/clones';
 
 type DbClient = SupabaseClient<Database, 'sarayamenu'>;
 
@@ -667,7 +668,9 @@ export async function buildSegmentSummary(
     ),
   }));
 
-  const qrOrders: ShiftSummaryQrOrder[] = (orders ?? []).map((order) => {
+  const qrOrders: ShiftSummaryQrOrder[] = (orders ?? [])
+    .filter((order) => !isCloneSale(order))
+    .map((order) => {
     const rawItems = Array.isArray(order.items) ? order.items : [];
     const items: ShiftSummaryItemLine[] = rawItems.map((item) => {
       const row = item as { name?: string; quantity?: number; price?: number };

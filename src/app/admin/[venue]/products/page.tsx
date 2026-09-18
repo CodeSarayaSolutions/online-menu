@@ -6,7 +6,7 @@ import {
   Plus, Trash2, Save, Search, X, Pencil, Flame,
   Image as ImageIcon, Package, Check, Sparkles,
   ArrowUp, ArrowDown, ChevronDown, ChevronUp, Tags,
-  PanelRightClose, PanelRightOpen, Clock,
+  PanelRightClose, PanelRightOpen, Clock, ChefHat, Wine,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCmsStore } from "@/store/cmsStore";
@@ -46,6 +46,7 @@ const blankProduct = (venueSlug: string): ProductItem => ({
   price: 0,
   image: "",
   category: "",
+  station: "both",
   addons: [],
   popular: false,
 });
@@ -1395,6 +1396,43 @@ export default function ProductsEditor() {
                     </select>
                     <p className="text-[10px] text-muted adm-text-muted mt-1.5">
                       Svaka stavka mora imati svoju vrstu.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">
+                      Stanica
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(
+                        [
+                          { id: "kitchen", label: "Kuhinja", icon: ChefHat },
+                          { id: "bar", label: "Šank", icon: Wine },
+                          { id: "both", label: "Oba", icon: Package },
+                        ] as const
+                      ).map((option) => {
+                        const selected = (editingProduct.station ?? "both") === option.id;
+                        return (
+                          <button
+                            key={option.id}
+                            type="button"
+                            onClick={() =>
+                              setEditingProduct({ ...editingProduct, station: option.id })
+                            }
+                            className={clsx(
+                              "flex flex-col items-center gap-1 rounded-2xl px-2 py-2.5 text-[11px] font-bold border transition",
+                              selected
+                                ? "border-primary bg-primary/10 text-primary"
+                                : "border-primary/10 adm-bg text-muted adm-text-muted"
+                            )}
+                          >
+                            <option.icon size={16} />
+                            {option.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[10px] text-muted adm-text-muted mt-1.5">
+                      Pića šaljite na šank, jela na kuhinju. Oba se vidi na obje stanice.
                     </p>
                   </div>
                 </div>

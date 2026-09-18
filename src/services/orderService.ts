@@ -2,11 +2,15 @@
 // Replaces: orderStore's localStorage-backed orders array
 // Uses: Supabase table + Realtime subscription for live updates
 
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { supabasePostgrestSchema } from '@/lib/supabase-schema';
-import type { Tables, InsertDto } from '@/types/supabase';
+import type { Database, Tables } from '@/types/supabase';
 import type { OrderStatus } from '@/types/order';
 import type { CartItem } from '@/types/cart';
+import { isCloneSale } from '@/lib/orders/clones';
+
+type DbClient = SupabaseClient<Database, 'sarayamenu'>;
 
 const realtimeSchema = supabasePostgrestSchema;
 
@@ -14,15 +18,19 @@ export type OrderRow = Tables<'orders'>;
 
 // ─── CRUD ────────────────────────────────────────────────
 
-export async function getOrders(restaurantId: string): Promise<OrderRow[]> {
-  const { data, error } = await supabase
+export async function getOrders(
+  restaurantId: string,
+  client?: DbClient
+): Promise<OrderRow[]> {
+  const db = client ?? supabase;
+  const { data, error } = await db
     .from('orders')
     .select('*')
     .eq('restaurant_id', restaurantId)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).filter((row) => !isCloneSale(row));
 }
 
 export async function getOrdersByStatus(
@@ -37,20 +45,28 @@ export async function getOrdersByStatus(
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).filter((row) => !isCloneSale(row));
 }
 
-export async function createOrder(order: {
-  id: string;
-  restaurantId: string;
-  items: CartItem[];
-  tableNumber: string;
-  kitchenNote: string;
-  paymentMethod: string;
-  total: number;
-  itemCount: number;
-}): Promise<OrderRow> {
-  const { data, error } = await supabase
+export async function createOrder(
+  order: {
+    id: string;
+    restaurantId: string;
+    items: CartItem[];
+    tableNumber: string;
+    kitchenNote: string;
+    paymentMethod: string;
+    total: number;
+    itemCount: number;
+  },
+  client?: DbClient
+): Promise<OrderRow> {
+  if (isCloneSale({ id: order.id, kitchen_note: order.kitchenNote })) {
+    throw new Error('Refusing to persist a station clone as an order');
+  }
+
+  const db = client ?? supabase;
+  const { data, error } = await db
     .from('orders')
     .insert({
       id: order.id,
@@ -70,8 +86,13 @@ export async function createOrder(order: {
   return data;
 }
 
-export async function updateOrderStatus(orderId: string, status: OrderStatus) {
-  const { data, error } = await supabase
+export async function updateOrderStatus(
+  orderId: string,
+  status: OrderStatus,
+  client?: DbClient
+) {
+  const db = client ?? supabase;
+  const { data, error } = await db
     .from('orders')
     .update({ status })
     .eq('id', orderId)
@@ -156,13 +177,13 @@ export async function getTodayOrderStats(restaurantId: string) {
 
   const { data, error } = await supabase
     .from('orders')
-    .select('id, total, status, created_at')
+    .select('id, total, status, created_at, kitchen_note')
     .eq('restaurant_id', restaurantId)
     .gte('created_at', today.toISOString());
 
   if (error) throw error;
 
-  const orders = data ?? [];
+  const orders = (data ?? []).filter((order) => !isCloneSale(order));
   return {
     totalOrders: orders.length,
     activeOrders: orders.filter((o) => ['pending', 'preparing', 'ready'].includes(o.status)).length,

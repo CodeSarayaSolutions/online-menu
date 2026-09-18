@@ -6,7 +6,7 @@ import { Maximize2, Minimize2, Volume2, VolumeX } from "lucide-react";
 import clsx from "clsx";
 import StationOrdersBoard from "@/components/admin/StationOrdersBoard";
 import BarActiveTabs from "@/components/admin/BarActiveTabs";
-import { useOrders } from "@/hooks/useOrders";
+import { useStationBoard } from "@/hooks/useStationBoard";
 import {
   isBarSoundMuted,
   playBarChime,
@@ -16,11 +16,14 @@ import {
 export default function BarStationPage() {
   const params = useParams();
   const venueSlug = typeof params.venue === "string" ? params.venue : "";
-  const { orders, updateStatus, refreshAndReconnect } = useOrders(venueSlug);
+  const { orders, tabs, updateStatus, refreshAndReconnect, error } = useStationBoard(
+    venueSlug,
+    "bar"
+  );
 
   const [muted, setMuted] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
-  const knownIdsRef = useRef<Set<string>>(new Set());
+  const knownSigRef = useRef<Map<string, string>>(new Map());
   const initializedRef = useRef(false);
   const hiddenWhileFullscreenRef = useRef(false);
   const pendingWhileHiddenRef = useRef(0);
@@ -64,28 +67,35 @@ export default function BarStationPage() {
     setBarSoundMuted(next);
   };
 
-  // Play chime when a new pending order arrives
+  // Play chime when a new pending order arrives or a pending ticket grows
   useEffect(() => {
     if (!venueSlug) return;
 
-    if (!initializedRef.current) {
-      orders.forEach((o) => knownIdsRef.current.add(o.id));
-      initializedRef.current = true;
-      return;
-    }
-
+    let shouldChime = false;
     for (const order of orders) {
-      if (!knownIdsRef.current.has(order.id)) {
-        knownIdsRef.current.add(order.id);
+      const sig = `${order.status}:${order.itemCount}:${order.total.toFixed(2)}`;
+      const prev = knownSigRef.current.get(order.id);
+      if (!initializedRef.current) {
+        knownSigRef.current.set(order.id, sig);
+        continue;
+      }
+      if (prev !== sig) {
+        knownSigRef.current.set(order.id, sig);
         if (
           order.status === "pending" &&
           document.visibilityState === "visible" &&
           !muted
         ) {
-          playBarChime();
+          shouldChime = true;
         }
       }
     }
+
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+      return;
+    }
+    if (shouldChime) playBarChime();
   }, [orders, venueSlug, muted]);
 
   // Fullscreen state
@@ -185,8 +195,11 @@ export default function BarStationPage() {
         </div>
       )}
 
+      {error ? (
+        <p className="mb-3 text-sm text-red-600 bg-red-50 rounded-xl px-3 py-2">{error}</p>
+      ) : null}
       <StationOrdersBoard mode="bar" orders={orders} updateStatus={updateStatus} compact />
-      {venueSlug ? <BarActiveTabs restaurantId={venueSlug} /> : null}
+      {venueSlug ? <BarActiveTabs restaurantId={venueSlug} tabs={tabs} /> : null}
 
       {!fullscreen && (
         <button

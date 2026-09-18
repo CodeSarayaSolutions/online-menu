@@ -101,7 +101,8 @@ export function canViewWaiterMode(user: AppUser | null, restaurantId: string): b
     isPlatformAdmin(user) ||
     role === 'owner' ||
     role === 'manager' ||
-    role === 'employee'
+    role === 'employee' ||
+    role === 'bar'
   );
 }
 

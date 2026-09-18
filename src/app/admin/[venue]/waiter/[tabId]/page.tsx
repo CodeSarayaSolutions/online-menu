@@ -11,7 +11,7 @@ import * as tabService from "@/services/tabService";
 import * as authService from "@/services/authService";
 import type { TabWithItems } from "@/services/tabService";
 import type { ProductItem } from "@/types/cms";
-import type { ProductStation } from "@/types/auth";
+import { productStation } from "@/lib/order-stations";
 import clsx from "clsx";
 
 export default function WaiterTabPage() {
@@ -110,13 +110,13 @@ export default function WaiterTabPage() {
     if (!canEdit || !tab) return;
     setBusy(true);
     try {
-      const station = (p.station ?? "bar") as ProductStation;
+      const station = productStation(p);
       await tabService.addItemToTab(tab.id, {
         productId: p.id,
         productName: p.name,
         unitPrice: p.price,
         quantity: 1,
-        station: station === "kitchen" ? "kitchen" : station === "both" ? "both" : "bar",
+        station,
         fireStatus: fireMode,
       });
       await load();

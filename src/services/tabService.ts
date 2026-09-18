@@ -111,8 +111,12 @@ async function recalcTabTotal(tabId: string): Promise<number> {
   return total;
 }
 
-export async function getOpenTabs(restaurantId: string): Promise<OpenTabRow[]> {
-  const { data, error } = await supabase
+export async function getOpenTabs(
+  restaurantId: string,
+  client?: DbClient
+): Promise<OpenTabRow[]> {
+  const db = client ?? supabase;
+  const { data, error } = await db
     .from('table_tabs')
     .select('*')
     .eq('restaurant_id', restaurantId)
@@ -120,7 +124,7 @@ export async function getOpenTabs(restaurantId: string): Promise<OpenTabRow[]> {
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  return attachItemsToTabs(await enrichTabs(data ?? []));
+  return attachItemsToTabs(await enrichTabs(data ?? [], client), client);
 }
 
 export async function getClosedTabs(
@@ -213,7 +217,7 @@ export async function addItemToTab(
         total_price: totalPrice,
         product_name: item.productName,
         station: item.station,
-        ...(fireStatus === 'fired' ? { fired_at: existing.fired_at ?? new Date().toISOString() } : {}),
+        ...(fireStatus === 'fired' ? { fired_at: new Date().toISOString() } : {}),
       })
       .eq('id', existing.id)
       .select()

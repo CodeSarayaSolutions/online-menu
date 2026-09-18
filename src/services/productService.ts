@@ -325,6 +325,7 @@ export async function getFullProduct(productId: string, client?: DbClient): Prom
     price: Number(product.price),
     image: product.image,
     category: product.category,
+    station: product.station ?? 'both',
     popular: product.popular,
     sortOrder: product.sort_order,
     addons: addons.map((a) => ({
@@ -384,6 +385,7 @@ export async function getFullMenu(restaurantId: string, client?: DbClient) {
     price: Number(p.price),
     image: p.image,
     category: p.category,
+    station: p.station ?? 'both',
     popular: p.popular,
     sortOrder: p.sort_order,
     addons: (allAddons ?? [])

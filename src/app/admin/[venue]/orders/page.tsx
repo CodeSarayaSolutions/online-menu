@@ -29,6 +29,7 @@ import { Order, OrderStatus } from "@/types/order";
 import type { OpenTabRow } from "@/services/tabService";
 import { useAuthStore } from "@/store/authStore";
 import clsx from "clsx";
+import { isPersistedGuestOrder } from "@/lib/orders/clones";
 
 type DateRangeKey = "today" | "week" | "custom";
 
@@ -149,7 +150,7 @@ export default function AdminOrdersPage() {
   const params = useParams();
   const venueSlug = typeof params.venue === "string" ? params.venue : "";
   const { orders, updateStatus, removeOrder, clearAllOrders, loading, refresh } =
-    useOrders(venueSlug);
+    useOrders(venueSlug, { feed: "ledger" });
   const users = useAuthStore((s) => s.users);
 
   const [filter, setFilter] = useState<OrderStatus | "all">("all");
@@ -194,9 +195,14 @@ export default function AdminOrdersPage() {
     void loadTabs();
   }, [loadTabs]);
 
+  const guestOrders = useMemo(
+    () => orders.filter(isPersistedGuestOrder),
+    [orders]
+  );
+
   const ordersInRange = useMemo(
-    () => orders.filter((o) => inRange(o.createdAt, rangeFrom, rangeTo)),
-    [orders, rangeFrom, rangeTo]
+    () => guestOrders.filter((o) => inRange(o.createdAt, rangeFrom, rangeTo)),
+    [guestOrders, rangeFrom, rangeTo]
   );
 
   const userNameById = useMemo(
@@ -212,18 +218,23 @@ export default function AdminOrdersPage() {
     [userNameById]
   );
 
+  const qrIncome = useMemo(
+    () => ordersInRange.filter((o) => o.status !== "cancelled"),
+    [ordersInRange]
+  );
+
   const filtered =
     filter === "all"
       ? ordersInRange
       : ordersInRange.filter((o) => o.status === filter);
 
-  const activeCount = orders.filter(
+  const activeCount = guestOrders.filter(
     (o) => o.status === "pending" || o.status === "preparing"
   ).length;
 
   const analytics = useMemo(() => {
     const allSales = [
-      ...ordersInRange.map((o) => ({ total: o.total, items: o.items, at: o.createdAt })),
+      ...qrIncome.map((o) => ({ total: o.total, items: o.items, at: o.createdAt })),
       ...closedTabs.map((t) => ({
         total: Number(t.total),
         items: t.tab_items ?? [],
@@ -231,10 +242,10 @@ export default function AdminOrdersPage() {
       })),
     ];
     const revenue = allSales.reduce((s, x) => s + x.total, 0);
-    const count = ordersInRange.length + closedTabs.length;
+    const count = qrIncome.length + closedTabs.length;
     const avg = count > 0 ? revenue / count : 0;
     const productCounts = new Map<string, number>();
-    for (const o of ordersInRange) {
+    for (const o of qrIncome) {
       for (const item of o.items) {
         const name = item.name;
         productCounts.set(name, (productCounts.get(name) ?? 0) + item.quantity);
@@ -255,12 +266,12 @@ export default function AdminOrdersPage() {
       }
     });
     return { count, revenue, avg, topProduct };
-  }, [ordersInRange, closedTabs]);
+  }, [qrIncome, closedTabs]);
 
   const exportCsv = () => {
     const lines = [
       "type,id,date,table,waiter,payment,total,status",
-      ...ordersInRange.map(
+      ...qrIncome.map(
         (o) =>
           `order,${o.id},${o.createdAt},${o.tableNumber},,,${o.total.toFixed(2)},${o.status}`
       ),

@@ -1,107 +1,128 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Wine, Check } from "lucide-react";
-import * as tabService from "@/services/tabService";
-import type { OpenTabRow } from "@/services/tabService";
+import type { OpenTabRow, TabItemRow } from "@/services/tabService";
+import { isFiredTabItem } from "@/lib/order-stations";
+import {
+  isBarSoundMuted,
+  playBarChime,
+} from "@/lib/bar-notification-sound";
 import clsx from "clsx";
 
 function clearedKey(restaurantId: string) {
   return `bar-cleared-tabs-${restaurantId}`;
 }
 
-function loadCleared(restaurantId: string): Set<string> {
-  if (typeof window === "undefined") return new Set();
+function loadCleared(restaurantId: string): Record<string, string> {
+  if (typeof window === "undefined") return {};
   try {
     const raw = sessionStorage.getItem(clearedKey(restaurantId));
-    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+    if (!raw) return {};
+    const parsed: unknown = JSON.parse(raw);
+    // Old format was a tab-id array and hid the whole ticket forever.
+    if (Array.isArray(parsed) || !parsed || typeof parsed !== "object") {
+      return {};
+    }
+    return parsed as Record<string, string>;
   } catch {
-    return new Set();
+    return {};
   }
 }
 
-function saveCleared(restaurantId: string, ids: Set<string>) {
-  sessionStorage.setItem(clearedKey(restaurantId), JSON.stringify(Array.from(ids)));
+function saveCleared(restaurantId: string, map: Record<string, string>) {
+  sessionStorage.setItem(clearedKey(restaurantId), JSON.stringify(map));
 }
 
-export default function BarActiveTabs({ restaurantId }: { restaurantId: string }) {
-  const [tabs, setTabs] = useState<OpenTabRow[]>([]);
-  const [itemsByTab, setItemsByTab] = useState<Record<string, Awaited<ReturnType<typeof tabService.getTabWithItems>>>>({});
-  const [cleared, setCleared] = useState<Set<string>>(() => loadCleared(restaurantId));
-  const [loading, setLoading] = useState(true);
+function itemFiredAt(item: TabItemRow): number {
+  const raw = item.fired_at || item.created_at;
+  const t = raw ? new Date(raw).getTime() : 0;
+  return Number.isFinite(t) ? t : 0;
+}
 
-  const refresh = useCallback(async () => {
-    try {
-      const open = await tabService.getOpenTabs(restaurantId);
-      setTabs(open);
-      const details: Record<string, Awaited<ReturnType<typeof tabService.getTabWithItems>>> = {};
-      await Promise.all(
-        open.map(async (t) => {
-          details[t.id] = await tabService.getTabWithItems(t.id);
-        })
-      );
-      setItemsByTab(details);
-    } finally {
-      setLoading(false);
-    }
-  }, [restaurantId]);
+function barItemsForTab(tab: OpenTabRow): TabItemRow[] {
+  return (tab.tab_items ?? []).filter(isFiredTabItem);
+}
+
+function tabHasBarWork(tab: OpenTabRow, clearedAt: string | undefined): boolean {
+  const items = barItemsForTab(tab);
+  if (items.length === 0) return false;
+  if (!clearedAt) return true;
+  const clearedMs = new Date(clearedAt).getTime();
+  return items.some((item) => itemFiredAt(item) > clearedMs);
+}
+
+export default function BarActiveTabs({
+  restaurantId,
+  tabs,
+}: {
+  restaurantId: string;
+  tabs: OpenTabRow[];
+}) {
+  const [cleared, setCleared] = useState<Record<string, string>>(() =>
+    loadCleared(restaurantId)
+  );
+  const knownItemIdsRef = useRef<Set<string>>(new Set());
+  const initializedRef = useRef(false);
 
   useEffect(() => {
     setCleared(loadCleared(restaurantId));
-    void refresh();
-  }, [restaurantId, refresh]);
+    initializedRef.current = false;
+    knownItemIdsRef.current = new Set();
+  }, [restaurantId]);
+
+  const barTabs = useMemo(
+    () => tabs.filter((tab) => tabHasBarWork(tab, cleared[tab.id])),
+    [tabs, cleared]
+  );
 
   useEffect(() => {
-    return tabService.subscribeToTabs(restaurantId, {
-      onTabChange: () => void refresh(),
-      onItemChange: () => void refresh(),
-    });
-  }, [restaurantId, refresh]);
+    const visibleItems = barTabs.flatMap((tab) => barItemsForTab(tab));
+    if (!initializedRef.current) {
+      visibleItems.forEach((item) => knownItemIdsRef.current.add(item.id));
+      initializedRef.current = true;
+      return;
+    }
 
-  const barTabs = useMemo(() => {
-    return tabs.filter((tab) => {
-      if (cleared.has(tab.id)) return false;
-      const detail = itemsByTab[tab.id];
-      const items = detail?.tab_items ?? [];
-      return items.some(
-        (i) => i.fire_status === "fired" && (i.station === "bar" || i.station === "both")
-      );
-    });
-  }, [tabs, itemsByTab, cleared]);
+    let newFired = false;
+    for (const item of visibleItems) {
+      if (!knownItemIdsRef.current.has(item.id)) {
+        knownItemIdsRef.current.add(item.id);
+        newFired = true;
+      }
+    }
+    if (
+      newFired &&
+      document.visibilityState === "visible" &&
+      !isBarSoundMuted()
+    ) {
+      playBarChime();
+    }
+  }, [barTabs]);
 
   const markClear = (tabId: string) => {
-    const next = new Set(cleared);
-    next.add(tabId);
+    const next = { ...cleared, [tabId]: new Date().toISOString() };
     setCleared(next);
     saveCleared(restaurantId, next);
   };
-
-  if (loading) {
-    return (
-      <div className="py-8 text-center text-muted adm-text-muted text-sm">Učitavanje kartica…</div>
-    );
-  }
 
   return (
     <section className="mt-8 border-t border adm-border pt-8">
       <div className="flex items-center gap-2 mb-4">
         <Wine size={18} className="text-purple-600" />
-        <h2 className="text-lg font-extrabold text-dark adm-text">Aktivne kartice (bar)</h2>
+        <h2 className="text-lg font-extrabold text-dark adm-text">Aktivne kartice (šank)</h2>
       </div>
       {barTabs.length === 0 ? (
         <div className="text-center adm-surface adm-border border rounded-xl border p-6">
           <p className="text-[10px] font-bold uppercase tracking-wider text-muted adm-text-muted mb-2">
-            Konobar kartice
+            Konobar / šanker kartice
           </p>
-          <p className="text-sm text-muted adm-text-muted">Nema aktivnih kartica za bar.</p>
+          <p className="text-sm text-muted adm-text-muted">Nema aktivnih kartica za šank.</p>
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {barTabs.map((tab) => {
-            const detail = itemsByTab[tab.id];
-            const barItems = (detail?.tab_items ?? []).filter(
-              (i) => i.fire_status === "fired" && (i.station === "bar" || i.station === "both")
-            );
+            const barItems = barItemsForTab(tab);
             const tableLabel = tab.table_label;
 
             return (
@@ -123,6 +144,9 @@ export default function BarActiveTabs({ restaurantId }: { restaurantId: string }
                     <li key={i.id} className="flex justify-between text-dark adm-text">
                       <span>
                         {i.quantity}× {i.product_name}
+                      </span>
+                      <span className="font-semibold shrink-0">
+                        {Number(i.total_price).toFixed(2)}
                       </span>
                     </li>
                   ))}

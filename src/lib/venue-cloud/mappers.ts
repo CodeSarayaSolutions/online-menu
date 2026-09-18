@@ -99,7 +99,7 @@ export function productToRow(p: ProductItem, restaurantId: string): InsertDto<'p
     image: p.image,
     popular: p.popular ?? false,
     sort_order: p.sortOrder ?? 0,
-    station: p.station ?? 'kitchen',
+    station: p.station ?? 'both',
   };
 }
 

@@ -20,6 +20,7 @@ import {
   itemsFoodOnlyOnBar,
   lineTotal,
 } from "@/lib/order-stations";
+import { isViewTicketId } from "@/lib/orders/clones";
 import clsx from "clsx";
 
 type StationMode = "kitchen" | "bar";
@@ -39,6 +40,7 @@ function formatTime(iso: string) {
 }
 
 function paymentBadgeLabel(method: string) {
+  if (method === "tab") return "Konobar";
   if (method === "cash") return "💵 Gotovina";
   if (method === "online" || method === "card") return "💳 Online";
   return null;
@@ -100,16 +102,23 @@ function OrderCard({
   onAdvance: (id: string, status: OrderStatus) => void;
 }) {
   const [showFull, setShowFull] = useState(false);
+  const barItems = itemsForBar(order.items);
+  const kitchenItems = itemsForKitchen(order.items);
+  const foodOnly = itemsFoodOnlyOnBar(order.items);
   const primary =
-    mode === "kitchen" ? itemsForKitchen(order.items) : itemsForBar(order.items);
-  const foodOnly = mode === "bar" ? itemsFoodOnlyOnBar(order.items) : [];
+    mode === "kitchen"
+      ? kitchenItems
+      : barItems.length > 0
+        ? barItems
+        : order.items;
   const hasPrimary = primary.length > 0;
   const next = nextStatus(order.status);
+  const isViewTicket = isViewTicketId(order.id);
   const isBarPending = mode === "bar" && order.status === "pending";
-  const isBarPreparing = mode === "bar" && order.status === "preparing";
+  const isBarPreparing = mode === "bar" && order.status === "preparing" && !isViewTicket;
 
   if (!hasPrimary && mode === "kitchen") return null;
-  if (!hasPrimary && foodOnly.length === 0 && mode === "bar") return null;
+  if (!hasPrimary && mode === "bar") return null;
 
   return (
     <motion.div
@@ -152,7 +161,11 @@ function OrderCard({
             <p className="text-[11px] text-muted adm-text-muted flex items-center gap-1">
               <Clock size={11} />
               {formatTime(order.createdAt)}
-              {isBarPreparing ? (
+              {isViewTicket ? (
+                <span className="ml-1 px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-700 font-bold text-[10px]">
+                  Kartica
+                </span>
+              ) : isBarPreparing ? (
                 <span className="ml-1 px-2 py-0.5 rounded-full bg-primary/15 text-primary font-bold text-[10px]">
                   U pripremi
                 </span>
@@ -162,16 +175,26 @@ function OrderCard({
             </p>
           </div>
         </div>
+        <div className="flex items-center gap-2 shrink-0">
         {mode === "bar" && isBarPending && (
           <button
             type="button"
-            onClick={() => onAdvance(order.id, "preparing")}
+            onClick={() => onAdvance(order.id, isViewTicket ? "served" : "preparing")}
             className="px-4 py-2 rounded-xl text-[12px] font-bold text-white bg-gradient-to-r from-primary to-amber-500 shadow-glow hover:brightness-105 transition"
           >
             Prihvati
           </button>
         )}
-        {mode === "kitchen" && next && (
+        {isViewTicket && (
+          <button
+            type="button"
+            onClick={() => onAdvance(order.id, "served")}
+            className="px-3 py-1.5 rounded-xl text-[11px] font-bold text-white transition bg-purple-600 hover:bg-purple-700"
+          >
+            Jasno
+          </button>
+        )}
+        {mode === "kitchen" && !isViewTicket && next && (
           <button
             type="button"
             onClick={() => onAdvance(order.id, next)}
@@ -180,7 +203,7 @@ function OrderCard({
             Mark {next}
           </button>
         )}
-        {mode === "bar" && isBarPreparing && next && (
+        {mode === "bar" && !isViewTicket && isBarPreparing && next && (
           <button
             type="button"
             onClick={() => onAdvance(order.id, next)}
@@ -189,7 +212,7 @@ function OrderCard({
             Mark {next}
           </button>
         )}
-        {mode === "bar" && !isBarPending && !isBarPreparing && next && (
+        {mode === "bar" && !isViewTicket && !isBarPending && !isBarPreparing && next && (
           <button
             type="button"
             onClick={() => onAdvance(order.id, next)}
@@ -198,12 +221,13 @@ function OrderCard({
             Mark {next}
           </button>
         )}
+        </div>
       </div>
 
       <div className="p-4 space-y-3">
         <ItemLines items={primary} showPrices={mode === "bar"} />
 
-        {mode === "bar" && foodOnly.length > 0 && !showFull && (
+        {mode === "bar" && barItems.length > 0 && foodOnly.length > 0 && !showFull && (
           <button
             type="button"
             onClick={() => setShowFull(true)}
@@ -278,7 +302,7 @@ export default function StationOrdersBoard({
 
   const visible = active.filter((o) => {
     if (mode === "kitchen") return itemsForKitchen(o.items).length > 0;
-    return itemsForBar(o.items).length > 0 || itemsFoodOnlyOnBar(o.items).length > 0;
+    return o.items.length > 0;
   });
 
   const Icon = mode === "kitchen" ? ChefHat : Wine;
@@ -330,16 +354,16 @@ export default function StationOrdersBoard({
       {visible.length === 0 ? (
         <div className="text-center py-16 adm-surface adm-border border rounded-2xl-dashed border adm-border">
           <p className="text-[10px] font-bold uppercase tracking-wider text-muted adm-text-muted mb-2">
-            Online narudžbe
+            Nove narudžbe
           </p>
           <CheckCircle2 size={40} className="mx-auto adm-text-faint mb-3" />
           <p className="text-sm font-semibold text-muted adm-text-muted">
-            {mode === "kitchen" ? "Nema aktivnih narudžbi za kuhinju" : "Nema aktivnih narudžbi za bar"}
+            {mode === "kitchen" ? "Nema aktivnih narudžbi za kuhinju" : "Nema aktivnih narudžbi za šank"}
           </p>
           <p className="text-[12px] text-muted adm-text-muted/70 mt-1">
             {mode === "kitchen"
-              ? "Narudžbe gostiju se pojavljuju ovdje kada uključuju jela."
-              : "Narudžbe gostiju se pojavljuju ovdje kada uključuju pića s bara."}
+              ? "Narudžbe gostiju i konobara se pojavljuju ovdje kada uključuju jela."
+              : "Narudžbe gostiju i šankera pojavljuju se ovdje čim stignu."}
           </p>
         </div>
       ) : (

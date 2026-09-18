@@ -322,7 +322,7 @@ export default function ProductPage() {
       price: product.price + addonsTotal + variationsTotal,
       quantity,
       image: product.image,
-      station: product.station ?? 'kitchen',
+      station: product.station ?? 'both',
       selectedVariations: selectedVarLabels,
       selectedAddons: selectedAddonLabels,
       addonQuantities: selectedAddons,

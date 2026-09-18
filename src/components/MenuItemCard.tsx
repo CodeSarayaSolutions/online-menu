@@ -54,7 +54,7 @@ export default function MenuItemCard({ product, index }: MenuItemCardProps) {
       price: product.price,
       quantity: 1,
       image: product.image,
-      station: product.station ?? 'kitchen',
+      station: product.station ?? 'both',
     });
     setJustAdded(true);
     setTimeout(() => setJustAdded(false), 800);
