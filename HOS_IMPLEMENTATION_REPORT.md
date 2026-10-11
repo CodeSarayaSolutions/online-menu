@@ -1,6 +1,6 @@
 # Hospitality operations system — implementation and verification
 
-Status: implemented in this working tree and tested against isolated synthetic fixtures and, on 11 October 2026, a restored snapshot of the live application schema on the existing self-hosted Supabase instance. **Not deployed to the live `sarayamenu` schema or public application.** `tracking.db` is the maintained per-issue record. This report is a readable snapshot of that record, updated 11 October 2026.
+Status: **deployed to https://menu.saraya.solutions and the live `sarayamenu` schema on 11 October 2026.** Application release `3a26446` includes the user's `7a399c8` push and the verified HTTPS-proxy origin fix. `tracking.db` is the maintained per-issue record. Earlier isolated and production-copy evidence is retained below.
 
 ## What the system now distinguishes
 
@@ -44,7 +44,7 @@ Status: implemented in this working tree and tested against isolated synthetic f
 ## Test evidence
 
 - `npm run build`: passed after final application edits, including type checking and static generation.
-- `npm test`: nine passing checks covering date/time boundaries, DST, route matching, cart/session isolation, expiry, overnight happy hour and duplicate category identity.
+- `npm test`: ten passing checks (including the production reverse-proxy origin regression) covering date/time boundaries, DST, route matching, cart/session isolation, expiry, overnight happy hour and duplicate category identity.
 - `tests/database/`: ten real PostgreSQL rollback suites: operations, configuration, menu, inventory, reporting, shifts, guests, backlog, import retry and injected settlement failure. All passed. Fixtures are rolled back.
 - `tests/http/isolated_api.py`: passed against `next start`, not only development mode. Covers authentication, authorization, bounded reports, QR order/accept/claim, simultaneous settlement with counted stock and immediate session revocation.
 - Final measured fresh report round trips: 81.7, 93.8, 109.5, 88.1, 82.5 ms; warm median about 91 ms. These are small-fixture remote round trips, not a production latency guarantee. Earlier faster measurements exposed stale Next fetch caching and were superseded after fixing it.
@@ -54,22 +54,21 @@ Status: implemented in this working tree and tested against isolated synthetic f
 
 The form uses focused essential questions and clear labels from [GOV.UK question-page guidance](https://design-system.service.gov.uk/patterns/question-pages/), clear save/error feedback from [W3C form notifications](https://www.w3.org/WAI/tutorials/forms/notifications/), and sufficiently sized controls informed by [WCAG target-size guidance](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html). Optional detail stays available without forcing extra steps for every edit. These are general business-form principles, not copies of another hospitality product.
 
-## Production rollout still required — ONM-41
+## Production rollout completed — ONM-41
 
-The migration set is `scripts/hos-001-foundation.sql` through `scripts/hos-011-write-boundaries.sql`. No application data was changed in the live `sarayamenu` schema during this implementation. The test environment was `onm_verification_20261010` on the same self-hosted Supabase instance; Supabase Auth was not introduced.
+The server fetched the user's `7a399c8` push from GitHub. Its old `production` branch at `9e35a14` was reviewed; the tested transactional actions and separate preparation acknowledgements replace those older order-routing/duplicate-sale workarounds. The original checkout and old build were retained.
 
-The temporary REST exposure for the test schema was removed after verification, and the local test server was stopped. The isolated schema remains for follow-up testing. The final `.next` build used the isolated schema: rebuild with production environment for release.
+Release `3a26446` was built on the application server with its existing production environment. A pre-cutover test found that the HTTPS reverse proxy made internal request origins differ from the public site origin. `APP_ORIGIN=https://menu.saraya.solutions` now explicitly configures the allowed browser origin; untrusted forwarded hosts cannot change it. The targeted regression test and server rebuild passed. This fix was pushed to GitHub using the server's working repository authentication.
 
-Deploy application and migrations as one coordinated release. The live-data backup and migration rehearsal below are complete. Take a fresh backup at the actual deployment window to include activity since this snapshot. Apply the numbered migrations in order while old writers are stopped. The grants in 003/011 intentionally reject old client writes, so an old frontend cannot safely remain the active application after those migrations. Invalidate/reload old application/PWA clients during cutover.
+During cutover, the old application was stopped and browser writes frozen. A fresh 27-table/18,526-row snapshot was saved under `.local/backups/sarayamenu-cutover-20261011/`, including original write-grant recovery SQL. All 11 migrations were applied in one transaction. Exact comparison confirmed every original column and row was preserved before the intended credential onboarding changes. No orders, stock movements or payments were invented or corrected.
 
-Prepare temporary PINs for existing accounts that do not already have a valid three-digit PIN, particularly the platform administrator, before switching login. Existing password-only or longer-PIN accounts cannot use the new three-digit screen without that transition. Never put generated production PINs in source or logs. Validate platform/owner/waiter access and one controlled order/settlement after deployment, then monitor the platform incident screen.
+The two existing accounts without PINs received temporary PINs with mandatory onboarding and seven-day expiry. Six existing PIN hashes were preserved exactly. The platform administrator's code and first-login instructions are in the private `.local/administrator-first-login.txt`; the complete operator credential handoff is `.local/release-temporary-pins.json`. Neither file is tracked in Git. Bootstrap reset the other PIN-less account before the issuer account because making the issuer require onboarding immediately removes its operational authority. The initial opposite-order transaction failed and rolled back completely before the successful retry.
 
-Keep historical totals and existing stock as recorded; there is no speculative repair of old Barista transactions. Ambiguous legacy category labels require an explicit category choice. The audit records new activity from rollout onward; it cannot reconstruct missing historical actors.
+PM2 `online-menu` now runs `/www/wwwroot/online-menu-releases/20261011-7a399c8` on port 3017 with code `3a26446`; its saved startup configuration was updated. PM2's startOrRestart retained the old working directory, so only the online-menu process registration was replaced and the correct cwd/script were then verified. Other applications were not restarted. The active config is `/root/onm-release-pm2.config.cjs`. The original `/www/wwwroot/online-menu` checkout is **not** the active release directory; future deployments must build a new release and update this process configuration. Restarting the old application against the new schema is not a valid rollback.
 
-Static printed QR codes remain bearer links: a copied link can create a new short session. The expiry limits an existing session; it does not establish physical presence. Real payments, fiscal-register integrations, ingredient recipes, shared product inventory variants and a new business/location hierarchy are outside this implemented scope.
+Production checks passed: HTTPS login and Barista menu return 200; the browser renders the real menu and three-digit PIN pad; administrator temporary PIN returns mandatory onboarding; the challenge cookie is Secure/HttpOnly and cannot read reports; cross-origin writes return 403; all six existing PINs remain unchanged; the live historical report matches database totals and returns at most 50 headers. No incident rows were recorded during these checks. Screenshot: `.local/live-admin-pin-pad.jpg`. The administrator still needs to choose their own PIN through onboarding. Existing open browser/PWA screens should be refreshed to load the release.
 
-Audit rows cannot be updated/deleted/truncated through application roles. A database superuser remains the ultimate trust boundary; database administrator controls and backups are necessary for protection against that level of access.
-
+The prior full order/settlement and injected-failure tests passed in isolated schemas and against the migrated production copy. Post-deployment verification did not place or settle a fake bill in Barista. Keep historical totals and stock as recorded. The new audit starts at rollout; it cannot reconstruct missing historical actors. Static QR links remain bearer links. Payment processing, fiscal integration, ingredient recipes, shared variant inventory and a new business/location hierarchy remain outside this scope. Database superusers remain the ultimate audit trust boundary.
 
 ## Live-data backup and migration rehearsal — 11 October 2026
 
@@ -83,4 +82,4 @@ The second fresh restore, `onm_rehearsal_20261011_2`, passed all 11 corrected mi
 
 Evidence: `rehearsal-2/migration-results.json`, `regression-results.json`, `post-migration-verification.json` and `historical-report-verification.json` inside the private backup directory. Migration hashes are recorded. Copy schemas have no browser-role schema access and were never added to the REST exposed-schema list. No live application records, credentials or schema were changed. The snapshot and both rehearsal schemas are retained; temporary SQL-upload schemas were removed transactionally.
 
-Deployment steps 2–5 remain: commit/push and server build, coordinated live migrations, existing-account PIN transition, then restart/client refresh and production checks. The live-copy rehearsal is complete; ONM-41 remains in progress for those release steps.
+This rehearsal was followed by the completed production rollout documented above.
