@@ -2,6 +2,7 @@ import 'server-only';
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import type { Json } from '@/types/supabase';
+import { isSameOrigin } from '@/lib/request-origin';
 
 export async function runAction(actorId: string, action: string, venue: string, data: Record<string, Json | undefined>) {
   const { data: result, error } = await supabaseAdmin.rpc('hos_action', {
@@ -25,6 +26,5 @@ export async function actionFailure(error: unknown, action: string, actorId?: st
 }
 
 export function sameOrigin(request: Request): boolean {
-  const origin = request.headers.get('origin');
-  return !origin || origin === new URL(request.url).origin;
+  return isSameOrigin(request, process.env.APP_ORIGIN);
 }
