@@ -28,14 +28,13 @@ function isMissingOptionMetadataColumn(error: unknown): boolean {
 
 export async function getCategories(restaurantId: string, client?: DbClient): Promise<CategoryRow[]> {
   const db = client ?? supabase;
-  const { data, error } = await db
-    .from('categories')
-    .select('*')
-    .eq('restaurant_id', restaurantId)
-    .order('sort_order', { ascending: true });
-
-  if (error) throw error;
-  return data ?? [];
+  const rows: CategoryRow[] = [];
+  for (let offset = 0; ; offset += 500) {
+    const { data, error } = await db.from('categories').select('*').eq('restaurant_id', restaurantId)
+      .order('sort_order').order('id').range(offset, offset + 499);
+    if (error) throw error;
+    rows.push(...(data ?? [])); if (!data || data.length < 500) return rows;
+  }
 }
 
 export async function upsertCategory(category: InsertDto<'categories'>, client?: DbClient) {
@@ -82,14 +81,13 @@ export async function reorderCategories(
 
 export async function getProducts(restaurantId: string, client?: DbClient): Promise<ProductRow[]> {
   const db = client ?? supabase;
-  const { data, error } = await db
-    .from('products')
-    .select('*')
-    .eq('restaurant_id', restaurantId)
-    .order('sort_order', { ascending: true });
-
-  if (error) throw error;
-  return data ?? [];
+  const rows: ProductRow[] = [];
+  for (let offset = 0; ; offset += 500) {
+    const { data, error } = await db.from('products').select('*').eq('restaurant_id', restaurantId)
+      .order('sort_order').order('id').range(offset, offset + 499);
+    if (error) throw error;
+    rows.push(...(data ?? [])); if (!data || data.length < 500) return rows;
+  }
 }
 
 export async function getProductById(productId: string, client?: DbClient): Promise<ProductRow | null> {
@@ -325,6 +323,8 @@ export async function getFullProduct(productId: string, client?: DbClient): Prom
     price: Number(product.price),
     image: product.image,
     category: product.category,
+    categoryId: product.category_id ?? undefined,
+    station: product.station,
     popular: product.popular,
     sortOrder: product.sort_order,
     addons: addons.map((a) => ({
@@ -359,20 +359,23 @@ export async function getFullMenu(restaurantId: string, client?: DbClient) {
 
   const productIds = products.map((p) => p.id);
 
-  const { data: allAddons } = await db
-    .from('addons')
-    .select('*')
-    .in('product_id', productIds);
-
-  const { data: allVariations } = await db
-    .from('variations')
-    .select('*')
-    .in('product_id', productIds);
-
-  const variationIds = (allVariations ?? []).map((v) => v.id);
-  const { data: allOptions } = variationIds.length
-    ? await db.from('variation_options').select('*').in('variation_id', variationIds)
-    : { data: [] };
+  // Bounded ID batches avoid oversized URLs; every relation is fully paged.
+  async function relatedRows<T extends 'addons' | 'variations' | 'variation_options'>(table: T, column: string, ids: string[]): Promise<Tables<T>[]> {
+    const rows: Tables<T>[] = [];
+    for (let batch = 0; batch < ids.length; batch += 100) {
+      for (let offset = 0; ; offset += 500) {
+        const { data, error } = await db.from(table as 'addons' | 'variations' | 'variation_options').select('*').in(column, ids.slice(batch, batch + 100)).order('id').range(offset, offset + 499);
+        if (error) throw error;
+        rows.push(...(data ?? []) as unknown as Tables<T>[]);
+        if (!data || data.length < 500) break;
+      }
+    }
+    return rows;
+  }
+  const [allAddons, allVariations] = await Promise.all([
+    relatedRows('addons', 'product_id', productIds), relatedRows('variations', 'product_id', productIds),
+  ]);
+  const allOptions = await relatedRows('variation_options', 'variation_id', allVariations.map(v => v.id));
 
   const fullProducts: ProductItem[] = products.map((p) => ({
     id: p.id,
@@ -383,7 +386,9 @@ export async function getFullMenu(restaurantId: string, client?: DbClient) {
     description_bs: p.description_bs ?? undefined,
     price: Number(p.price),
     image: p.image,
-    category: p.category,
+    category: categories.find(c => c.id === (p.category_id ?? p.category))?.label ?? p.category,
+    categoryId: p.category_id ?? categories.find(c => c.id === p.category || c.label === p.category)?.id,
+    station: p.station,
     popular: p.popular,
     sortOrder: p.sort_order,
     addons: (allAddons ?? [])

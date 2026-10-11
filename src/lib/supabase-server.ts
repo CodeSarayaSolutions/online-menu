@@ -1,3 +1,4 @@
+import 'server-only';
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/supabase';
 import { supabasePostgrestSchema } from '@/lib/supabase-schema';
@@ -21,6 +22,9 @@ if (!supabaseUrl || !supabaseServiceKey) {
 }
 
 export const supabaseAdmin = createClient<Database, 'sarayamenu'>(supabaseUrl, supabaseServiceKey, {
+  // Next.js can cache Supabase's internal fetch even inside a dynamic route.
+  // Operational reads and session/role checks must always reach PostgreSQL.
+  global: { fetch: (input, init) => fetch(input, { ...init, cache: 'no-store' }) },
   db: { schema: supabasePostgrestSchema as 'sarayamenu' },
   auth: {
     autoRefreshToken: false,

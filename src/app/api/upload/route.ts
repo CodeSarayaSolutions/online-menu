@@ -1,3 +1,4 @@
+import { actionFailure, sameOrigin } from '@/lib/hos-server';
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { getSessionUserFromRequest } from '@/lib/auth/require-session';
@@ -14,6 +15,7 @@ const PLACEMENTS = new Set<ImagePlacement>([
 ]);
 
 export async function POST(request: Request) {
+  if (!sameOrigin(request)) return NextResponse.json({}, { status: 403 });
   const user = await getSessionUserFromRequest(request);
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -40,20 +42,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid placement' }, { status: 400 });
   }
 
-  const objectPath = buildStorageObjectPath(restaurantId, placement, file.name || 'upload.bin');
-  const buffer = Buffer.from(await file.arrayBuffer());
-
-  const { error } = await supabaseAdmin.storage.from(STORAGE_BUCKET).upload(objectPath, buffer, {
-    contentType: file.type || 'application/octet-stream',
-    upsert: true,
-  });
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  return NextResponse.json({
-    path: objectPath,
-    url: publicStorageUrl(objectPath),
-  });
+  try {
+    const { data: role, error: roleError } = await supabaseAdmin.rpc('hos_role', { p_actor: user.id, p_venue: restaurantId });
+    if (roleError) throw roleError;
+    if (!['admin', 'owner', 'manager'].includes(role ?? '')) return NextResponse.json({}, { status: 403 });
+    const allowedTypes = placement === 'video' ? ['video/mp4', 'video/webm'] : ['image/jpeg','image/png','image/webp','image/gif','image/avif'];
+    if (!allowedTypes.includes(file.type) || file.size > (placement === 'video' ? 50 : 10) * 1024 * 1024) return NextResponse.json({ error: 'Odaberite podržanu sliku ili manji fajl.' }, { status: 400 });
+    // Unique object names prevent an image edit from overwriting a file used by other products.
+    const objectPath = buildStorageObjectPath(restaurantId, placement, `${crypto.randomUUID()}-${file.name}`);
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const { error } = await supabaseAdmin.storage.from(STORAGE_BUCKET).upload(objectPath, buffer, { contentType: file.type, upsert: false });
+    if (error) throw error;
+    const {error:auditError}=await supabaseAdmin.rpc('hos_action',{p_actor_id:user.id,p_action:'media.upload',p_venue:restaurantId,p_data:{path:objectPath,bytes:file.size,placement}});
+    if(auditError)throw auditError;
+    return NextResponse.json({ path: objectPath, url: publicStorageUrl(objectPath) });
+  } catch (error) { return actionFailure(error,'media.upload',user.id,restaurantId); }
 }

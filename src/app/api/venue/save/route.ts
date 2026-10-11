@@ -1,32 +1,17 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { getSessionUserFromRequest } from '@/lib/auth/require-session';
-import type { RestaurantData } from '@/store/cmsStore';
-import { saveVenueToCloud } from '@/lib/venue-cloud/sync';
-
+import { actionFailure, sameOrigin } from '@/lib/hos-server';
 export async function POST(request: Request) {
+  if (!sameOrigin(request)) return NextResponse.json({}, { status: 403 });
   const user = await getSessionUserFromRequest(request);
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  let body: { slug?: string; data?: RestaurantData };
+  if (!user) return NextResponse.json({}, { status: 401 });
+  let slug = '';
   try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
-
-  const { slug, data } = body;
-  if (!slug || !data) {
-    return NextResponse.json({ error: 'slug and data are required' }, { status: 400 });
-  }
-
-  try {
-    await saveVenueToCloud(slug, data, supabaseAdmin);
-    return NextResponse.json({ ok: true }, { status: 200 });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Save failed';
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
+    const body = await request.json(); slug = body.slug;
+    if (typeof slug !== 'string' || !slug || !body.patch || typeof body.patch !== 'object' || !body.requestKey) return NextResponse.json({}, { status: 400 });
+    const { data, error } = await supabaseAdmin.rpc('hos_menu_save', { p_actor: user.id, p_venue: slug, p_revision: body.revision, p_patch: body.patch, p_request_key: body.requestKey });
+    if (error) throw error;
+    return NextResponse.json(data);
+  } catch (error) { return actionFailure(error, 'menu.save', user.id, slug); }
 }

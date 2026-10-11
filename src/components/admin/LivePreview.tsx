@@ -1,5 +1,6 @@
 "use client";
 
+import { useUiText } from "@/hooks/useUiText";
 import { useEffect, useRef, useState } from "react";
 import { Smartphone, Monitor, RotateCw, Maximize2, Minimize2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -16,6 +17,7 @@ interface LivePreviewProps {
 }
 
 export default function LivePreview({ pageContent, componentStyles, layoutConfig, venueSlug }: LivePreviewProps) {
+  const uiText = useUiText();
   // Always resolve the active venue – use prop if provided, otherwise fall back to authStore
   const activeRestaurantId = useAuthStore((s) => s.activeRestaurantId);
   const resolvedSlug = venueSlug || activeRestaurantId || null;
@@ -113,8 +115,8 @@ export default function LivePreview({ pageContent, componentStyles, layoutConfig
             <Smartphone size={13} className="text-white" />
           </div>
           <div>
-            <p className="text-xs font-extrabold text-dark adm-text leading-tight">Live Preview</p>
-            <p className="text-[10px] text-muted adm-text-muted">Changes appear instantly</p>
+            <p className="text-xs font-extrabold text-dark adm-text leading-tight">{uiText("Live Preview")}</p>
+            <p className="text-[10px] text-muted adm-text-muted">{uiText("Changes appear instantly")}</p>
           </div>
         </div>
 
@@ -128,7 +130,7 @@ export default function LivePreview({ pageContent, componentStyles, layoutConfig
                 ? "bg-primary/10 text-primary"
                 : "text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)]"
             )}
-            title="Phone view"
+            title={uiText("Phone view")}
           >
             <Smartphone size={14} />
           </button>
@@ -140,7 +142,7 @@ export default function LivePreview({ pageContent, componentStyles, layoutConfig
                 ? "bg-primary/10 text-primary"
                 : "text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)]"
             )}
-            title="Tablet view"
+            title={uiText("Tablet view")}
           >
             <Monitor size={14} />
           </button>
@@ -154,7 +156,7 @@ export default function LivePreview({ pageContent, componentStyles, layoutConfig
               }
             }}
             className="p-1.5 rounded-lg text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)] transition-all ml-1"
-            title="Refresh preview"
+            title={uiText("Refresh preview")}
           >
             <RotateCw size={14} />
           </button>
@@ -183,7 +185,7 @@ export default function LivePreview({ pageContent, componentStyles, layoutConfig
                 <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center animate-pulse">
                   <Smartphone size={18} className="text-primary" />
                 </div>
-                <p className="text-xs font-semibold text-muted adm-text-muted">Loading preview…</p>
+                <p className="text-xs font-semibold text-muted adm-text-muted">{uiText("Loading preview…")}</p>
               </div>
             </motion.div>
           )}
@@ -235,7 +237,7 @@ export default function LivePreview({ pageContent, componentStyles, layoutConfig
                   width: deviceWidth,
                   height: deviceHeight,
                 }}
-                title="Live Menu Preview"
+                title={uiText("Live Menu Preview")}
               />
             </div>
 

@@ -19,7 +19,8 @@ export async function getSessionUserFromRequest(
   const tokenHash = hashSessionToken(token);
   const { data: session } = await supabaseAdmin
     .from('sessions')
-    .select('user_id, expires_at')
+    .select('user_id, expires_at, credential_version')
+    .eq('purpose', 'full')
     .eq('token_hash', tokenHash)
     .gt('expires_at', new Date().toISOString())
     .maybeSingle();
@@ -28,9 +29,10 @@ export async function getSessionUserFromRequest(
 
   const { data: user } = await supabaseAdmin
     .from('users')
-    .select(USER_PUBLIC_COLUMNS)
+    .select(`${USER_PUBLIC_COLUMNS}, credential_version, onboarding_required`)
     .eq('id', session.user_id)
     .maybeSingle();
 
-  return user as SessionUser | null;
+  if (!user || user.onboarding_required || user.credential_version !== session.credential_version) return null;
+  return { id: user.id, email: user.email, name: user.name, platform_role: user.platform_role };
 }

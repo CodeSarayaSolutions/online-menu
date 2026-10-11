@@ -2,6 +2,7 @@
 
 import { CartItem as CartItemType } from "@/types/cart";
 import { useCartStore } from "@/store/cartStore";
+import { useTranslation } from "@/hooks/useTranslation";
 import { useCmsData } from "@/hooks/useCmsData";
 import { Trash2, Minus, Plus } from "lucide-react";
 import { motion } from "framer-motion";
@@ -13,6 +14,7 @@ interface OrderItemProps {
 }
 
 export default function OrderItem({ item, index = 0 }: OrderItemProps) {
+  const {text}=useTranslation();
   const updateQuantity = useCartStore((s) => s.updateQuantity);
   const removeItem = useCartStore((s) => s.removeItem);
   const { pageContent, componentStyles: cs } = useCmsData();
@@ -136,7 +138,7 @@ export default function OrderItem({ item, index = 0 }: OrderItemProps) {
             {/* Per-item price when qty > 1 */}
             {item.quantity > 1 && (
               <span className="text-[11px] ml-2" style={{ color: cardMuted }}>
-                {item.price.toFixed(2)} {pageContent.currencySymbol} each
+                {item.price.toFixed(2)} {pageContent.currencySymbol} {text("po komadu","each")}
               </span>
             )}
           </div>

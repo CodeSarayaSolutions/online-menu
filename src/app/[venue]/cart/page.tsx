@@ -20,7 +20,7 @@ export default function CartPage() {
   const getItemCount = useCartStore((s) => s.getItemCount);
   const clearCart = useCartStore((s) => s.clearCart);
   const { pageContent, componentStyles: cs } = useCmsData();
-  const { t } = useTranslation();
+  const { text, t } = useTranslation();
 
   // Redirect to menu in view-only mode
   useEffect(() => {
@@ -68,8 +68,8 @@ export default function CartPage() {
             <h1 className="text-xl md:text-2xl lg:text-3xl font-extrabold" style={{ color: titleColor }}>{t(pageContent, "cartTitle")}</h1>
             <p className="text-[11px] md:text-xs font-medium mt-0.5" style={{ color: cardMuted }}>
               {count > 0
-                ? `${count} item${count !== 1 ? "s" : ""} in your order`
-                : "Your order is empty"}
+                ? `${count} ${text("stavki u narudžbi","items in your order")}`
+                : text("Vaša narudžba je prazna","Your order is empty")}
             </p>
           </div>
           {items.length > 0 && (
@@ -130,7 +130,7 @@ export default function CartPage() {
               <div className="px-4 md:px-6 lg:px-0 mt-4 space-y-3 md:space-y-4">
                 <AnimatePresence mode="popLayout">
                   {items.map((item, i) => (
-                    <OrderItem key={item.id} item={item} index={i} />
+                    <OrderItem key={item.cartKey || item.id} item={item} index={i} />
                   ))}
                 </AnimatePresence>
               </div>
@@ -165,7 +165,7 @@ export default function CartPage() {
                   {/* Item breakdown */}
                   <div className="space-y-2">
                     {items.map((item) => (
-                      <div key={item.id} className="flex justify-between text-sm">
+                      <div key={item.cartKey || item.id} className="flex justify-between text-sm">
                         <span style={{ color: cardMuted }}>
                           {item.quantity}× {item.name}
                         </span>
@@ -181,7 +181,7 @@ export default function CartPage() {
 
                   {/* Subtotal */}
                   <div className="flex justify-between text-sm">
-                    <span style={{ color: cardMuted }}>Subtotal ({count} items)</span>
+                    <span style={{ color: cardMuted }}>{text("Iznos (","Subtotal (")}{count} {text("stavki)","items)")}</span>
                     <span className="font-semibold" style={{ color: titleColor }}>{total.toFixed(2)} {pageContent.currencySymbol}</span>
                   </div>
 
@@ -195,7 +195,7 @@ export default function CartPage() {
 
                   {/* Total */}
                   <div className="mt-4 flex justify-between items-baseline">
-                    <span className="text-base md:text-lg font-extrabold" style={{ color: titleColor }}>Total</span>
+                    <span className="text-base md:text-lg font-extrabold" style={{ color: titleColor }}>{text("Ukupno","Total")}</span>
                     <span className="text-2xl md:text-3xl font-extrabold" style={{ color: accent }}>
                       {total.toFixed(2)} {pageContent.currencySymbol}
                     </span>

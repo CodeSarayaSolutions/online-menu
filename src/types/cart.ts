@@ -1,4 +1,6 @@
 export interface SelectedVariation {
+  variationId?: string;
+  optionId?: string;
   variationName: string;
   optionLabel: string;
   priceAdjustment: number;

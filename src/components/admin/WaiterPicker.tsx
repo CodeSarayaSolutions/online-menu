@@ -1,5 +1,6 @@
 "use client";
 
+import { useUiText } from "@/hooks/useUiText";
 import { useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import PinPad from "@/components/admin/PinPad";
@@ -29,6 +30,7 @@ function avatarColor(name: string) {
 }
 
 export default function WaiterPicker({ venueSlug, users, onLogin }: Props) {
+  const uiText = useUiText();
   const [selectedUser, setSelectedUser] = useState<AppUser | null>(null);
   const [pinMode, setPinMode] = useState<PinMode>("verify");
   const [pinError, setPinError] = useState<string | null>(null);
@@ -128,8 +130,8 @@ export default function WaiterPicker({ venueSlug, users, onLogin }: Props) {
   if (!selectedUser) {
     return (
       <div className="min-h-[calc(100vh-64px)] adm-bg flex flex-col items-center px-4 py-10">
-        <h1 className="text-2xl font-extrabold text-dark adm-text text-center">Ko si ti?</h1>
-        <p className="text-sm text-muted adm-text-muted mt-2 mb-8">Odaberi svoje ime</p>
+        <h1 className="text-2xl font-extrabold text-dark adm-text text-center">{uiText("Ko si ti?")}</h1>
+        <p className="text-sm text-muted adm-text-muted mt-2 mb-8">{uiText("Odaberi svoje ime")}</p>
         <div className="grid grid-cols-2 gap-3 w-full max-w-md">
           {sortedUsers.map((user) => (
             <button
@@ -161,7 +163,7 @@ export default function WaiterPicker({ venueSlug, users, onLogin }: Props) {
           ))}
         </div>
         {sortedUsers.length === 0 && (
-          <p className="text-sm text-muted adm-text-muted">Nema korisnika za prikaz.</p>
+          <p className="text-sm text-muted adm-text-muted">{uiText("Nema korisnika za prikaz.")}</p>
         )}
       </div>
     );
@@ -174,7 +176,7 @@ export default function WaiterPicker({ venueSlug, users, onLogin }: Props) {
         onClick={goBack}
         className="flex items-center gap-2 text-sm font-semibold text-muted adm-text-muted mb-6 min-h-[44px]"
       >
-        <ArrowLeft size={20} /> Nazad
+        <ArrowLeft size={20} /> {uiText("Nazad")}
       </button>
 
       <div className="flex flex-col items-center mb-6">
@@ -192,7 +194,7 @@ export default function WaiterPicker({ venueSlug, users, onLogin }: Props) {
         )}
         <h2 className="text-xl font-extrabold text-dark adm-text">{selectedUser.name}</h2>
         <p className="text-sm text-muted adm-text-muted mt-1">
-          {pinMode === "set" ? "Postavite vaš PIN" : "Unesite PIN"}
+          {pinMode === "set" ? uiText("Postavite vaš PIN") : uiText("Unesite PIN")}
         </p>
       </div>
 

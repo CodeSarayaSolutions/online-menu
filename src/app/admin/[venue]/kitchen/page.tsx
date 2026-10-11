@@ -1,15 +1,14 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import StationOrdersBoard from "@/components/admin/StationOrdersBoard";
-import { useOrders } from "@/hooks/useOrders";
+import BarActiveTabs from "@/components/admin/BarActiveTabs";
+import { useCmsStore } from "@/store/cmsStore";
 
 export default function KitchenStationPage() {
   const params = useParams();
   const venueSlug = typeof params.venue === "string" ? params.venue : "";
-  const { orders, updateStatus } = useOrders(venueSlug);
 
-  return (
-    <StationOrdersBoard mode="kitchen" orders={orders} updateStatus={updateStatus} compact />
-  );
+  const enabled = useCmsStore(s => s.allRestaurants[venueSlug]?.restaurant.kitchenEnabled ?? false);
+  if (!enabled) return null;
+  return <BarActiveTabs restaurantId={venueSlug} station="kitchen" />;
 }

@@ -8,7 +8,7 @@ export const ADMIN_PANEL_TITLE = 'Upravljanje restoranom';
 export const ADMIN_PANEL_TAGLINE = 'Poslovni panel restorana';
 
 export const LOGIN_EMAIL_SUBTITLE =
-  'Unesite email — zatim lozinka ili pozivni kod';
+  'Unesite email, zatim svoj trocifreni PIN';
 
 export function venueLoginTitle(venueName: string): string {
   return `Prijava — ${venueName}`;

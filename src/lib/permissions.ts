@@ -57,27 +57,15 @@ export function canManageVenueCms(user: AppUser | null, restaurantId: string): b
 
 export function canManageVenueStaff(user: AppUser | null, restaurantId: string): boolean {
   const role = getRestaurantRole(user, restaurantId);
-  return role === 'owner' || isPlatformAdmin(user);
+  return role === 'owner' || role === 'manager' || isPlatformAdmin(user);
 }
 
 export function canViewKitchenStation(user: AppUser | null, restaurantId: string): boolean {
-  const role = getRestaurantRole(user, restaurantId);
-  return (
-    isPlatformAdmin(user) ||
-    role === 'owner' ||
-    role === 'manager' ||
-    role === 'kitchen'
-  );
+  return isPlatformAdmin(user) || getRestaurantRole(user, restaurantId) === 'kitchen';
 }
-
 export function canViewBarStation(user: AppUser | null, restaurantId: string): boolean {
   const role = getRestaurantRole(user, restaurantId);
-  return (
-    isPlatformAdmin(user) ||
-    role === 'owner' ||
-    role === 'manager' ||
-    role === 'bar'
-  );
+  return isPlatformAdmin(user) || role === 'owner' || role === 'bar';
 }
 
 export function canViewOrdersList(user: AppUser | null, restaurantId: string): boolean {
@@ -107,7 +95,7 @@ export function canViewWaiterMode(user: AppUser | null, restaurantId: string): b
 
 export function canManageInventory(user: AppUser | null, restaurantId: string): boolean {
   const role = getRestaurantRole(user, restaurantId);
-  return isPlatformAdmin(user) || role === 'owner';
+  return isPlatformAdmin(user) || role === 'owner' || role === 'manager';
 }
 
 /** Shift scheduling — manager + owner */
@@ -175,9 +163,9 @@ export function restaurantRoleLabel(role: RestaurantRole): string {
   const labels: Record<RestaurantRole, string> = {
     owner: 'Owner',
     manager: 'Manager',
-    kitchen: 'Kitchen',
-    bar: 'Bar',
-    employee: 'Staff',
+    kitchen: 'Kitchen staff',
+    bar: 'Bar staff',
+    employee: 'Waiter',
   };
   return labels[role];
 }

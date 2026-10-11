@@ -1,3 +1,4 @@
+import { performAction } from './actionService';
 // ─── Restaurant Service ──────────────────────────────────
 // Replaces: cmsStore's allRestaurants CRUD + flat field management
 // Handles: Restaurant info, page content, styles, layout, themes
@@ -69,10 +70,8 @@ export async function updateRestaurant(
   return data;
 }
 
-export async function deleteRestaurant(slug: string, client?: DbClient) {
-  const db = client ?? supabase;
-  const { error } = await db.from('restaurants').delete().eq('id', slug);
-  if (error) throw error;
+export async function deleteRestaurant(slug: string) {
+  await performAction('venue.delete', slug, {});
 }
 
 // ─── Page Content (JSONB) ────────────────────────────────

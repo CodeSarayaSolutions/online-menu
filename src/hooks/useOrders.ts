@@ -29,6 +29,8 @@ export function useOrders(restaurantId: string | null) {
     }
   }, [restaurantId, subscriptionKey]);
 
+  useEffect(()=>{const timer=setInterval(()=>{if(!document.hidden)void refresh();},15000);return()=>clearInterval(timer);},[refresh]);
+
   const reconnect = useCallback(() => {
     setSubscriptionKey((key) => key + 1);
   }, []);
@@ -48,34 +50,17 @@ export function useOrders(restaurantId: string | null) {
     return orderService.subscribeToOrders(restaurantId, {
       onInsert: (row) =>
         setOrders((prev) => {
+          if(row.status!=="pending")return prev;
           const next = orderRowToOrder(row);
           if (prev.some((o) => o.id === next.id)) return prev;
           return [next, ...prev];
         }),
       onUpdate: (row) =>
         setOrders((prev) =>
-          prev.map((o) => (o.id === row.id ? orderRowToOrder(row) : o))
+          prev.map((o) => (o.id === row.id ? orderRowToOrder(row) : o)).filter(o=>o.status==="pending")
         ),
       onDelete: ({ id }) => setOrders((prev) => prev.filter((o) => o.id !== id)),
     });
-  }, [restaurantId]);
-
-  const updateStatus = useCallback(async (orderId: string, status: OrderStatus) => {
-    await orderService.updateOrderStatus(orderId, status);
-    setOrders((prev) =>
-      prev.map((o) => (o.id === orderId ? { ...o, status } : o))
-    );
-  }, []);
-
-  const removeOrder = useCallback(async (orderId: string) => {
-    await orderService.deleteOrder(orderId);
-    setOrders((prev) => prev.filter((o) => o.id !== orderId));
-  }, []);
-
-  const clearAllOrders = useCallback(async () => {
-    if (!restaurantId) return;
-    await orderService.clearAllOrders(restaurantId);
-    setOrders([]);
   }, [restaurantId]);
 
   return {
@@ -85,8 +70,6 @@ export function useOrders(restaurantId: string | null) {
     refresh,
     reconnect,
     refreshAndReconnect,
-    updateStatus,
-    removeOrder,
-    clearAllOrders,
+
   };
 }

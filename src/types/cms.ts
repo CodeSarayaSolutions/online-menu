@@ -11,6 +11,9 @@
 export type AppLanguage = 'en' | 'bs';
 
 export interface RestaurantInfo {
+  language?: AppLanguage;
+  timezone?: string;
+  kitchenEnabled?: boolean;
   name: string;
   name_bs?: string;
   tagline: string;
@@ -70,6 +73,8 @@ export interface Variation {
 }
 
 export interface ProductItem {
+  /** Creation-only stock instruction; never resets existing inventory. */
+  initialInventory?: { tracked: boolean; quantity: number };
   id: string;
   restaurantId: string;
   name: string;
@@ -82,6 +87,7 @@ export interface ProductItem {
   happyHourLabel?: string;
   image: string;
   category: string;
+  categoryId?: string;
   station?: 'kitchen' | 'bar' | 'both';
   addons?: Addon[];
   variations?: Variation[];

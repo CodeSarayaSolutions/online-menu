@@ -1,5 +1,6 @@
 "use client";
 
+import { useUiText } from "@/hooks/useUiText";
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -12,6 +13,7 @@ import clsx from "clsx";
 type TableRow = Tables<"restaurant_tables">;
 
 export default function TablesPage() {
+  const uiText = useUiText();
   const params = useParams();
   const venueSlug = typeof params.venue === "string" ? params.venue : "";
 
@@ -34,7 +36,7 @@ export default function TablesPage() {
       setTables(rows.filter((t) => t.is_active));
       setError("");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Učitavanje stolova nije uspjelo");
+      setError(uiText("Žao nam je, nešto nije uspjelo. Pokušajte ponovo."));
     } finally {
       setLoading(false);
     }
@@ -63,7 +65,7 @@ export default function TablesPage() {
       setNewCapacity(4);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Kreiranje nije uspjelo");
+      setError(uiText("Žao nam je, nešto nije uspjelo. Pokušajte ponovo."));
     }
   };
 
@@ -83,7 +85,7 @@ export default function TablesPage() {
       setEditingId(null);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Spremanje nije uspjelo");
+      setError(uiText("Žao nam je, nešto nije uspjelo. Pokušajte ponovo."));
     }
   };
 
@@ -93,7 +95,7 @@ export default function TablesPage() {
       await tableService.deleteTable(id);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Brisanje nije uspjelo");
+      setError(uiText("Žao nam je, nešto nije uspjelo. Pokušajte ponovo."));
     }
   };
 
@@ -101,9 +103,9 @@ export default function TablesPage() {
     <div className="p-5 lg:p-8 max-w-[1100px]">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-extrabold text-dark adm-text tracking-tight">Stolovi</h1>
+          <h1 className="text-2xl font-extrabold text-dark adm-text tracking-tight">{uiText("Stolovi")}</h1>
           <p className="text-sm text-muted adm-text-muted mt-1">
-            {tables.length} aktivnih stolova · raspored za konobare
+            {tables.length} {uiText("aktivnih stolova · raspored za konobare")}
           </p>
         </div>
         <button
@@ -114,7 +116,7 @@ export default function TablesPage() {
           }}
           className="flex items-center gap-2 bg-gradient-to-r from-primary to-amber-500 text-white px-5 py-2.5 rounded-2xl text-sm font-bold shadow-glow hover:brightness-105 transition"
         >
-          <Plus size={16} /> Novi stol
+          <Plus size={16} /> {uiText("Novi stol")}
         </button>
       </div>
 
@@ -131,8 +133,8 @@ export default function TablesPage() {
       ) : tables.length === 0 ? (
         <div className="adm-surface adm-border border rounded-2xl adm-border shadow-soft p-16 text-center">
           <LayoutGrid size={40} className="text-primary/30 mx-auto mb-4" />
-          <p className="font-semibold text-dark adm-text">Nema stolova</p>
-          <p className="text-sm text-muted adm-text-muted mt-1">Dodajte prvi stol za konobarski rad</p>
+          <p className="font-semibold text-dark adm-text">{uiText("Nema stolova")}</p>
+          <p className="text-sm text-muted adm-text-muted mt-1">{uiText("Dodajte prvi stol za konobarski rad")}</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -149,7 +151,7 @@ export default function TablesPage() {
                     className="w-full px-3 py-2 rounded-xl border border-primary/20 text-sm font-bold text-center"
                   />
                   <p className="text-[10px] text-muted adm-text-muted text-center -mt-1">
-                    Mora biti jedinstveno (npr. Stol 1, Terasa A)
+                    {uiText("Mora biti jedinstveno (npr. Stol 1, Terasa A)")}
                   </p>
                   <input
                     type="number"
@@ -164,14 +166,14 @@ export default function TablesPage() {
                       onClick={() => setEditingId(null)}
                       className="flex-1 py-2 rounded-xl border text-xs font-bold"
                     >
-                      Odustani
+                      {uiText("Odustani")}
                     </button>
                     <button
                       type="button"
                       onClick={() => void saveEdit()}
                       className="flex-1 py-2 rounded-xl bg-primary text-white text-xs font-bold"
                     >
-                      Spremi
+                      {uiText("Spremi")}
                     </button>
                   </div>
                 </div>
@@ -182,14 +184,14 @@ export default function TablesPage() {
                   </div>
                   <h3 className="text-lg font-extrabold text-dark adm-text">{t.label}</h3>
                   <p className="text-xs text-muted adm-text-muted flex items-center gap-1 mt-1">
-                    <Users size={12} /> {t.capacity} mjesta
+                    <Users size={12} /> {t.capacity} {uiText("mjesta")}
                   </p>
                   <div className="flex gap-2 mt-4">
                     <button
                       type="button"
                       onClick={() => setQrTable(t)}
                       className="p-2 rounded-xl hover:bg-[var(--adm-surface-2)] text-muted adm-text-muted hover:text-primary transition"
-                      title="QR kod"
+                      title={uiText("QR kod")}
                     >
                       <QrCode size={15} />
                     </button>
@@ -197,7 +199,7 @@ export default function TablesPage() {
                       type="button"
                       onClick={() => startEdit(t)}
                       className="p-2 rounded-xl hover:bg-[var(--adm-surface-2)] text-muted adm-text-muted hover:text-primary transition"
-                      title="Uredi"
+                      title={uiText("Uredi")}
                     >
                       <Pencil size={15} />
                     </button>
@@ -205,7 +207,7 @@ export default function TablesPage() {
                       type="button"
                       onClick={() => void deactivate(t.id)}
                       className="p-2 rounded-xl hover:bg-red-50 text-muted adm-text-muted hover:text-accent-red transition"
-                      title="Deaktiviraj"
+                      title={uiText("Deaktiviraj")}
                     >
                       <Trash2 size={15} />
                     </button>
@@ -241,22 +243,22 @@ export default function TablesPage() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-extrabold text-dark adm-text">Novi stol</h3>
+                <h3 className="text-lg font-extrabold text-dark adm-text">{uiText("Novi stol")}</h3>
                 <button type="button" onClick={() => setShowAdd(false)} className="p-1.5 rounded-lg hover:bg-[var(--adm-surface-2)]">
                   <X size={18} />
                 </button>
               </div>
-              <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase mb-1.5">Naziv</label>
+              <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase mb-1.5">{uiText("Naziv")}</label>
               <input
                 value={newLabel}
                 onChange={(e) => setNewLabel(e.target.value)}
-                placeholder="Stol 1"
+                placeholder={uiText("Stol 1")}
                 className="w-full px-4 py-3 rounded-xl border border adm-border mb-1 text-sm"
               />
               <p className="text-[10px] text-muted adm-text-muted mb-4">
-                Mora biti jedinstveno (npr. Stol 1, Terasa A)
+                {uiText("Mora biti jedinstveno (npr. Stol 1, Terasa A)")}
               </p>
-              <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase mb-1.5">Kapacitet</label>
+              <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase mb-1.5">{uiText("Kapacitet")}</label>
               <input
                 type="number"
                 min={1}
@@ -270,7 +272,7 @@ export default function TablesPage() {
                 disabled={!newLabel.trim()}
                 className="w-full py-3 rounded-2xl bg-gradient-to-r from-primary to-amber-500 text-white font-bold text-sm disabled:opacity-40"
               >
-                Kreiraj stol
+                {uiText("Kreiraj stol")}
               </button>
             </motion.div>
           </motion.div>

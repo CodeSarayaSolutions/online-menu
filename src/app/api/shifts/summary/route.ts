@@ -1,3 +1,4 @@
+import { actionFailure, sameOrigin } from '@/lib/hos-server';
 import { NextResponse } from 'next/server';
 import { getSessionUserFromRequest } from '@/lib/auth/require-session';
 import { canViewShiftSummary } from '@/lib/auth/shift-access';
@@ -28,14 +29,13 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const summary = await buildSegmentSummary(restaurantId, date, segmentId, supabaseAdmin);
+    const summary = await buildSegmentSummary(restaurantId, date, segmentId, user.id, supabaseAdmin);
     if (!summary) {
       return NextResponse.json({ error: 'Segment not found' }, { status: 404 });
     }
 
     return NextResponse.json({ summary }, { status: 200 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to build summary';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return actionFailure(err, 'shift.summary', user.id, restaurantId);
   }
 }

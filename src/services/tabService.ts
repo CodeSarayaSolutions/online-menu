@@ -1,10 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { supabasePostgrestSchema } from '@/lib/supabase-schema';
-import type { Database, InsertDto, Tables } from '@/types/supabase';
+import type { Database, Tables } from '@/types/supabase';
 
 type DbClient = SupabaseClient<Database, 'sarayamenu'>;
-import { deductTabFromInventory } from '@/services/inventoryService';
+import { performAction } from '@/services/actionService';
 
 const realtimeSchema = supabasePostgrestSchema;
 const TAB_ITEMS_BATCH_SIZE = 75;
@@ -37,19 +37,19 @@ async function enrichTabs(tabs: TableTabRow[], client?: DbClient): Promise<OpenT
 
   const db = client ?? supabase;
   const tableIds = Array.from(new Set(tabs.map((t) => t.table_id)));
-  const waiterIds = Array.from(new Set(tabs.map((t) => t.waiter_id)));
+  const waiterIds = Array.from(new Set(tabs.map((t) => t.waiter_id).filter((id): id is string => !!id)));
 
-  const [{ data: tables }, { data: waiters }] = await Promise.all([
-    db.from('restaurant_tables').select('id, label, capacity').in('id', tableIds),
-    db.from('users').select('id, name').in('id', waiterIds),
-  ]);
+  const tables: Pick<Tables<'restaurant_tables'>,'id'|'label'|'capacity'>[]=[];
+  const waiters: Pick<Tables<'users'>,'id'|'name'>[]=[];
+  for(let i=0;i<tableIds.length;i+=100){const {data,error}=await db.from('restaurant_tables').select('id,label,capacity').in('id',tableIds.slice(i,i+100));if(error)throw error;tables.push(...data??[]);}
+  for(let i=0;i<waiterIds.length;i+=100){const {data,error}=await db.from('users').select('id,name').in('id',waiterIds.slice(i,i+100));if(error)throw error;waiters.push(...data??[]);}
 
   const tableMap = new Map((tables ?? []).map((t) => [t.id, t]));
   const waiterMap = new Map((waiters ?? []).map((w) => [w.id, w]));
 
   return tabs.map((tab) => {
     const table = tableMap.get(tab.table_id);
-    const waiter = waiterMap.get(tab.waiter_id);
+    const waiter = tab.waiter_id ? waiterMap.get(tab.waiter_id) : undefined;
     return {
       ...tab,
       table_label: table?.label ?? 'Stol',
@@ -71,14 +71,10 @@ async function attachItemsToTabs<T extends OpenTabRow>(
 
   for (let i = 0; i < tabIds.length; i += TAB_ITEMS_BATCH_SIZE) {
     const chunk = tabIds.slice(i, i + TAB_ITEMS_BATCH_SIZE);
-    const { data, error } = await db
-      .from('tab_items')
-      .select('*')
-      .in('tab_id', chunk)
-      .order('created_at', { ascending: true });
-
-    if (error) throw error;
-    items.push(...(data ?? []));
+    for(let offset=0;;offset+=500){
+      const {data,error}=await db.from('tab_items').select('*').in('tab_id',chunk).order('created_at').order('id').range(offset,offset+499);
+      if(error)throw error;items.push(...data??[]);if(!data||data.length<500)break;
+    }
   }
 
   const byTab = new Map<string, TabItemRow[]>();
@@ -98,51 +94,13 @@ async function attachItemsToTabs<T extends OpenTabRow>(
   });
 }
 
-async function recalcTabTotal(tabId: string): Promise<number> {
-  const { data: items, error } = await supabase
-    .from('tab_items')
-    .select('total_price')
-    .eq('tab_id', tabId);
-
-  if (error) throw error;
-  const total = (items ?? []).reduce((s, i) => s + Number(i.total_price), 0);
-  const { error: upErr } = await supabase.from('table_tabs').update({ total }).eq('id', tabId);
-  if (upErr) throw upErr;
-  return total;
-}
-
 export async function getOpenTabs(restaurantId: string): Promise<OpenTabRow[]> {
-  const { data, error } = await supabase
-    .from('table_tabs')
-    .select('*')
-    .eq('restaurant_id', restaurantId)
-    .eq('status', 'open')
-    .order('created_at', { ascending: false });
-
-  if (error) throw error;
-  return attachItemsToTabs(await enrichTabs(data ?? []));
-}
-
-export async function getClosedTabs(
-  restaurantId: string,
-  from?: string,
-  to?: string,
-  client?: DbClient
-): Promise<OpenTabRow[]> {
-  const db = client ?? supabase;
-  let q = db
-    .from('table_tabs')
-    .select('*')
-    .eq('restaurant_id', restaurantId)
-    .eq('status', 'closed')
-    .order('closed_at', { ascending: false });
-
-  if (from) q = q.gte('closed_at', from);
-  if (to) q = q.lte('closed_at', to);
-
-  const { data, error } = await q;
-  if (error) throw error;
-  return attachItemsToTabs(await enrichTabs(data ?? [], client), client);
+  const rows:TableTabRow[]=[];
+  for(let offset=0;;offset+=200){
+    const {data,error}=await supabase.from('table_tabs').select('*').eq('restaurant_id',restaurantId).eq('status','open').order('created_at',{ascending:false}).order('id').range(offset,offset+199);
+    if(error)throw error;rows.push(...data??[]);if(!data||data.length<200)break;
+  }
+  return attachItemsToTabs(await enrichTabs(rows));
 }
 
 export async function getOpenTabForTable(tableId: string): Promise<TableTabRow | null> {
@@ -162,103 +120,26 @@ export async function openTab(
   tableId: string,
   waiterId: string
 ): Promise<TableTabRow> {
-  const existing = await getOpenTabForTable(tableId);
-  if (existing) {
-    throw new Error('Ovaj stol već ima otvorenu karticu.');
-  }
-
-  const row: InsertDto<'table_tabs'> = {
-    restaurant_id: restaurantId,
-    table_id: tableId,
-    waiter_id: waiterId,
-    status: 'open',
-    total: 0,
-  };
-
-  const { data, error } = await supabase.from('table_tabs').insert(row).select().single();
-  if (error) throw error;
-  return data;
+  return performAction<TableTabRow>('tab.open', restaurantId, { tableId });
 }
 
 export async function addItemToTab(
   tabId: string,
-  item: {
-    productId: string;
-    productName: string;
-    unitPrice: number;
-    quantity: number;
-    station: 'kitchen' | 'bar' | 'both';
-    fireStatus?: TabItemFireStatus;
-  }
+  item: { productId: string; productName: string; unitPrice: number; quantity: number; station: 'kitchen' | 'bar' | 'both'; fireStatus?: TabItemFireStatus },
+  intervention = false
 ): Promise<TabItemRow> {
-  const fireStatus = item.fireStatus ?? 'fired';
-  const { data: existing, error: findError } = await supabase
-    .from('tab_items')
-    .select('*')
-    .eq('tab_id', tabId)
-    .eq('product_id', item.productId)
-    .eq('fire_status', fireStatus)
-    .maybeSingle();
-
-  if (findError) throw findError;
-
-  if (existing) {
-    const quantity = Number(existing.quantity) + item.quantity;
-    const unitPrice = Number(existing.unit_price);
-    const totalPrice = unitPrice * quantity;
-    const { data, error } = await supabase
-      .from('tab_items')
-      .update({
-        quantity,
-        total_price: totalPrice,
-        product_name: item.productName,
-        station: item.station,
-        ...(fireStatus === 'fired' ? { fired_at: existing.fired_at ?? new Date().toISOString() } : {}),
-      })
-      .eq('id', existing.id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    await recalcTabTotal(tabId);
-    return data;
-  }
-
-  const totalPrice = item.unitPrice * item.quantity;
-  const row: InsertDto<'tab_items'> = {
-    tab_id: tabId,
-    product_id: item.productId,
-    product_name: item.productName,
-    quantity: item.quantity,
-    unit_price: item.unitPrice,
-    total_price: totalPrice,
-    station: item.station,
-    fire_status: fireStatus,
-    fired_at: fireStatus === 'fired' ? new Date().toISOString() : null,
-  };
-
-  const { data, error } = await supabase.from('tab_items').insert(row).select().single();
-  if (error) throw error;
-  await recalcTabTotal(tabId);
-  return data;
+  return performAction<TabItemRow>('tab.add', '', { tabId, productId: item.productId, quantity: item.quantity, fireStatus: item.fireStatus ?? 'fired', intervention });
 }
 
-export async function activateTabItems(itemIds: string[]): Promise<void> {
-  const ids = Array.from(new Set(itemIds.filter(Boolean)));
-  if (ids.length === 0) return;
-
-  for (let i = 0; i < ids.length; i += TAB_ITEMS_BATCH_SIZE) {
-    const chunk = ids.slice(i, i + TAB_ITEMS_BATCH_SIZE);
-    const { error } = await supabase
-      .from('tab_items')
-      .update({
-        fire_status: 'fired',
-        fired_at: new Date().toISOString(),
-      })
-      .in('id', chunk);
-
-    if (error) throw error;
-  }
+export async function activateTabItems(itemIds: string[], intervention = false): Promise<void> {
+  if (!itemIds.length) return;
+  // Backlog can span several bills; each transaction checks every supplied line against its bill.
+  const { data, error } = await supabase.from('tab_items').select('id,tab_id').in('id', itemIds);
+  if (error) throw error;
+  if (data.length !== new Set(itemIds).size) throw new Error('Stavke nisu dostupne.');
+  const groups = new Map<string, string[]>();
+  for (const item of data) groups.set(item.tab_id, [...(groups.get(item.tab_id) ?? []), item.id]);
+  for (const [tabId, ids] of Array.from(groups.entries())) await performAction('tab.fire', '', { tabId, itemIds: ids, intervention });
 }
 
 export async function getBacklogForWaiter(
@@ -279,107 +160,12 @@ export async function getBacklogForWaiter(
     .filter((tab) => tab.tab_items.length > 0);
 }
 
-export async function removeItemFromTab(tabItemId: string, tabId: string): Promise<void> {
-  const { error } = await supabase.from('tab_items').delete().eq('id', tabItemId);
-  if (error) throw error;
-  await recalcTabTotal(tabId);
+export async function removeItemFromTab(tabItemId: string, tabId: string, intervention = false): Promise<void> {
+  await performAction('tab.remove', '', { tabId, itemId: tabItemId, intervention });
 }
 
-export async function discardEmptyTab(
-  tabId: string,
-  waiterId?: string,
-  client?: DbClient
-): Promise<void> {
-  const db = client ?? supabase;
-  const tab = await getTabWithItems(tabId, client);
-  if (!tab || tab.status !== 'open') {
-    throw new Error('Kartica nije otvorena.');
-  }
-  if (waiterId && tab.waiter_id !== waiterId) {
-    throw new Error('Nemate dozvolu zatvoriti ovu karticu.');
-  }
-  if ((tab.tab_items ?? []).length > 0) {
-    throw new Error('Kartica ima stavke i ne može se odbaciti kao prazna.');
-  }
-
-  const { error } = await db.from('table_tabs').delete().eq('id', tabId);
-  if (error) throw error;
-}
-
-export async function discardStaleEmptyOpenTabs(
-  restaurantId: string,
-  options: { waiterId?: string; olderThanMs?: number } = {},
-  client?: DbClient
-): Promise<number> {
-  const db = client ?? supabase;
-  const olderThanMs = options.olderThanMs ?? 2 * 60 * 1000;
-  const cutoff = new Date(Date.now() - olderThanMs).toISOString();
-
-  let query = db
-    .from('table_tabs')
-    .select('*')
-    .eq('restaurant_id', restaurantId)
-    .eq('status', 'open')
-    .lt('created_at', cutoff);
-
-  if (options.waiterId) {
-    query = query.eq('waiter_id', options.waiterId);
-  }
-
-  const { data: tabs, error } = await query;
-  if (error) throw error;
-  if (!tabs?.length) return 0;
-
-  const enriched = await attachItemsToTabs(await enrichTabs(tabs, client), client);
-  const emptyIds = enriched
-    .filter((tab) => (tab.tab_items ?? []).length === 0)
-    .map((tab) => tab.id);
-
-  if (emptyIds.length === 0) return 0;
-
-  for (let i = 0; i < emptyIds.length; i += TAB_ITEMS_BATCH_SIZE) {
-    const chunk = emptyIds.slice(i, i + TAB_ITEMS_BATCH_SIZE);
-    const { error: deleteError } = await db.from('table_tabs').delete().in('id', chunk);
-    if (deleteError) throw deleteError;
-  }
-  return emptyIds.length;
-}
-
-export async function closeTab(
-  tabId: string,
-  paymentMethod: 'cash' | 'card',
-  client?: DbClient
-): Promise<TableTabRow> {
-  const db = client ?? supabase;
-  const tab = await getTabWithItems(tabId, client);
-  if (!tab || tab.status !== 'open') {
-    throw new Error('Kartica nije otvorena.');
-  }
-
-  const { data, error } = await db
-    .from('table_tabs')
-    .update({
-      status: 'closed',
-      payment_method: paymentMethod,
-      closed_at: new Date().toISOString(),
-    })
-    .eq('id', tabId)
-    .select()
-    .single();
-
-  if (error) throw error;
-
-  await deductTabFromInventory(
-    { id: tab.id, restaurant_id: tab.restaurant_id, waiter_id: tab.waiter_id },
-    (tab.tab_items ?? []).map((i) => ({
-      product_id: i.product_id,
-      product_name: i.product_name,
-      quantity: i.quantity,
-    })),
-    client
-  );
-
-  return data;
+export async function closeTab(tabId: string, paymentMethod: 'cash' | 'card', intervention = false): Promise<TableTabRow> {
+  return performAction<TableTabRow>('tab.close', '', { tabId, paymentMethod, intervention });
 }
 
 export async function getTabWithItems(tabId: string, client?: DbClient): Promise<TabWithItems | null> {
@@ -393,20 +179,8 @@ export async function getTabWithItems(tabId: string, client?: DbClient): Promise
   if (error) throw error;
   if (!tab) return null;
 
-  const [{ data: items, error: itemsError }, enriched] = await Promise.all([
-    db.from('tab_items').select('*').eq('tab_id', tabId).order('created_at'),
-    enrichTabs([tab], client),
-  ]);
-
-  if (itemsError) throw itemsError;
-
-  const meta = enriched[0];
-  return {
-    ...tab,
-    tab_items: items ?? [],
-    table_label: meta?.table_label ?? 'Stol',
-    waiter_name: meta?.waiter_name ?? '—',
-  };
+  const [loaded] = await attachItemsToTabs(await enrichTabs([tab],client),client);
+  return { ...loaded, tab_items: loaded.tab_items ?? [] };
 }
 
 export function subscribeToTabs(

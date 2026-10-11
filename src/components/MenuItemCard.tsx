@@ -27,7 +27,7 @@ export default function MenuItemCard({ product, index }: MenuItemCardProps) {
   const addItem = useCartStore((s) => s.addItem);
   const items = useCartStore((s) => s.items);
   const { pageContent, componentStyles: cs } = useCmsData();
-  const { t, tProduct, tVariation, tVariationOption } = useTranslation();
+  const { text, t, tProduct, tVariation, tVariationOption } = useTranslation();
   const [justAdded, setJustAdded] = useState(false);
 
   const cartItem = items.find((i) => i.id === product.id);
@@ -79,7 +79,7 @@ export default function MenuItemCard({ product, index }: MenuItemCardProps) {
     <div>
       <div className="flex items-baseline gap-1.5 flex-wrap">
         {hasPriceRange && (
-          <span className="text-[9px] md:text-[10px] font-medium" style={{ color: cs.cardDescriptionColor }}>from</span>
+          <span className="text-[9px] md:text-[10px] font-medium" style={{ color: cs.cardDescriptionColor }}>{text("od", "from")}</span>
         )}
         {hasHappyHour && (
           <span className="text-[10px] md:text-[11px] line-through font-semibold" style={{ color: cs.cardDescriptionColor }}>

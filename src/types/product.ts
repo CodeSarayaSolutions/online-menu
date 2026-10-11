@@ -49,7 +49,8 @@ export interface Product {
   happyHourLabel?: string;
   image: string;
   category: string;
-  /** Which station screen shows this item (default kitchen) */
+  categoryId?: string;
+  /** Which station screen shows this item (default bar) */
   station?: ProductStation;
   addons?: Addon[];
   variations?: Variation[];

@@ -64,7 +64,7 @@ export default function ProductPage() {
     componentStyles: cs,
     layoutConfig: lc,
   } = useCmsData();
-  const { t, tProduct, tAddon, tVariation, tVariationOption } = useTranslation();
+  const { text, t, tProduct, tAddon, tVariation, tVariationOption } = useTranslation();
   const { prices: happyHourPrices } = useHappyHourPricing(venueSlug);
   const addItem = useCartStore((s) => s.addItem);
   const items = useCartStore((s) => s.items);
@@ -94,7 +94,7 @@ export default function ProductPage() {
   // Related items from same category
   const relatedItems = product
     ? pricedProducts
-        .filter((p) => p.category === product.category && p.id !== product.id)
+        .filter((p) => (product.categoryId ? p.categoryId === product.categoryId : p.category === product.category) && p.id !== product.id)
         .slice(0, 4)
     : [];
 
@@ -296,6 +296,8 @@ export default function ProductPage() {
               .map((optionId) => v.options.find((o) => o.id === optionId))
               .filter((opt): opt is VariationOption => !!opt && hasSelectedDependency(opt.dependsOn))
               .map((opt) => ({
+                variationId: v.id,
+                optionId: opt.id,
                 variationName: v.name,
                 optionLabel: opt.label,
                 priceAdjustment: opt.priceAdjustment,
@@ -322,7 +324,7 @@ export default function ProductPage() {
       price: product.price + addonsTotal + variationsTotal,
       quantity,
       image: product.image,
-      station: product.station ?? 'kitchen',
+      station: product.station ?? 'bar',
       selectedVariations: selectedVarLabels,
       selectedAddons: selectedAddonLabels,
       addonQuantities: selectedAddons,
@@ -451,7 +453,7 @@ export default function ProductPage() {
             {" "}{pageContent.currencySymbol}
             {product.happyHourPrice !== undefined && (
               <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-[10px] uppercase">
-                Happy Hour
+                {text("Sretni sati","Happy hour")}
               </span>
             )}
           </p>
@@ -509,7 +511,7 @@ export default function ProductPage() {
                   }}
                 >
                   <Check size={12} strokeWidth={3} />
-                  {existingInCart.quantity} in cart
+                  {existingInCart.quantity} {text("u narudžbi","in cart")}
                 </span>
               )}
             </div>
@@ -601,7 +603,7 @@ export default function ProductPage() {
                     className="text-[10px]"
                     style={{ color: cardMutedColor }}
                   >
-                    Loved by our guests
+                    {text("Omiljeno među gostima","Loved by our guests")}
                   </p>
                 </div>
               </div>
@@ -672,7 +674,7 @@ export default function ProductPage() {
               color: cs.productButtonBgColor,
             }}
           >
-            Required
+            {text("Obavezno","Required")}
           </span>
         );
       }
@@ -1103,7 +1105,7 @@ export default function ProductPage() {
                 )}
                 style={{ color: cardDark ? "#F5F5F5" : cs.productTitleColor }}
               >
-                Extras
+                {text("Dodaci","Extras")}
               </h2>
               <span
                 className="px-2 py-0.5 rounded-full text-[10px] font-medium"
@@ -1226,7 +1228,7 @@ export default function ProductPage() {
                                   onClick={() => setAddonQuantity(addon, qty - 1)}
                                   className="w-8 h-8 rounded-lg flex items-center justify-center"
                                   style={{ backgroundColor: subtleBg, color: activeBorder }}
-                                  aria-label={`Decrease ${addon.name}`}
+                                  aria-label={`${text("Smanji", "Decrease")} ${addon.name}`}
                                 >
                                   <Minus size={14} />
                                 </button>
@@ -1238,7 +1240,7 @@ export default function ProductPage() {
                                   onClick={() => setAddonQuantity(addon, qty + 1)}
                                   className="w-8 h-8 rounded-lg flex items-center justify-center"
                                   style={{ backgroundColor: activeBorder, color: "#FFFFFF" }}
-                                  aria-label={`Increase ${addon.name}`}
+                                  aria-label={`${text("Povećaj", "Increase")} ${addon.name}`}
                                 >
                                   <Plus size={14} />
                                 </button>

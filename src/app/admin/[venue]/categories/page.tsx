@@ -1,5 +1,6 @@
 "use client";
 
+import { useUiText } from "@/hooks/useUiText";
 import { useState } from "react";
 import { Plus, Trash2, Save, Check, ChevronUp, ChevronDown, X, Pencil } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -24,6 +25,7 @@ const colorPresets = [
 ];
 
 export default function CategoriesEditor() {
+  const uiText = useUiText();
   const { venue } = useParams<{ venue: string }>();
   const categories = useCmsStore((s) => s.categories);
   const addCategory = useCmsStore((s) => s.addCategory);
@@ -45,20 +47,20 @@ export default function CategoriesEditor() {
   const startEdit = (cat: CategoryInfo) => { setEditingId(cat.id); setEditForm({ ...cat }); };
   const cancelEdit = () => { setEditingId(null); setEditForm(null); };
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (editingId && editForm) {
       updateCategory(editingId, { ...editForm, icon: (editForm.icon ?? "").trim() });
-      setTimeout(() => saveActiveToAllRestaurants(venue), 0);
+      if (!await saveActiveToAllRestaurants(venue)) return;
       setSaved(editingId);
       setTimeout(() => setSaved(null), 1200);
       cancelEdit();
     }
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!newCat.id || !newCat.label) return;
     addCategory({ ...newCat, icon: (newCat.icon ?? "").trim() });
-    setTimeout(() => saveActiveToAllRestaurants(venue), 0);
+    if (!await saveActiveToAllRestaurants(venue)) return;
     setSaved(newCat.id);
     setTimeout(() => setSaved(null), 1200);
     setNewCat({ id: "", label: "", icon: "", color: "from-amber-400 to-orange-500" });
@@ -82,15 +84,15 @@ export default function CategoriesEditor() {
     <div className="max-w-3xl">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-extrabold text-dark adm-text tracking-tight">Vrste</h1>
-          <p className="text-sm text-muted adm-text-muted mt-1">{categories.length} vrsti ukupno</p>
+          <h1 className="text-2xl font-extrabold text-dark adm-text tracking-tight">{uiText("Vrste")}</h1>
+          <p className="text-sm text-muted adm-text-muted mt-1">{categories.length} {uiText("vrsti ukupno")}</p>
         </div>
         <button
           onClick={() => setShowAdd(true)}
           className="flex items-center gap-2 bg-gradient-to-r from-primary to-amber-500 text-white px-4 py-2.5 rounded-2xl text-sm font-bold hover:brightness-105 transition shadow-glow"
         >
           <Plus size={16} />
-          Nova vrsta
+          {uiText("Nova vrsta")}
         </button>
       </div>
 
@@ -105,14 +107,14 @@ export default function CategoriesEditor() {
           >
             <div className="adm-surface adm-border border rounded-2xl border-2 border-primary/30 p-6 shadow-card">
               <div className="flex items-center justify-between mb-5">
-                <h3 className="text-[15px] font-extrabold text-dark adm-text">Kreiraj vrstu</h3>
+                <h3 className="text-[15px] font-extrabold text-dark adm-text">{uiText("Kreiraj vrstu")}</h3>
                 <button onClick={() => setShowAdd(false)} className="p-1.5 rounded-xl hover:bg-[var(--adm-surface-2)] text-muted adm-text-muted transition"><X size={16} /></button>
               </div>
               <div className="grid grid-cols-2 gap-4 mb-4">
-                <InputField label="ID (mala slova)" value={newCat.id} onChange={(v) => setNewCat((c) => ({ ...c, id: v.toLowerCase().replace(/\s/g, "-") }))} placeholder="npr. morski-plodovi" />
-                <InputField label="Naziv za prikaz" value={newCat.label} onChange={(v) => setNewCat((c) => ({ ...c, label: v }))} placeholder="npr. Morski plodovi" />
+                <InputField label="ID (mala slova)" value={newCat.id} onChange={(v) => setNewCat((c) => ({ ...c, id: v.toLowerCase().replace(/\s/g, "-") }))} placeholder={uiText("npr. morski-plodovi")} />
+                <InputField label="Naziv za prikaz" value={newCat.label} onChange={(v) => setNewCat((c) => ({ ...c, label: v }))} placeholder={uiText("npr. Morski plodovi")} />
                 <div className="col-span-2">
-                  <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Boja</label>
+                  <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">{uiText("Boja")}</label>
                   <div className="flex flex-wrap gap-1.5">
                     {colorPresets.map((color) => (
                       <button
@@ -125,8 +127,8 @@ export default function CategoriesEditor() {
                 </div>
               </div>
               <div className="flex gap-3">
-                <button onClick={() => setShowAdd(false)} className="flex-1 py-2.5 rounded-2xl border border-primary/10 text-sm font-semibold text-dark adm-text hover:bg-[var(--adm-surface-2)] transition">Odustani</button>
-                <button onClick={handleAdd} disabled={!newCat.id || !newCat.label} className="flex-1 py-2.5 rounded-2xl bg-gradient-to-r from-primary to-amber-500 text-white text-sm font-bold hover:brightness-105 transition disabled:opacity-40 shadow-glow">Kreiraj</button>
+                <button onClick={() => setShowAdd(false)} className="flex-1 py-2.5 rounded-2xl border border-primary/10 text-sm font-semibold text-dark adm-text hover:bg-[var(--adm-surface-2)] transition">{uiText("Odustani")}</button>
+                <button onClick={handleAdd} disabled={!newCat.id || !newCat.label} className="flex-1 py-2.5 rounded-2xl bg-gradient-to-r from-primary to-amber-500 text-white text-sm font-bold hover:brightness-105 transition disabled:opacity-40 shadow-glow">{uiText("Kreiraj")}</button>
               </div>
             </div>
           </motion.div>
@@ -153,14 +155,14 @@ export default function CategoriesEditor() {
               {isEditing && editForm ? (
                 <div className="p-5 space-y-4">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-extrabold text-dark adm-text">Uređivanje: {cat.label}</h4>
+                    <h4 className="text-sm font-extrabold text-dark adm-text">{uiText("Uređivanje:")} {cat.label}</h4>
                     <button onClick={cancelEdit} className="p-1.5 rounded-xl hover:bg-[var(--adm-surface-2)] text-muted adm-text-muted transition"><X size={14} /></button>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                    <InputField label="Naziv za prikaz" value={editForm.label} onChange={(v) => setEditForm((f) => f ? { ...f, label: v } : f)} placeholder="npr. Morski plodovi" />
+                    <InputField label="Naziv za prikaz" value={editForm.label} onChange={(v) => setEditForm((f) => f ? { ...f, label: v } : f)} placeholder={uiText("npr. Morski plodovi")} />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Boja</label>
+                    <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">{uiText("Boja")}</label>
                     <div className="flex flex-wrap gap-1.5">
                       {colorPresets.map((color) => (
                         <button
@@ -172,9 +174,9 @@ export default function CategoriesEditor() {
                     </div>
                   </div>
                   <div className="flex gap-3 pt-1">
-                    <button onClick={cancelEdit} className="flex-1 py-2.5 rounded-2xl border border-primary/10 text-sm font-semibold text-dark adm-text hover:bg-[var(--adm-surface-2)] transition">Odustani</button>
+                    <button onClick={cancelEdit} className="flex-1 py-2.5 rounded-2xl border border-primary/10 text-sm font-semibold text-dark adm-text hover:bg-[var(--adm-surface-2)] transition">{uiText("Odustani")}</button>
                     <button onClick={saveEdit} className="flex-1 py-2.5 rounded-2xl bg-gradient-to-r from-primary to-amber-500 text-white text-sm font-bold hover:brightness-105 flex items-center justify-center gap-2 shadow-glow">
-                      <Save size={14} /> Spremi
+                      <Save size={14} /> {uiText("Spremi")}
                     </button>
                   </div>
                 </div>
@@ -198,7 +200,7 @@ export default function CategoriesEditor() {
                   <div className="flex-1 min-w-0">
                     <p className="text-[14px] font-semibold text-dark adm-text">{cat.label}</p>
                     <p className="text-[11px] text-muted adm-text-muted">
-                      {isSpecial(cat.id) ? <span className="text-primary font-medium">Sistem</span> : `${productCount} ${productCount !== 1 ? "stavki" : "stavka"}`}
+                      {isSpecial(cat.id) ? <span className="text-primary font-medium">{uiText("Sistem")}</span> : `${productCount} ${productCount !== 1 ? uiText("stavki") : uiText("stavka")}`}
                     </p>
                   </div>
 
@@ -211,8 +213,8 @@ export default function CategoriesEditor() {
                     {!isSpecial(cat.id) && (
                       confirmDelete === cat.id ? (
                         <div className="flex items-center gap-1">
-                          <button onClick={() => handleDelete(cat.id)} className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-accent-red text-white hover:brightness-110 transition">Obriši</button>
-                          <button onClick={() => setConfirmDelete(null)} className="px-2 py-1.5 rounded-xl text-[11px] text-muted adm-text-muted hover:bg-[var(--adm-surface-2)] transition">Ne</button>
+                          <button onClick={() => handleDelete(cat.id)} className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-accent-red text-white hover:brightness-110 transition">{uiText("Obriši")}</button>
+                          <button onClick={() => setConfirmDelete(null)} className="px-2 py-1.5 rounded-xl text-[11px] text-muted adm-text-muted hover:bg-[var(--adm-surface-2)] transition">{uiText("Ne")}</button>
                         </div>
                       ) : (
                         <button onClick={() => setConfirmDelete(cat.id)} className="p-2 rounded-xl adm-text-faint hover:text-accent-red hover:bg-red-50 transition">

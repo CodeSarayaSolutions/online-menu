@@ -15,13 +15,10 @@ const BTN_RADIUS = { rounded: "rounded-2xl", pill: "rounded-full", square: "roun
 export default function OrderBar() {
   const { venue } = useParams<{ venue: string }>();
   const venueSlug = decodeURIComponent(venue || "");
-  const getTotal = useCartStore((s) => s.getTotal);
-  const getItemCount = useCartStore((s) => s.getItemCount);
+  const total = useCartStore((s) => s.getTotal());
+  const count = useCartStore((s) => s.getItemCount());
   const { pageContent, componentStyles: cs } = useCmsData();
   const { t } = useTranslation();
-
-  const count = getItemCount();
-  const total = getTotal();
 
   if (count === 0 || cs.viewOnlyMode) return null;
 

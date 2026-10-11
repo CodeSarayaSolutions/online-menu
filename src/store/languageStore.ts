@@ -6,6 +6,7 @@ import type { AppLanguage } from "@/types/cms";
 
 interface LanguageState {
   language: AppLanguage;
+  hasPreference: boolean;
   setLanguage: (lang: AppLanguage) => void;
   toggleLanguage: () => void;
 }
@@ -13,10 +14,11 @@ interface LanguageState {
 export const useLanguageStore = create<LanguageState>()(
   persist(
     (set, get) => ({
-      language: "en",
-      setLanguage: (lang) => set({ language: lang }),
+      language: "bs",
+      hasPreference: false,
+      setLanguage: (lang) => set({ language: lang, hasPreference:true }),
       toggleLanguage: () =>
-        set({ language: get().language === "en" ? "bs" : "en" }),
+        set({ language: get().language === "en" ? "bs" : "en",hasPreference:true }),
     }),
     {
       name: "saraya-language",

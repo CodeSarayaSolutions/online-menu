@@ -1,0 +1,86 @@
+# Hospitality operations system — implementation and verification
+
+Status: implemented in this working tree and tested against isolated synthetic fixtures and, on 11 October 2026, a restored snapshot of the live application schema on the existing self-hosted Supabase instance. **Not deployed to the live `sarayamenu` schema or public application.** `tracking.db` is the maintained per-issue record. This report is a readable snapshot of that record, updated 11 October 2026.
+
+## What the system now distinguishes
+
+- A table is a physical location. An open bill is a seating with one responsible staff member. Finishing order entry does not settle the bill.
+- Each added round keeps its own price. Adding one coffee at 2 KM and another later at 3 KM produces a 5 KM bill; it does not retroactively reprice either round.
+- Bar/kitchen preparation acknowledgements only dismiss the displayed work. They cannot create another sale, take payment, close a bill or deduct stock.
+- A guest order starts pending, is accepted by bar with an estimated preparation time, and joins the table's open bill. A new guest bill is unassigned until someone explicitly takes responsibility. Its guest origin remains visible after staff add another round.
+- Counted stock decreases on settlement. Sold quantities are reported independently, including coffee and made-to-order products without counted stock. This is not yet a recipe/ingredient or shared-inventory-variant system.
+- Revenue reporting uses settled bills and settlement time. Open bills are shown separately. A venue's timezone defines today/week/custom date boundaries. Ranges include their start and exclude the next boundary.
+
+## Per-issue implementation
+
+| Issue | Result | Evidence |
+|---|---|---|
+| ONM-4 | Server actions validate custom session, role, target venue and ownership; browser writes to protected tables are revoked. | HTTP denials, real anon-role SQL grants, configuration/operations/shift tests. |
+| ONM-6, ONM-25 | Checkout hook order is stable; failed submission preserves the cart and shows a short recovery message. Guest receipts reflect actual pending/accepted/ready state. | Guest unit/SQL/HTTP tests and browser submit/reload/accept/ready flow. |
+| ONM-7, ONM-8 | Menu saves are transactional changes to changed sections only, with revision conflict detection, retry identity, preserved draft and visible save result. Product options cannot be half-replaced. | Menu failure/rollback and stale-revision tests; browser saved product and content changes. |
+| ONM-9 | Settlement, stock movements and audit commit together. Locking and retry handling prevent duplicate deductions. | Injected stock-history failure rolls everything back; production HTTP concurrent settlement deducts counted stock exactly once. |
+| ONM-17 | Deferred rounds remain unsent until explicitly activated. Activation is scoped and atomic; preparation does not hide a later round. | Dedicated backlog SQL suite and quantity acknowledgement tests. |
+| ONM-18 | Station survives loading/saving. Disabled kitchens route to bar; enabled kitchens require a preparation choice during new-product creation. | Menu/operations/guest SQL tests and phone editor checks. |
+| ONM-19, ONM-32 | Custom email + three-digit PIN login, generated temporary PIN, restricted onboarding challenge, welcome/new/repeat/done flow. Login and onboarding use a touch PIN pad with keyboard/backspace support. Legacy PIN bypass routes are retired. | Browser onboarding and keypad proof; SQL challenge/credential invalidation; HTTP retired-endpoint and session-revocation tests. |
+| ONM-20 | Server aggregates plus 50 bill headers, cursor paging and on-demand details/rankings. Browser cache is actor/venue/period scoped and version checked. Operational Supabase server requests bypass Next fetch caching. | 1,205-bill SQL fixture verifies full totals and tied-time paging; production HTTP freshness test. |
+| ONM-21 | Shift segment IDs and staff assignments are checked against the authorized venue before any write. | Cross-venue and mixed-invalid batch rollback tests. |
+| ONM-22, ONM-35 | Venue-scoped session-storage cart/table context, five-minute server QR grant, stable table-ID links and legacy printed-link support. Orders are priced on the server and submitted idempotently. | Cross-venue/expiry/price tampering/retry SQL and HTTP tests; complete guest browser flow; staff adds to the same guest bill. |
+| ONM-23 | Venue-time clock refreshes at minute boundaries and on focus; schedules support midnight crossing. Schedule/product-price saves are atomic and bounded reads are paged. | Half-open/overnight unit tests; configuration failure test. |
+| ONM-24 | Order bar observes changing cart state. Variant lines use their cart identity. | Browser add/cart/order flow and store scoping tests. |
+| ONM-26 | Platform role changes persist through authorized server actions. Managers cannot grant platform access. | SQL promotion/demotion and manager-denial checks. |
+| ONM-27 | Actual RLS/grants/functions inspected through Supabase pg-meta. Anonymous operational reads short-circuit; credential columns and protected write RPCs are not available to browser roles. | Real-role SQL checks; security-definer execute-grant inspection. |
+| ONM-28 | Category IDs are used through menu loading, editor, grouped lists, waiter ordering and import. Legacy labels resolve only when unambiguous. | Duplicate-label unit and database tests; no implicit first-match selection. |
+| ONM-29 | Separate immutable price snapshots for separate rounds. | SQL 2 KM + 3 KM = 5 KM assertion, with separate lines. |
+| ONM-30 | Sidebar matching uses route boundaries, so `barista` does not match the `/bar` route. | Dedicated route unit test and browser sidebar review. |
+| ONM-31 | Compact append-only action audit, actual actor/role plus responsible waiter, and platform-only incident/activity screen. Manager intervention opens a warning and is explicitly recorded. | SQL update/delete/truncate denial, platform-only feed, browser warning and attributed DB event. |
+| ONM-33 | Platform-controlled Bosnian/English, valid timezone and kitchen capability on creation/editing. Manager cannot enable kitchen or assign kitchen staff when disabled. | Configuration/menu/operations SQL tests; browser saved locale and kitchen-hidden controls. |
+| ONM-34 | Bar sees preparation work; kitchen sees food only. Guest acceptance, preparation and settlement are distinct. | Guest/operations SQL and browser bar Done -> guest Ready while bill stays open. |
+| ONM-36 | Counted inventory and sales are separate. Initial quantity produces one movement; editing/retrying cannot reset stock. History remains when tracking is disabled. | Inventory suite (including 1,205 coffee sales with no stock row); browser 12 initial bottles + 6 = 18 and movement history. |
+| ONM-37 | Manager is assignable staff. Multiple staff per segment are supported. Ended-shift summaries are available the same day; historical assignments/names survive template edits. | Shift SQL suite and browser manager + waiter roster saved/reloaded. |
+| ONM-38 | Phone product form prioritizes name/price/category/preparation, explains stock versus sales, collapses optional settings, keeps save accessible and waits for persistence. | Phone browser creation/edit flow and stock initialization check. |
+| ONM-39 | Interface copy is available in Bosnian/English across operational and guest views, including editor controls, onboarding, dates and shift CSV. Venue-authored menu text uses its existing translation fields. | Source copy review, TypeScript/build and browser English settings/roster/guest receipt; Bosnian operational flows tested earlier. |
+| ONM-40 | Integrated verification uses a disposable schema and synthetic accounts, not Barista's business data. | Build, unit, SQL, production HTTP and browser evidence below. |
+
+## Test evidence
+
+- `npm run build`: passed after final application edits, including type checking and static generation.
+- `npm test`: nine passing checks covering date/time boundaries, DST, route matching, cart/session isolation, expiry, overnight happy hour and duplicate category identity.
+- `tests/database/`: ten real PostgreSQL rollback suites: operations, configuration, menu, inventory, reporting, shifts, guests, backlog, import retry and injected settlement failure. All passed. Fixtures are rolled back.
+- `tests/http/isolated_api.py`: passed against `next start`, not only development mode. Covers authentication, authorization, bounded reports, QR order/accept/claim, simultaneous settlement with counted stock and immediate session revocation.
+- Final measured fresh report round trips: 81.7, 93.8, 109.5, 88.1, 82.5 ms; warm median about 91 ms. These are small-fixture remote round trips, not a production latency guarantee. Earlier faster measurements exposed stale Next fetch caching and were superseded after fixing it.
+- Browser evidence includes `.local/pin-pad-proof.jpg`, `.local/guest-order-ready.jpg`, and `.local/manager-intervention-proof.jpg`. Other checks covered staff creation, mandatory onboarding, phone product entry, saved stock, shift roster, localization and guest-to-staff ordering. Final browser checks created a venue with English, Sarajevo timezone and kitchen enabled, required an explicit kitchen/bar choice for its new product, and confirmed editing a counted product preserved its stock. The platform support filter displayed the manager intervention with the original responsible waiter. A venue slug containing `barista` left only Products highlighted. Venue creation now scrolls with its action bar kept accessible.
+
+## Product UX research applied
+
+The form uses focused essential questions and clear labels from [GOV.UK question-page guidance](https://design-system.service.gov.uk/patterns/question-pages/), clear save/error feedback from [W3C form notifications](https://www.w3.org/WAI/tutorials/forms/notifications/), and sufficiently sized controls informed by [WCAG target-size guidance](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html). Optional detail stays available without forcing extra steps for every edit. These are general business-form principles, not copies of another hospitality product.
+
+## Production rollout still required — ONM-41
+
+The migration set is `scripts/hos-001-foundation.sql` through `scripts/hos-011-write-boundaries.sql`. No application data was changed in the live `sarayamenu` schema during this implementation. The test environment was `onm_verification_20261010` on the same self-hosted Supabase instance; Supabase Auth was not introduced.
+
+The temporary REST exposure for the test schema was removed after verification, and the local test server was stopped. The isolated schema remains for follow-up testing. The final `.next` build used the isolated schema: rebuild with production environment for release.
+
+Deploy application and migrations as one coordinated release. The live-data backup and migration rehearsal below are complete. Take a fresh backup at the actual deployment window to include activity since this snapshot. Apply the numbered migrations in order while old writers are stopped. The grants in 003/011 intentionally reject old client writes, so an old frontend cannot safely remain the active application after those migrations. Invalidate/reload old application/PWA clients during cutover.
+
+Prepare temporary PINs for existing accounts that do not already have a valid three-digit PIN, particularly the platform administrator, before switching login. Existing password-only or longer-PIN accounts cannot use the new three-digit screen without that transition. Never put generated production PINs in source or logs. Validate platform/owner/waiter access and one controlled order/settlement after deployment, then monitor the platform incident screen.
+
+Keep historical totals and existing stock as recorded; there is no speculative repair of old Barista transactions. Ambiguous legacy category labels require an explicit category choice. The audit records new activity from rollout onward; it cannot reconstruct missing historical actors.
+
+Static printed QR codes remain bearer links: a copied link can create a new short session. The expiry limits an existing session; it does not establish physical presence. Real payments, fiscal-register integrations, ingredient recipes, shared product inventory variants and a new business/location hierarchy are outside this implemented scope.
+
+Audit rows cannot be updated/deleted/truncated through application roles. A database superuser remains the ultimate trust boundary; database administrator controls and backups are necessary for protection against that level of access.
+
+
+## Live-data backup and migration rehearsal — 11 October 2026
+
+Completed under ONM-41. A single-statement MVCC snapshot captured all 27 `sarayamenu` tables at 13:14:22 Sarajevo time, including data, columns, defaults, constraints, indexes, functions, triggers, RLS policies and grants. The copy contains 18,501 rows: 5,189 tabs, 7,444 tab lines and 5,459 inventory movements. The oldest tab is 25 May 2026. At snapshot time there were 5,182 closed tabs and seven open tabs across the schema.
+
+Private files are under `.local/backups/sarayamenu-20261011/` (gitignored). `snapshot.json.gz` is the untouched logical snapshot; `manifest.json` records counts and its uncompressed SHA-256. `restore-copy.sql.gz` restores into a new private schema and refuses to overwrite an existing one. These files contain production records and credential hashes; do not commit or publish them. This is the application's schema backup, not a backup of unrelated databases or uploaded image binaries.
+
+Restoration verified equality of every row and original column, not only row counts. The first rehearsal found the category-ID backfill was touching product modification timestamps. `hos-001-foundation.sql` now temporarily suspends the product timestamp trigger during that structural backfill and restores its previous mode in the same transaction.
+
+The second fresh restore, `onm_rehearsal_20261011_2`, passed all 11 corrected migrations. Every one of the 18,501 original rows still matches the untouched snapshot after migration and tests. All ten rollback database suites passed on this migrated copy. Reports for each copied venue matched its complete historical settled count and revenue while returning at most 50 headers. All 85 products resolved their categories. The timestamp trigger remained enabled.
+
+Evidence: `rehearsal-2/migration-results.json`, `regression-results.json`, `post-migration-verification.json` and `historical-report-verification.json` inside the private backup directory. Migration hashes are recorded. Copy schemas have no browser-role schema access and were never added to the REST exposed-schema list. No live application records, credentials or schema were changed. The snapshot and both rehearsal schemas are retained; temporary SQL-upload schemas were removed transactionally.
+
+Deployment steps 2–5 remain: commit/push and server build, coordinated live migrations, existing-account PIN transition, then restart/client refresh and production checks. The live-copy rehearsal is complete; ONM-41 remains in progress for those release steps.

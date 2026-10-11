@@ -1,5 +1,9 @@
 import { supabase } from '@/lib/supabase';
-import type { InsertDto, Tables } from '@/types/supabase';
+import { DEFAULT_TIMEZONE } from '@/lib/venue-time';
+import { isTimeWithinSchedule } from '@/lib/happy-hour';
+export { isTimeWithinSchedule } from '@/lib/happy-hour';
+import { performAction } from './actionService';
+import type { Tables } from '@/types/supabase';
 
 export type HappyHourProduct = Tables<'happy_hour_products'>;
 export type HappyHourSchedule = Tables<'happy_hour_schedules'> & {
@@ -25,44 +29,24 @@ export interface ActiveHappyHourPrice {
   scheduleId: string;
 }
 
-function normalizeTime(value: string): string {
-  const [hours = '00', minutes = '00'] = value.split(':');
-  return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}:00`;
-}
-
-function timeToMinutes(value: string): number {
-  const [hours = '0', minutes = '0'] = value.split(':');
-  return Number(hours) * 60 + Number(minutes);
-}
-
-export function isTimeWithinSchedule(now: Date, startTime: string, endTime: string): boolean {
-  const current = now.getHours() * 60 + now.getMinutes();
-  return current >= timeToMinutes(startTime) && current < timeToMinutes(endTime);
-}
-
 async function fetchSchedules(
   restaurantId: string,
   activeOnly: boolean
 ): Promise<HappyHourSchedule[]> {
-  let query = supabase
-    .from('happy_hour_schedules')
-    .select('*')
-    .eq('restaurant_id', restaurantId)
-    .order('start_time', { ascending: true });
-
-  if (activeOnly) query = query.eq('active', true);
-
-  const { data: schedules, error } = await query;
-  if (error) throw error;
-  if (!schedules?.length) return [];
-
-  const scheduleIds = schedules.map((schedule) => schedule.id);
-  const { data: products, error: productsError } = await supabase
-    .from('happy_hour_products')
-    .select('*')
-    .in('schedule_id', scheduleIds);
-
-  if (productsError) throw productsError;
+  const schedules: Tables<'happy_hour_schedules'>[] = [];
+  for(let offset=0;;offset+=500){
+    let query=supabase.from('happy_hour_schedules').select('*').eq('restaurant_id',restaurantId).order('start_time').order('id').range(offset,offset+499);
+    if(activeOnly)query=query.eq('active',true);
+    const {data,error}=await query;if(error)throw error;schedules.push(...data??[]);if(!data||data.length<500)break;
+  }
+  if(!schedules.length)return [];
+  const products: HappyHourProduct[]=[];
+  for(let batch=0;batch<schedules.length;batch+=100){
+    for(let offset=0;;offset+=500){
+      const {data,error}=await supabase.from('happy_hour_products').select('*').in('schedule_id',schedules.slice(batch,batch+100).map(s=>s.id)).order('schedule_id').order('product_id').range(offset,offset+499);
+      if(error)throw error;products.push(...data??[]);if(!data||data.length<500)break;
+    }
+  }
 
   return schedules.map((schedule) => ({
     ...schedule,
@@ -82,72 +66,23 @@ export async function saveHappyHourSchedule(
   restaurantId: string,
   input: HappyHourScheduleInput
 ): Promise<HappyHourSchedule> {
-  if (timeToMinutes(input.startTime) >= timeToMinutes(input.endTime)) {
-    throw new Error('Vrijeme početka mora biti prije vremena završetka.');
-  }
-
-  const invalidProduct = input.products.find((product) => !product.overridePrice || product.overridePrice <= 0);
-  if (invalidProduct) {
-    throw new Error('Happy hour cijena mora biti veća od 0 za svaki odabrani proizvod.');
-  }
-
-  const scheduleRow: InsertDto<'happy_hour_schedules'> = {
-    ...(input.id ? { id: input.id } : {}),
-    restaurant_id: restaurantId,
-    label: input.label?.trim() || null,
-    start_time: normalizeTime(input.startTime),
-    end_time: normalizeTime(input.endTime),
-    active: input.active,
-    updated_at: new Date().toISOString(),
-  };
-
-  const { data: schedule, error: scheduleError } = await supabase
-    .from('happy_hour_schedules')
-    .upsert(scheduleRow, { onConflict: 'id' })
-    .select()
-    .single();
-
-  if (scheduleError) throw scheduleError;
-
-  const { error: deleteError } = await supabase
-    .from('happy_hour_products')
-    .delete()
-    .eq('schedule_id', schedule.id);
-
-  if (deleteError) throw deleteError;
-
-  if (input.products.length > 0) {
-    const rows: InsertDto<'happy_hour_products'>[] = input.products.map((product) => ({
-      schedule_id: schedule.id,
-      product_id: product.productId,
-      override_price: product.overridePrice,
-    }));
-
-    const { error: productsError } = await supabase.from('happy_hour_products').insert(rows);
-    if (productsError) throw productsError;
-  }
-
-  const [saved] = await getHappyHourSchedules(restaurantId).then((rows) =>
-    rows.filter((row) => row.id === schedule.id)
-  );
-  return saved ?? { ...schedule, products: [] };
+  return performAction<HappyHourSchedule>('happyhour.save', restaurantId, { ...input });
 }
 
 export async function deleteHappyHourSchedule(scheduleId: string): Promise<void> {
-  const { error } = await supabase
-    .from('happy_hour_schedules')
-    .delete()
-    .eq('id', scheduleId);
+  const { data, error } = await supabase.from('happy_hour_schedules').select('restaurant_id').eq('id', scheduleId).single();
   if (error) throw error;
+  await performAction('happyhour.delete', data.restaurant_id, { id: scheduleId });
 }
 
 export function getActiveHappyHourPriceMap(
   schedules: HappyHourSchedule[],
-  now = new Date()
+  now = new Date(),
+  timezone = DEFAULT_TIMEZONE
 ): Map<string, ActiveHappyHourPrice> {
   const prices = new Map<string, ActiveHappyHourPrice>();
   for (const schedule of schedules) {
-    if (!schedule.active || !isTimeWithinSchedule(now, schedule.start_time, schedule.end_time)) continue;
+    if (!schedule.active || !isTimeWithinSchedule(now, schedule.start_time, schedule.end_time, timezone)) continue;
     for (const product of schedule.products) {
       prices.set(product.product_id, {
         productId: product.product_id,

@@ -1,5 +1,8 @@
 "use client";
 
+import { useUiText } from "@/hooks/useUiText";
+import { isActiveRoute } from '@/lib/route-matching';
+
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
@@ -87,10 +90,11 @@ const navItems: NavItem[] = [
 ];
 
 const platformNavItems: NavItem[] = [
-  { path: "users", label: "Korisnici i uloge", icon: Users, desc: "Upravljanje pristupom", adminOnly: true },
+  { path: "users", label: "Osoblje", icon: Users, desc: "Ljudi i uloge u lokalu" },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const uiText = useUiText();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -169,12 +173,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // Determine page type from URL segments
   const urlSegments = useMemo(() => pathname.split("/").filter(Boolean), [pathname]);
   // /admin is the platform/local list. /admin/[venue] is only a transient entry route.
-  const isOnVenuePage = pathname === "/admin";
+  const isOnVenuePage = pathname === "/admin" || pathname === "/admin/support";
 
   // Extract venue slug from URL: /admin/[venue]/... → second segment
   const venueSlug = useMemo(() => {
     if (urlSegments.length >= 2 && urlSegments[0] === "admin" && urlSegments[1] !== undefined) {
-      return pathname === "/admin" ? null : urlSegments[1];
+      return pathname === "/admin" || pathname === "/admin/support" ? null : urlSegments[1];
     }
     return null;
   }, [pathname, urlSegments]);
@@ -190,7 +194,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // Check if a nav item is active based on the current pathname
   const isItemActive = (item: NavItem) => {
     if (item.path === "/admin") return pathname === "/admin";
-    return pathname.includes(`/${item.path}`);
+    return isActiveRoute(pathname, getHref(item));
   };
 
   // ─── Auth gates ───────────────────────────────────────────
@@ -253,15 +257,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       if (item.path === "tables") return canManageTables(currentUser, effectiveVenueId);
       if (item.path === "inventory") return canManageInventory(currentUser, effectiveVenueId);
       if (item.path === "waiter") return canViewWaiterMode(currentUser, effectiveVenueId);
-      if (item.path === "kitchen") return canViewKitchenStation(currentUser, effectiveVenueId);
+      if (item.path === "kitchen") return !!allRestaurants[effectiveVenueId]?.restaurant.kitchenEnabled && canViewKitchenStation(currentUser, effectiveVenueId);
       if (item.path === "bar") return canViewBarStation(currentUser, effectiveVenueId);
       return false;
     });
-  }, [currentUser, effectiveVenueId]);
+  }, [currentUser, effectiveVenueId, allRestaurants]);
 
   const visiblePlatformNav = useMemo(() => {
     if (!currentUser || !effectiveVenueId) return [];
     return platformNavItems.filter((item) => {
+      if (item.path === "users") return canManageVenueStaff(currentUser, effectiveVenueId);
       if (item.adminOnly) {
         return isPlatformAdmin(currentUser);
       }
@@ -326,15 +331,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     if (sessionError) {
       return (
         <div className="fixed inset-0 z-[60] adm-bg flex items-center justify-center p-6">
-          <div className="max-w-md w-full adm-surface adm-border border rounded-2xl-red-200 p-6 text-center shadow-card">
-            <p className="text-sm font-bold text-dark adm-text mb-2">Provjera sesije nije uspjela</p>
+          <div className="max-w-md w-full adm-surface adm-border border border-red-200 rounded-2xl p-6 text-center shadow-card">
+            <p className="text-sm font-bold text-dark adm-text mb-2">{uiText("Provjera sesije nije uspjela")}</p>
             <p className="text-[13px] text-muted adm-text-muted mb-4">{sessionError}</p>
             <button
               type="button"
               onClick={() => router.replace("/admin/login")}
               className="w-full py-3 rounded-xl bg-primary text-white font-bold text-sm"
             >
-              Idi na prijavu
+              {uiText("Idi na prijavu")}
             </button>
           </div>
         </div>
@@ -352,7 +357,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="fixed inset-0 z-[60] adm-bg flex items-center justify-center p-6">
         <div className="text-center max-w-sm">
           <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-sm font-semibold text-dark adm-text">Učitavanje lokala…</p>
+          <p className="text-sm font-semibold text-dark adm-text">{uiText("Učitavanje lokala…")}</p>
           {venuesError && (
             <p className="text-[12px] text-red-600 mt-2 bg-red-50 px-3 py-2 rounded-lg">{venuesError}</p>
           )}
@@ -364,12 +369,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const bootBanner =
     venuesLoading && isVenueGrid ? (
       <div className="bg-amber-50 border-b border-amber-200/80 px-4 py-2 text-[12px] text-amber-900 text-center">
-        Učitavanje restorana iz baze…
-        {venuesError ? ` — ${venuesError}` : ""}
+        {uiText("Učitavanje restorana iz baze…")}
+        
       </div>
     ) : venuesError && isVenueGrid ? (
       <div className="bg-red-50 border-b border-red-200/80 px-4 py-2 text-[12px] text-red-800 text-center">
-        {venuesError} — provjerite da je schema <strong>sarayamenu</strong> izložena u PostgREST.
+        {uiText("Žao nam je, podaci trenutno nisu dostupni. Osvježite stranicu i pokušajte ponovo.")}
       </div>
     ) : null;
 
@@ -382,17 +387,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     if (target === "/admin/login") {
       return (
         <div className="fixed inset-0 z-[60] adm-bg flex items-center justify-center p-6">
-          <div className="max-w-md w-full adm-surface adm-border border rounded-2xl-amber-200 p-6 text-center shadow-card">
-            <p className="text-sm font-bold text-dark adm-text mb-2">Nema dodijeljenog restorana</p>
+          <div className="max-w-md w-full adm-surface adm-border border border-amber-200 rounded-2xl p-6 text-center shadow-card">
+            <p className="text-sm font-bold text-dark adm-text mb-2">{uiText("Nema dodijeljenog restorana")}</p>
             <p className="text-[13px] text-muted adm-text-muted mb-4">
-              Vaš račun nema pristup nijednom lokalu. Administrator mora dodijeliti ulogu u Users &amp; Roles.
+              {uiText("Vaš račun nema pristup nijednom lokalu. Obratite se administratoru.")}
             </p>
             <button
               type="button"
               onClick={() => router.replace("/admin/login")}
               className="w-full py-3 rounded-xl bg-primary text-white font-bold text-sm"
             >
-              Nazad na prijavu
+              {uiText("Nazad na prijavu")}
             </button>
           </div>
         </div>
@@ -402,7 +407,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="fixed inset-0 z-[60] adm-bg flex items-center justify-center p-6">
         <div className="text-center max-w-sm">
           <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-sm font-semibold text-dark adm-text">Preusmjeravanje na vaš restoran…</p>
+          <p className="text-sm font-semibold text-dark adm-text">{uiText("Preusmjeravanje na vaš restoran…")}</p>
         </div>
       </div>
     );
@@ -430,7 +435,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </div>
               <div>
                 <span className="font-extrabold text-dark adm-text text-[15px] tracking-tight">{BRAND_NAME}</span>
-                <span className="block text-[10px] text-muted adm-text-muted font-medium -mt-0.5">{ADMIN_PANEL_TITLE}</span>
+                <span className="block text-[10px] text-muted adm-text-muted font-medium -mt-0.5">{uiText(ADMIN_PANEL_TITLE)}</span>
               </div>
             </div>
             <button className="lg:hidden p-1.5 rounded-xl hover:bg-[var(--adm-surface-2)] text-muted adm-text-muted transition" onClick={() => setSidebarOpen(false)}>
@@ -442,7 +447,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
           {/* Navigation */}
           <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto">
-            <p className="px-3 text-[10px] font-bold adm-text-faint uppercase tracking-[0.15em] mb-2">Platforma</p>
+            <p className="px-3 text-[10px] font-bold adm-text-faint uppercase tracking-[0.15em] mb-2">{uiText("Platforma")}</p>
             {[navItems[0]].map((item) => {
               const isActive = item.path === "/admin";
               return (
@@ -450,8 +455,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-primary rounded-r-full" />
                   <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-gradient-to-br from-primary to-amber-500 text-white shadow-sm"><item.icon size={16} /></div>
                   <div className="flex-1 min-w-0">
-                    <span className="block text-[13px] font-semibold leading-tight">{item.label}</span>
-                    <span className="block text-[10px] mt-0.5 text-primary/60">{item.desc}</span>
+                    <span className="block text-[13px] font-semibold leading-tight">{uiText(item.label)}</span>
+                    <span className="block text-[10px] mt-0.5 text-primary/60">{uiText(item.desc)}</span>
                   </div>
                   <ChevronRight size={14} className="text-primary/40" />
                 </Link>
@@ -465,8 +470,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               >
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[var(--adm-surface-2)] text-muted adm-text-muted"><Users size={16} /></div>
                 <div className="flex-1 min-w-0">
-                  <span className="block text-[13px] font-semibold leading-tight">Korisnici i uloge</span>
-                  <span className="block text-[10px] mt-0.5 adm-text-faint">Upravljanje pristupom</span>
+                  <span className="block text-[13px] font-semibold leading-tight">{uiText("Korisnici i uloge")}</span>
+                  <span className="block text-[10px] mt-0.5 adm-text-faint">{uiText("Upravljanje pristupom")}</span>
                 </div>
               </Link>
             )}
@@ -481,9 +486,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   <div className="w-8 h-8 rounded-xl adm-surface adm-border border flex items-center justify-center text-base shrink-0">{currentUser.avatar || "👤"}</div>
                   <div className="flex-1 min-w-0">
                     <span className="block text-[11px] font-bold text-dark adm-text truncate">{currentUser.name}</span>
-                    <span className="block text-[9px] text-muted adm-text-muted">{currentUser.platformRole === "admin" ? "Platforma admin" : "User"}</span>
+                    <span className="block text-[9px] text-muted adm-text-muted">{uiText(currentUser.platformRole === "admin" ? "Administrator platforme" : "Korisnik")}</span>
                   </div>
-                  <button onClick={handleLogout} className="text-muted adm-text-muted hover:text-accent-red transition" title="Odjava"><LogOut size={13} /></button>
+                  <button onClick={handleLogout} className="text-muted adm-text-muted hover:text-accent-red transition" title={uiText("Odjava")}><LogOut size={13} /></button>
                 </div>
               </div>
             )}
@@ -493,11 +498,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 onClick={() => void handleInstall()}
                 className="flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium text-primary hover:bg-primary/10 transition w-full"
               >
-                <Download size={15} /> Instaliraj aplikaciju
+                <Download size={15} /> {uiText("Instaliraj aplikaciju")}
               </button>
             )}
             {(activeRestaurantId || accessibleRestaurants[0]) && (
-              <Link href={`/${activeRestaurantId || accessibleRestaurants[0]}`} className="flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)] transition"><ArrowLeft size={15} />Povratak na meni</Link>
+              <Link href={`/${activeRestaurantId || accessibleRestaurants[0]}`} className="flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)] transition"><ArrowLeft size={15} />{uiText("Povratak na meni")}</Link>
             )}
           </div>
         </aside>
@@ -505,13 +510,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* ── Main content ── */}
         <div className="flex-1 flex flex-col min-w-0 adm-bg">
           <header className="h-[64px] adm-header backdrop-blur-md border-b border adm-border flex items-center px-4 lg:px-8 gap-4 shrink-0 sticky top-0 z-10 shadow-soft">
-            <button className="lg:hidden p-2 -ml-1 hover:bg-[var(--adm-surface-2)] rounded-xl transition" onClick={() => setSidebarOpen(true)}><Menu size={20} className="text-dark adm-text" /></button>
+            <button className="lg:hidden p-2 -ml-1 hover:bg-[var(--adm-surface-2)] rounded-xl transition" aria-label={uiText("Otvori navigaciju")} onClick={() => setSidebarOpen(true)}><Menu size={20} className="text-dark adm-text" /></button>
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center"><Building2 size={15} className="text-primary" /></div>
-              <div className="min-w-0"><h1 className="text-[15px] font-extrabold text-dark adm-text truncate">Lokali</h1></div>
+              <div className="min-w-0"><h1 className="text-[15px] font-extrabold text-dark adm-text truncate">{uiText("Lokali")}</h1></div>
             </div>
             <div className="ml-auto flex items-center gap-3">
-              <motion.button whileTap={{ scale: 0.9 }} onClick={toggleDarkMode} className={clsx("w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200", darkMode ? "bg-primary/15 text-primary" : "bg-[var(--adm-surface-2)] text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)]")} title={darkMode ? "Switch to light mode" : "Switch to dark mode"}>
+              <motion.button whileTap={{ scale: 0.9 }} onClick={toggleDarkMode} className={clsx("w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200", darkMode ? "bg-primary/15 text-primary" : "bg-[var(--adm-surface-2)] text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)]")} title={darkMode ? uiText("Switch to light mode") : uiText("Switch to dark mode")}>
                 <AnimatePresence mode="wait">
                   {darkMode ? (
                     <motion.div key="sun" initial={{ scale: 0, rotate: -90 }} animate={{ scale: 1, rotate: 0 }} exit={{ scale: 0, rotate: 90 }} transition={{ duration: 0.2 }}><Sun size={16} /></motion.div>
@@ -521,7 +526,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 </AnimatePresence>
               </motion.button>
               {(activeRestaurantId || accessibleRestaurants[0]) && (
-                <Link href={`/${activeRestaurantId || accessibleRestaurants[0]}`} target="_blank" className="hidden md:flex items-center gap-1.5 bg-gradient-to-r from-primary to-amber-500 text-white px-3.5 py-1.5 rounded-full text-[11px] font-bold shadow-glow hover:brightness-105 transition">Pogledaj meni</Link>
+                <Link href={`/${activeRestaurantId || accessibleRestaurants[0]}`} target="_blank" className="hidden md:flex items-center gap-1.5 bg-gradient-to-r from-primary to-amber-500 text-white px-3.5 py-1.5 rounded-full text-[11px] font-bold shadow-glow hover:brightness-105 transition">{uiText("Pogledaj meni")}</Link>
               )}
             </div>
           </header>
@@ -539,7 +544,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // ─── Gate: if not on venue page and missing context, show nothing (redirect happens via useEffect) ──
   const venueReady = effectiveVenueId && (allRestaurants[effectiveVenueId] || !venuesReady);
   if (!venueReady || !currentUserId || !currentUser || !effectiveVenueId) {
-    return null;
+    return <div className="min-h-screen grid place-items-center p-6"><div className="text-center space-y-4"><p>{uiText("Žao nam je, lokal trenutno nije dostupan.")}</p><button onClick={() => window.location.reload()} className="min-h-[48px] px-5 rounded-xl bg-primary text-white font-bold">{uiText("Pokušaj ponovo")}</button><button onClick={handleLogout} className="block mx-auto min-h-[44px]">{uiText("Odjava")}</button></div></div>;
   }
 
   const stationFocus =
@@ -557,10 +562,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           type="button"
           onClick={() => void handleLogout()}
           className="absolute top-2 right-2 z-20 px-3 py-1.5 rounded-lg text-[11px] font-bold text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)] transition"
-          title="Odjava"
+          title={uiText("Odjava")}
         >
           <LogOut size={14} className="inline -mt-0.5 mr-1" />
-          Odjava
+          {uiText("Odjava")}
         </button>
         <main className="flex-1 overflow-y-auto min-h-0">
           <motion.div
@@ -598,7 +603,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
             <div>
               <span className="font-extrabold text-dark adm-text text-[15px] tracking-tight">{BRAND_NAME}</span>
-              <span className="block text-[10px] text-muted adm-text-muted font-medium -mt-0.5">{ADMIN_PANEL_TAGLINE}</span>
+              <span className="block text-[10px] text-muted adm-text-muted font-medium -mt-0.5">{uiText(ADMIN_PANEL_TAGLINE)}</span>
             </div>
           </div>
           <button className="lg:hidden p-1.5 rounded-xl hover:bg-[var(--adm-surface-2)] text-muted adm-text-muted transition" onClick={() => setSidebarOpen(false)}>
@@ -623,7 +628,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
             <div className="flex-1 min-w-0">
               <span className="block text-[12px] font-bold text-dark adm-text truncate">{restaurant.name}</span>
-                    <span className="block text-[9px] text-muted adm-text-muted">{currentRestaurantRole ? restaurantRoleLabel(currentRestaurantRole) : "—"}</span>
+                    <span className="block text-[9px] text-muted adm-text-muted">{isPlatformAdmin(currentUser) ? uiText("Administrator platforme") : currentRestaurantRole ? uiText(restaurantRoleLabel(currentRestaurantRole)) : "—"}</span>
             </div>
             <ChevronDown size={14} className={clsx("text-muted adm-text-muted transition-transform", showRestaurantPicker && "rotate-180")} />
           </button>
@@ -657,7 +662,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto">
-          <p className="px-3 text-[10px] font-bold adm-text-faint uppercase tracking-[0.15em] mb-2">Restaurant</p>
+          <p className="px-3 text-[10px] font-bold adm-text-faint uppercase tracking-[0.15em] mb-2">{uiText("Restaurant")}</p>
           {visibleNavItems.filter((item) => item.path !== "/admin").map((item) => {
             const href = getHref(item);
             const isActive = isItemActive(item);
@@ -666,8 +671,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 {isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-primary rounded-r-full" />}
                 <div className={clsx("w-9 h-9 rounded-xl flex items-center justify-center transition-all", isActive ? "bg-gradient-to-br from-primary to-amber-500 text-white shadow-sm" : "bg-[var(--adm-surface-2)] text-muted adm-text-muted group-hover:adm-text")}><item.icon size={16} /></div>
                 <div className="flex-1 min-w-0">
-                  <span className="block text-[13px] font-semibold leading-tight">{item.label}</span>
-                  <span className={clsx("block text-[10px] mt-0.5", isActive ? "text-primary/60" : "adm-text-faint")}>{item.desc}</span>
+                  <span className="block text-[13px] font-semibold leading-tight">{uiText(item.label)}</span>
+                  <span className={clsx("block text-[10px] mt-0.5", isActive ? "text-primary/60" : "adm-text-faint")}>{uiText(item.desc)}</span>
                 </div>
                 {isActive && <ChevronRight size={14} className="text-primary/40" />}
               </Link>
@@ -675,7 +680,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           })}
           {visiblePlatformNav.length > 0 && (
             <>
-              <div className="pt-3"><p className="px-3 text-[10px] font-bold adm-text-faint uppercase tracking-[0.15em] mb-2">Platform</p></div>
+              <div className="pt-3"><p className="px-3 text-[10px] font-bold adm-text-faint uppercase tracking-[0.15em] mb-2">{uiText("Osoblje")}</p></div>
               {visiblePlatformNav.map((item) => {
                 const href = getHref(item);
                 const isActive = isItemActive(item);
@@ -684,8 +689,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     {isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-primary rounded-r-full" />}
                     <div className={clsx("w-9 h-9 rounded-xl flex items-center justify-center transition-all", isActive ? "bg-gradient-to-br from-primary to-amber-500 text-white shadow-sm" : "bg-[var(--adm-surface-2)] text-muted adm-text-muted group-hover:adm-text")}><item.icon size={16} /></div>
                     <div className="flex-1 min-w-0">
-                      <span className="block text-[13px] font-semibold leading-tight">{item.label}</span>
-                      <span className={clsx("block text-[10px] mt-0.5", isActive ? "text-primary/60" : "adm-text-faint")}>{item.desc}</span>
+                      <span className="block text-[13px] font-semibold leading-tight">{uiText(item.label)}</span>
+                      <span className={clsx("block text-[10px] mt-0.5", isActive ? "text-primary/60" : "adm-text-faint")}>{uiText(item.desc)}</span>
                     </div>
                     {isActive && <ChevronRight size={14} className="text-primary/40" />}
                   </Link>
@@ -703,38 +708,38 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <div className="w-8 h-8 rounded-xl adm-surface adm-border border flex items-center justify-center text-base shrink-0">{currentUser.avatar || "👤"}</div>
               <div className="flex-1 min-w-0">
                 <span className="block text-[11px] font-bold text-dark adm-text truncate">{currentUser.name}</span>
-                    <span className="block text-[9px] text-muted adm-text-muted">{currentRestaurantRole ? restaurantRoleLabel(currentRestaurantRole) : "—"}</span>
+                    <span className="block text-[9px] text-muted adm-text-muted">{isPlatformAdmin(currentUser) ? uiText("Administrator platforme") : currentRestaurantRole ? uiText(restaurantRoleLabel(currentRestaurantRole)) : "—"}</span>
               </div>
             </div>
           </div>
-          <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)] transition w-full"><LogOut size={15} />Odjava</button>
+          <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)] transition w-full"><LogOut size={15} />{uiText("Odjava")}</button>
           {canInstall && (
             <button
               type="button"
               onClick={() => void handleInstall()}
               className="flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium text-primary hover:bg-primary/10 transition w-full"
             >
-              <Download size={15} /> Instaliraj aplikaciju
+              <Download size={15} /> {uiText("Instaliraj aplikaciju")}
             </button>
           )}
-          <Link href={`/${effectiveVenueId}`} className="flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)] transition"><ArrowLeft size={15} />Povratak na meni</Link>
+          <Link href={`/${effectiveVenueId}`} className="flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)] transition"><ArrowLeft size={15} />{uiText("Povratak na meni")}</Link>
         </div>
       </aside>
 
       {/* ── Main content ── */}
       <div className="flex-1 flex flex-col min-w-0 adm-bg">
         <header className="h-[64px] adm-header backdrop-blur-md border-b border adm-border flex items-center px-4 lg:px-8 gap-4 shrink-0 sticky top-0 z-10 shadow-soft">
-          <button className="lg:hidden p-2 -ml-1 hover:bg-[var(--adm-surface-2)] rounded-xl transition" onClick={() => setSidebarOpen(true)}><Menu size={20} className="text-dark adm-text" /></button>
+          <button className="lg:hidden p-2 -ml-1 hover:bg-[var(--adm-surface-2)] rounded-xl transition" aria-label={uiText("Otvori navigaciju")} onClick={() => setSidebarOpen(true)}><Menu size={20} className="text-dark adm-text" /></button>
           <div className="flex items-center gap-3 min-w-0">
             {currentPage && (
               <>
                 <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center"><currentPage.icon size={15} className="text-primary" /></div>
-                <div className="min-w-0"><h1 className="text-[15px] font-extrabold text-dark adm-text truncate">{currentPage.label}</h1></div>
+                <div className="min-w-0"><h1 className="text-[15px] font-extrabold text-dark adm-text truncate">{uiText(currentPage.label)}</h1></div>
               </>
             )}
           </div>
           <div className="ml-auto flex items-center gap-3">
-            <motion.button whileTap={{ scale: 0.9 }} onClick={toggleDarkMode} className={clsx("w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200", darkMode ? "bg-primary/15 text-primary" : "bg-[var(--adm-surface-2)] text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)]")} title={darkMode ? "Switch to light mode" : "Switch to dark mode"}>
+            <motion.button whileTap={{ scale: 0.9 }} onClick={toggleDarkMode} className={clsx("w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200", darkMode ? "bg-primary/15 text-primary" : "bg-[var(--adm-surface-2)] text-muted adm-text-muted hover:adm-text hover:bg-[var(--adm-surface-2)]")} title={darkMode ? uiText("Switch to light mode") : uiText("Switch to dark mode")}>
               <AnimatePresence mode="wait">
                 {darkMode ? (
                   <motion.div key="sun" initial={{ scale: 0, rotate: -90 }} animate={{ scale: 1, rotate: 0 }} exit={{ scale: 0, rotate: 90 }} transition={{ duration: 0.2 }}><Sun size={16} /></motion.div>
@@ -745,9 +750,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </motion.button>
             <div className="hidden sm:flex items-center gap-1.5 glass rounded-full px-3 py-1.5 shadow-sm border border-primary/10">
               {currentUser.platformRole === "admin" ? <ShieldCheck size={11} className="text-primary" /> : <Shield size={11} className="text-accent-blue" />}
-              <span className="text-[11px] font-semibold text-dark adm-text">{currentRestaurantRole ? restaurantRoleLabel(currentRestaurantRole) : "Viewer"}</span>
+              <span className="text-[11px] font-semibold text-dark adm-text">{isPlatformAdmin(currentUser) ? uiText("Administrator platforme") : currentRestaurantRole ? uiText(restaurantRoleLabel(currentRestaurantRole)) : uiText("Samo čitanje")}</span>
             </div>
-            <Link href={`/${effectiveVenueId}`} target="_blank" className="hidden md:flex items-center gap-1.5 bg-gradient-to-r from-primary to-amber-500 text-white px-3.5 py-1.5 rounded-full text-[11px] font-bold shadow-glow hover:brightness-105 transition">Pogledaj meni</Link>
+            <Link href={`/${effectiveVenueId}`} target="_blank" className="hidden md:flex items-center gap-1.5 bg-gradient-to-r from-primary to-amber-500 text-white px-3.5 py-1.5 rounded-full text-[11px] font-bold shadow-glow hover:brightness-105 transition">{uiText("Pogledaj meni")}</Link>
           </div>
         </header>
         <main className="flex-1 overflow-y-auto">

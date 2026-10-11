@@ -92,6 +92,7 @@ export function useTranslation() {
   };
 
   return {
+    text: (bs:string,en:string) => language === "bs" ? bs : en,
     language,
     t,
     tProduct,

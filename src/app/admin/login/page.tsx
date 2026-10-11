@@ -1,5 +1,6 @@
 "use client";
 
+import { useOperationalText } from "@/hooks/useOperationalText";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
@@ -21,6 +22,7 @@ import {
 
 export default function AdminLoginPage() {
   const router = useRouter();
+  const t = useOperationalText();
   const setSessionUser = useAuthStore((s) => s.setSessionUser);
   const currentUser = useAuthStore((s) => s.getCurrentUser());
   const darkMode = useAdminStore((s) => s.darkMode);
@@ -47,7 +49,7 @@ export default function AdminLoginPage() {
     const appUser = mapApiUserToAppUser(session.user, session.restaurantAccess ?? []);
     if (appUser.platformRole === "user" && appUser.restaurantAccess.length === 0) {
       throw new Error(
-        "Račun nema dodijeljen restoran. Pitajte administratora da vas ponovo pozove (Invite user) i dodijeli ulogu."
+        t("Računu nije dodijeljen lokal. Obratite se voditelju.", "No venue is assigned to this account. Please contact your manager.")
       );
     }
     saveLoginToHistory({
@@ -65,7 +67,7 @@ export default function AdminLoginPage() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className={clsx(
-        "fixed inset-0 adm-bg flex items-center justify-center p-6 overflow-y-auto",
+        "fixed inset-0 adm-bg flex items-start justify-center p-4 sm:p-6 overflow-y-auto",
         darkMode && "admin-dark"
       )}
       style={{ background: darkMode ? "#0f0f0f" : undefined }}
@@ -73,7 +75,7 @@ export default function AdminLoginPage() {
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-[420px] adm-surface adm-border border rounded-2xl shadow-card p-8"
+        className="my-auto shrink-0 w-full max-w-[420px] adm-surface adm-border border rounded-2xl shadow-card p-8"
       >
         <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-amber-500 flex items-center justify-center mx-auto mb-6 shadow-glow">
           <span className="text-white font-black text-lg">S</span>
@@ -108,8 +110,8 @@ export default function AdminLoginPage() {
                   title={hasHistory ? undefined : BRAND_NAME}
                   subtitle={
                     hasHistory
-                      ? LOGIN_EMAIL_SUBTITLE
-                      : `${ADMIN_PANEL_TITLE} · ${LOGIN_EMAIL_SUBTITLE}`
+                      ? t("Unesite email, zatim svoj trocifreni PIN", "Enter your email, then your three-digit PIN")
+                      : t("Upravljanje lokalom · Unesite email, zatim svoj trocifreni PIN", "Venue operations · Enter your email, then your three-digit PIN")
                   }
                 />
               </div>

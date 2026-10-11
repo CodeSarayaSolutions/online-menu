@@ -1,3 +1,4 @@
+import { actionFailure, sameOrigin } from '@/lib/hos-server';
 import { NextResponse } from 'next/server';
 import { getSessionUserFromRequest } from '@/lib/auth/require-session';
 import { canManageShifts, canViewShiftSummary } from '@/lib/auth/shift-access';
@@ -27,12 +28,12 @@ export async function GET(request: Request) {
     const roster = await getDateRoster(restaurantId, date, supabaseAdmin);
     return NextResponse.json({ roster }, { status: 200 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to load roster';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return actionFailure(err, 'shift.roster', user.id, restaurantId);
   }
 }
 
 export async function PUT(request: Request) {
+  if (!sameOrigin(request)) return NextResponse.json({}, { status: 403 });
   const user = await getSessionUserFromRequest(request);
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -57,10 +58,9 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const saved = await saveDateRoster(restaurantId, roster, supabaseAdmin);
+    const saved = await saveDateRoster(restaurantId, roster, user.id, supabaseAdmin);
     return NextResponse.json({ roster: saved }, { status: 200 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to save roster';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return actionFailure(err, 'shift.roster', user.id, restaurantId);
   }
 }

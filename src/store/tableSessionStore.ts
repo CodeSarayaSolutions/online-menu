@@ -3,12 +3,15 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
-const SESSION_MS = 45 * 60 * 1000;
+
 
 type TableSessionState = {
   tableNumber: string | null;
+  tableId: string | null;
+  venue: string | null;
+  activateVenue: (venue: string) => void;
   expiresAt: number | null;
-  setTable: (tableNumber: string) => void;
+  setTable: (tableNumber: string, tableId: string, expiresAt: number) => void;
   clearTable: () => void;
   isValid: () => boolean;
 };
@@ -17,15 +20,19 @@ export const useTableSessionStore = create<TableSessionState>()(
   persist(
     (set, get) => ({
       tableNumber: null,
+      tableId: null,
+      venue: null,
+      activateVenue: (venue) => { if (get().venue !== venue) set({venue,tableNumber:null,tableId:null,expiresAt:null}); },
       expiresAt: null,
 
-      setTable: (tableNumber) =>
+      setTable: (tableNumber,tableId,expiresAt) =>
         set({
           tableNumber: tableNumber.trim(),
-          expiresAt: Date.now() + SESSION_MS,
+          tableId,
+          expiresAt,
         }),
 
-      clearTable: () => set({ tableNumber: null, expiresAt: null }),
+      clearTable: () => set({ tableNumber: null, tableId: null, expiresAt: null }),
 
       isValid: () => {
         const { tableNumber, expiresAt } = get();
@@ -34,7 +41,7 @@ export const useTableSessionStore = create<TableSessionState>()(
       },
     }),
     {
-      name: "saraya_table_session",
+      name: "saraya_table_session_v2",
       storage: createJSONStorage(() => sessionStorage),
       onRehydrateStorage: () => (state) => {
         if (!state?.tableNumber || !state.expiresAt) return;

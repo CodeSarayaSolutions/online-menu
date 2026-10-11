@@ -20,11 +20,13 @@ export default function LanguageSwitcher() {
   const isEn = language === "en";
 
   return (
-    <motion.div
+    <motion.button
+      type="button"
+      aria-label={isEn ? "Switch to Bosnian" : "Prebaci na engleski"}
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.4, duration: 0.3 }}
-      className="fixed z-50 bottom-4 left-4 flex items-center rounded-full backdrop-blur-xl overflow-hidden cursor-pointer select-none"
+      className="min-h-[44px] fixed z-50 bottom-4 left-4 flex items-center rounded-full backdrop-blur-xl overflow-hidden cursor-pointer select-none"
       style={{
         backgroundColor: dark
           ? "rgba(0,0,0,0.45)"
@@ -68,6 +70,6 @@ export default function LanguageSwitcher() {
         }}
         transition={{ type: "spring", stiffness: 500, damping: 30 }}
       />
-    </motion.div>
+    </motion.button>
   );
 }

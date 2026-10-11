@@ -1,0 +1,18 @@
+"use client";
+import {useEffect,useState} from 'react';
+import {useAuthStore} from '@/store/authStore';
+import {useOperationalText} from '@/hooks/useOperationalText';
+type Row={id:string;occurred_at:string;restaurant_id:string;actor_name:string;actor_id:string;actor_role:string;action:string;entity_type:string;entity_id:string;responsible_waiter_id:string;changes:unknown};
+export default function SupportPage(){
+ const admin=useAuthStore(s=>s.getCurrentUser()?.platformRole==='admin'),t=useOperationalText();
+ const [kind,setKind]=useState('audit'),[venue,setVenue]=useState(''),[entity,setEntity]=useState('');
+ const [rows,setRows]=useState<Row[]>([]),[cursor,setCursor]=useState<{at:string;id:string}|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(false);
+ const load=async(more=false,signal?:AbortSignal)=>{setBusy(true);setError(false);try{
+  const options={kind,venue,entity,...(more&&cursor?{cursor}:{})};
+  const res=await fetch(`/api/admin/support?options=${encodeURIComponent(JSON.stringify(options))}`,{credentials:'include',cache:'no-store',signal});if(!res.ok)throw new Error();
+  const body=await res.json();setRows(old=>more?[...old,...body.rows]:body.rows);setCursor(body.nextCursor);
+ }catch{if(!signal?.aborted)setError(true);}finally{if(!signal?.aborted)setBusy(false);}};
+ useEffect(()=>{if(!admin)return;const ctrl=new AbortController();setRows([]);void load(false,ctrl.signal);return()=>ctrl.abort();},[admin,kind]);
+ if(!admin)return <p>{t('Pristup samo administratorima platforme.','Platform administrators only.')}</p>;
+ return <div className="max-w-5xl space-y-4"><h1 className="text-2xl font-bold adm-text">{t('Podrška: aktivnosti i poteškoće','Support: activity and incidents')}</h1><div className="flex flex-wrap gap-2">{['audit','incidents'].map(k=><button key={k} className="min-h-11 rounded-xl border adm-border px-4 adm-text" aria-pressed={kind===k} onClick={()=>setKind(k)}>{k==='audit'?t('Aktivnosti','Activity'):t('Poteškoće','Incidents')}</button>)}</div><form className="flex flex-wrap items-end gap-3" onSubmit={e=>{e.preventDefault();void load();}}><label className="text-sm adm-text">{t('ID lokala (opcionalno)','Venue ID (optional)')}<input className="block min-h-11 rounded-xl border adm-border adm-bg px-3" value={venue} onChange={e=>setVenue(e.target.value)}/></label><label className="text-sm adm-text">{t('ID računa ili reference (opcionalno)','Bill or reference ID (optional)')}<input className="block min-h-11 rounded-xl border adm-border adm-bg px-3" value={entity} onChange={e=>setEntity(e.target.value)}/></label><button disabled={busy} className="min-h-11 rounded-xl bg-primary px-4 text-white">{t('Pretraži','Search')}</button></form>{error&&<p role="alert">{t('Žao nam je, pokušajte ponovo.','Sorry, please try again.')}</p>}{rows.map(r=><details key={r.id} className="rounded-xl border adm-border adm-surface p-4 adm-text"><summary className="cursor-pointer"><span className="font-bold">{r.action}</span> · {r.actor_name??r.actor_id??'system'} · {r.actor_role}<small className="block adm-text-muted">{new Date(r.occurred_at).toLocaleString()} · {r.restaurant_id} · {r.entity_type} · {r.entity_id}</small></summary><p className="mt-3 text-sm">{t('Odgovorno osoblje','Responsible staff')}: {r.responsible_waiter_id??'—'}</p><pre className="mt-2 overflow-auto text-xs">{JSON.stringify(r.changes,null,2)}</pre></details>)}{!busy&&!rows.length&&!error&&<p className="adm-text-muted">{t('Nema zapisa.','No records.')}</p>}{cursor&&<button disabled={busy} onClick={()=>void load(true)} className="min-h-11 rounded-xl border adm-border px-4 adm-text">{t('Prikaži još','Show more')}</button>}</div>;
+}

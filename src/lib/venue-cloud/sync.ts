@@ -1,20 +1,16 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
 import * as restaurantService from '@/services/restaurantService';
 import * as productService from '@/services/productService';
 import type { RestaurantData } from '@/store/cmsStore';
 import { useCmsStore } from '@/store/cmsStore';
-import type { Database } from '@/types/supabase';
 import {
   buildRestaurantData,
-  dbCategoriesForSave,
-  productToRow,
-  restaurantInfoToRow,
 } from '@/lib/venue-cloud/mappers';
 import type { ThemeCustomization } from '@/store/cmsStore';
+import { menuPatch } from './patch';
+import { useVenueSaveStore } from '@/store/venueSaveStore';
 
-type DbClient = SupabaseClient<Database, 'sarayamenu'>;
-
-const saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const saveChains = new Map<string, Promise<void>>();
+const confirmed = new Map<string, RestaurantData>();
 
 export async function loadVenueBundle(slug: string): Promise<RestaurantData | null> {
   const [row, menu, pageContent, componentStyles, layoutConfig, themeRows] =
@@ -38,130 +34,58 @@ export async function loadVenueBundle(slug: string): Promise<RestaurantData | nu
     };
   }
 
-  return buildRestaurantData(row, menu, {
+  const bundle = buildRestaurantData(row, menu, {
     pageContent,
     componentStyles,
     layoutConfig,
     themeCustomizations,
   });
+  confirmed.set(slug, structuredClone(bundle));
+  return bundle;
 }
 
-export async function saveVenueToCloud(
-  slug: string,
-  data: RestaurantData,
-  client?: DbClient
-): Promise<void> {
-  const row = restaurantInfoToRow(slug, data.restaurant, data.venueType);
-  const existing = await restaurantService.getRestaurant(slug, client);
-  if (existing) {
-    await restaurantService.updateRestaurant(slug, row, client);
-  } else {
-    await restaurantService.createRestaurant(row, client);
-  }
-
-  await Promise.all([
-    restaurantService.savePageContent(slug, data.pageContent, client),
-    restaurantService.saveComponentStyles(slug, data.componentStyles, client),
-    restaurantService.saveLayoutConfig(slug, data.layoutConfig, client),
-  ]);
-
-  for (const [themeId, customization] of Object.entries(data.themeCustomizations ?? {})) {
-    await restaurantService.saveThemeCustomization(
-      slug,
-      themeId,
-      {
-        componentStyles: customization.componentStyles,
-        layoutConfig: customization.layoutConfig,
-        pageContent: customization.pageContent,
-      },
-      client
-    );
-  }
-
-  const categories = dbCategoriesForSave(data.categories);
-  const existingCats = await productService.getCategories(slug, client);
-  const keepCatIds = new Set(categories.map((c) => c.id));
-  for (const c of existingCats) {
-    if (!keepCatIds.has(c.id)) {
-      await productService.deleteCategory(slug, c.id, client);
-    }
-  }
-  for (let i = 0; i < categories.length; i++) {
-    const c = categories[i];
-    await productService.upsertCategory(
-      {
-        id: c.id,
-        restaurant_id: slug,
-        label: c.label,
-        label_bs: c.label_bs ?? null,
-        icon: c.icon,
-        color: c.color,
-        sort_order: i,
-      },
-      client
-    );
-  }
-
-  const existingProducts = await productService.getProducts(slug, client);
-  const keepProductIds = new Set(data.products.map((p) => p.id));
-  for (const p of existingProducts) {
-    if (!keepProductIds.has(p.id)) {
-      await productService.deleteProduct(p.id, client);
-    }
-  }
-
-  for (const product of data.products) {
-    const productRow = productToRow(product, slug);
-    const existingProduct = await productService.getProductById(product.id, client);
-    if (existingProduct) {
-      await productService.updateProduct(product.id, productRow, client);
-    } else {
-      await productService.createProduct(productRow, client);
-    }
-    await productService.syncAddons(product.id, product.addons ?? [], client);
-    await productService.syncVariations(product.id, product.variations ?? [], client);
-  }
+export async function saveVenueToCloud(slug: string, data: RestaurantData): Promise<void> {
+  const snapshot = structuredClone(data);
+  const previous = saveChains.get(slug) ?? Promise.resolve();
+  const task = previous.catch(() => undefined).then(() => postSaveVenueToCloud(slug, snapshot));
+  saveChains.set(slug, task);
+  try { await task; } finally { if (saveChains.get(slug) === task) saveChains.delete(slug); }
 }
 
 async function postSaveVenueToCloud(slug: string, data: RestaurantData): Promise<void> {
-  const res = await fetch('/api/venue/save', {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ slug, data }),
-  });
-
-  if (!res.ok) {
-    let message = res.statusText;
-    try {
-      const body = (await res.json()) as { error?: string };
-      if (body.error) message = body.error;
-    } catch {
-      /* ignore */
+  const setStatus = useVenueSaveStore.getState().setStatus;
+  const base = confirmed.get(slug);
+  const patch = menuPatch(slug, data, base);
+  if (!Object.keys(patch).length) return;
+  setStatus(slug, { state: 'saving' });
+  try {
+    const payload = JSON.stringify({ slug, revision: base?.revision ?? data.revision ?? null, patch, requestKey: crypto.randomUUID() });
+    let res: Response;
+    try { res = await fetch('/api/venue/save', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: payload }); }
+    catch { res = await fetch('/api/venue/save', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: payload }); }
+    const body = await res.json();
+    if (!res.ok) {
+      setStatus(slug, { state: 'error', conflict: res.status === 409 });
+      throw new Error(body.error ?? 'Sačuvajte izmjene ponovo.');
     }
-    throw new Error(message);
+    confirmed.set(slug, { ...data, revision: body.revision });
+    useCmsStore.setState(s => ({ allRestaurants: { ...s.allRestaurants, [slug]: { ...(s.allRestaurants[slug] ?? data), revision: body.revision } } }));
+    setStatus(slug, { state: 'saved' });
+  } catch (error) {
+    if (useVenueSaveStore.getState().venues[slug]?.state !== 'error') setStatus(slug, { state: 'error' });
+    throw error;
   }
 }
 
-export function queueSaveVenueToCloud(slug: string, data: RestaurantData, delayMs = 600): void {
-  const prev = saveTimers.get(slug);
-  if (prev) clearTimeout(prev);
-  saveTimers.set(
-    slug,
-    setTimeout(() => {
-      saveTimers.delete(slug);
-      void postSaveVenueToCloud(slug, data).catch((err) => {
-        console.error(`[venue-cloud] Failed to save ${slug}:`, err);
-      });
-    }, delayMs)
-  );
+export async function queueSaveVenueToCloud(slug: string, data: RestaurantData): Promise<boolean> {
+  try { await saveVenueToCloud(slug, data); return true; }
+  catch { return false; } // The shared save banner retains the draft and offers recovery.
 }
 
 export async function deleteVenueFromCloud(slug: string): Promise<void> {
-  const t = saveTimers.get(slug);
-  if (t) clearTimeout(t);
-  saveTimers.delete(slug);
+  await saveChains.get(slug);
   await restaurantService.deleteRestaurant(slug);
+  confirmed.delete(slug);
 }
 
 export async function loadAllVenuesIntoStore(): Promise<{ count: number; migrated: boolean }> {
@@ -190,7 +114,9 @@ export async function loadAllVenuesIntoStore(): Promise<{ count: number; migrate
         return bundle ? ([row.id, bundle] as const) : null;
       } catch (e) {
         console.error(`[venue-cloud] Failed to load ${row.id}:`, e);
-        return null;
+        const previous = useCmsStore.getState().allRestaurants[row.id];
+        if (previous) return [row.id, previous] as const;
+        throw e;
       }
     })
   );

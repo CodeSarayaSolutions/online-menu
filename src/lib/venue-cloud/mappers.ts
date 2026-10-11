@@ -48,6 +48,9 @@ export function dbCategoriesForSave(categories: CategoryInfo[]): CategoryInfo[] 
 
 export function restaurantRowToInfo(row: RestaurantRow): RestaurantInfo {
   return {
+    language: row.language ?? 'bs',
+    timezone: row.timezone ?? 'Europe/Sarajevo',
+    kitchenEnabled: row.kitchen_enabled ?? false,
     name: row.name,
     name_bs: row.name_bs ?? undefined,
     tagline: row.tagline,
@@ -91,6 +94,7 @@ export function productToRow(p: ProductItem, restaurantId: string): InsertDto<'p
     id: p.id,
     restaurant_id: restaurantId,
     category: p.category,
+    category_id: p.categoryId ?? null,
     name: p.name,
     name_bs: p.name_bs ?? null,
     description: p.description,
@@ -99,7 +103,7 @@ export function productToRow(p: ProductItem, restaurantId: string): InsertDto<'p
     image: p.image,
     popular: p.popular ?? false,
     sort_order: p.sortOrder ?? 0,
-    station: p.station ?? 'kitchen',
+    station: p.station ?? 'bar',
   };
 }
 
@@ -114,6 +118,7 @@ export function buildRestaurantData(
   }
 ): RestaurantData {
   return {
+    revision: row.revision ?? 0,
     venueType: row.venue_type as VenueType,
     restaurant: restaurantRowToInfo(row),
     categories: ensureVirtualCategories(menu.categories),

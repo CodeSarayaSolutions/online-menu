@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { productCategoryId } from "@/lib/category-identity";
+import { useUiText } from "@/hooks/useUiText";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useParams } from "next/navigation";
 import {
   Plus, Trash2, Save, Search, X, Pencil, Flame,
@@ -20,6 +22,9 @@ import * as inventoryService from "@/services/inventoryService";
 import type { HappyHourSchedule, HappyHourScheduleInput } from "@/services/happyHourService";
 import type { Tables } from "@/types/supabase";
 import clsx from "clsx";
+import { useOperationalText } from "@/hooks/useOperationalText";
+import { useVenueSaveStore } from "@/store/venueSaveStore";
+import VenueSaveFeedback from "@/components/admin/VenueSaveFeedback";
 
 /* ─── Color presets for categories ──────────────────────── */
 const colorPresets = [
@@ -113,6 +118,7 @@ const scheduleProductMap = (schedules: HappyHourSchedule[]) => {
    MAIN COMPONENT
    ════════════════════════════════════════════════════════════ */
 export default function ProductsEditor() {
+  const uiText = useUiText();
   const { venue } = useParams<{ venue: string }>();
   const currentUser = useAuthStore((s) => s.getCurrentUser());
   /* ─── CMS store ─────────────────────────────────────────── */
@@ -131,13 +137,17 @@ export default function ProductsEditor() {
   const layoutConfig = useCmsStore((s) => s.layoutConfig);
   const saveActiveToAllRestaurants = useCmsStore((s) => s.saveActiveToAllRestaurants);
 
+  const t = useOperationalText();
+  const kitchenEnabled = useCmsStore(s => !!s.restaurant.kitchenEnabled);
+  const savingProduct = useVenueSaveStore(s => s.venues[venue]?.state === 'saving');
+  const drawerRef = useRef<HTMLElement>(null);
   /* ─── Product state ─────────────────────────────────────── */
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCategory, setFilterCategory] = useState("all");
   const [editingProduct, setEditingProduct] = useState<ProductItem | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [initialStock, setInitialStock] = useState(0);
-  const [pendingInventoryTracked, setPendingInventoryTracked] = useState(true);
+  const [pendingInventoryTracked, setPendingInventoryTracked] = useState(false);
   const [inventoryRows, setInventoryRows] = useState<InventoryRow[]>([]);
   const [trackingConfirm, setTrackingConfirm] = useState<{
     productId: string;
@@ -173,7 +183,7 @@ export default function ProductsEditor() {
   });
 
   /* ─── Preview state ──────────────────────────────────────── */
-  const [showPreview, setShowPreview] = useState(true);
+  const [showPreview, setShowPreview] = useState(false);
 
   /* ═════════════════════════════════════════════════════════
      CATEGORY ACTIONS
@@ -183,20 +193,20 @@ export default function ProductsEditor() {
   const startCatEdit = (cat: CategoryInfo) => { setCatEditingId(cat.id); setCatEditForm({ ...cat }); };
   const cancelCatEdit = () => { setCatEditingId(null); setCatEditForm(null); };
 
-  const saveCatEdit = () => {
+  const saveCatEdit = async () => {
     if (catEditingId && catEditForm) {
       updateCategory(catEditingId, categoryForSave(catEditForm));
-      setTimeout(() => saveActiveToAllRestaurants(venue), 0);
+      if (!await saveActiveToAllRestaurants(venue)) return;
       setCatSaved(catEditingId);
       setTimeout(() => setCatSaved(null), 1200);
       cancelCatEdit();
     }
   };
 
-  const handleCatAdd = () => {
+  const handleCatAdd = async () => {
     if (!newCat.id || !newCat.label) return;
     addCategory(categoryForSave(newCat));
-    setTimeout(() => saveActiveToAllRestaurants(venue), 0);
+    if (!await saveActiveToAllRestaurants(venue)) return;
     setCatSaved(newCat.id);
     setTimeout(() => setCatSaved(null), 1200);
     setNewCat({ id: "", label: "", icon: "", color: defaultCategoryColor });
@@ -230,7 +240,7 @@ export default function ProductsEditor() {
     : undefined;
   const currentInventoryTracked = isNew
     ? pendingInventoryTracked
-    : currentInventoryRow?.tracked !== false;
+    : currentInventoryRow?.tracked ?? false;
 
   const loadInventoryRows = async () => {
     if (!venue) return;
@@ -249,7 +259,7 @@ export default function ProductsEditor() {
       setHappyHourSchedules(schedules);
     } catch (err) {
       console.error("[happy-hour] failed to load schedules", err);
-      setHappyHourToast(err instanceof Error ? err.message : "Happy hour nije učitan");
+      setHappyHourToast(uiText("Žao nam je, nešto nije uspjelo. Pokušajte ponovo."));
     }
   };
 
@@ -257,21 +267,16 @@ export default function ProductsEditor() {
     void loadInventoryRows();
     void loadHappyHours();
   }, [venue]);
-  /** Labels used in product.category — includes DB categories + any product bucket not in the list */
-  const menuCategories = useMemo(() => {
-    const fromCats = realCategories.map((c) => c.label);
-    const fromProducts = products.map((p) => p.category).filter(Boolean);
-    return Array.from(new Set([...fromCats, ...fromProducts]));
-  }, [realCategories, products]);
+  const categoryKey = (p: ProductItem) => productCategoryId(p, realCategories) ?? `legacy:${p.category}`;
+  const menuCategories = useMemo(() => Array.from(new Set([...realCategories.map(c => c.id), ...products.map(categoryKey)])), [realCategories, products]);
 
   const startAdd = (category?: string) => {
     const p = blankProduct(venue);
-    if (category) p.category = category;
-    setEditingProduct(p);
-    setIsNew(true);
-    setInitialStock(0);
-    setPendingInventoryTracked(true);
-    setStockToast(null);
+    const selected = realCategories.find(c=>c.id===category) ?? realCategories[0];
+    p.category = selected?.label ?? '';
+    p.categoryId = selected?.id;
+    p.station = kitchenEnabled ? undefined : "bar";
+    setEditingProduct(p);setIsNew(true);setInitialStock(0);setPendingInventoryTracked(false);setStockToast(null);
   };
 
   const openProductCatModal = () => {
@@ -279,7 +284,7 @@ export default function ProductsEditor() {
     setShowProductCatModal(true);
   };
 
-  const saveQuickCategory = () => {
+  const saveQuickCategory = async () => {
     if (!quickNewCat.label.trim()) return;
     const id =
       quickNewCat.id.trim() ||
@@ -289,9 +294,9 @@ export default function ProductsEditor() {
         .replace(/^-|-$/g, "");
     const cat: CategoryInfo = categoryForSave({ ...quickNewCat, id, label: quickNewCat.label.trim() });
     addCategory(cat);
-    setTimeout(() => saveActiveToAllRestaurants(venue), 0);
+    if (!await saveActiveToAllRestaurants(venue)) return;
     if (editingProduct) {
-      setEditingProduct({ ...editingProduct, category: cat.label });
+      setEditingProduct({ ...editingProduct, category: cat.label, categoryId: cat.id });
     }
     setFilterCategory(id);
     setShowProductCatModal(false);
@@ -305,86 +310,53 @@ export default function ProductsEditor() {
       variations: p.variations ? p.variations.map((v) => ({ ...v, options: v.options.map((o) => ({ ...o })) })) : [],
     });
     setIsNew(false);
-    setPendingInventoryTracked(true);
+    setPendingInventoryTracked(false);
   };
   const cancelEdit = () => {
+    if (savingProduct) return;
     setEditingProduct(null);
     setIsNew(false);
     setInitialStock(0);
     setStockToast(null);
   };
 
-  const saveProduct = () => {
-    if (!editingProduct || !editingProduct.name || !editingProduct.price) return;
-    const catLabel = editingProduct.category?.trim();
-    if (!catLabel) {
+  useEffect(() => {
+    if (!editingProduct) return;
+    const previous = document.activeElement as HTMLElement | null;
+    drawerRef.current?.focus();
+    return () => previous?.focus();
+  }, [!!editingProduct]);
+
+  const saveProduct = async () => {
+    if (savingProduct || !editingProduct || !editingProduct.name.trim() || !Number.isFinite(editingProduct.price) || editingProduct.price < 0) return;
+    if (kitchenEnabled && !editingProduct.station) return;
+    const selectedCategory = realCategories.find(c=>c.id===productCategoryId(editingProduct,realCategories));
+    const catLabel = selectedCategory?.label;
+    if (!selectedCategory) {
       openProductCatModal();
       return;
     }
     const payload = {
       ...editingProduct,
       restaurantId: venue,
-      category: catLabel,
+      category: selectedCategory.label,
+      categoryId: selectedCategory.id,
+      station: kitchenEnabled ? (editingProduct.station ?? "bar") : "bar",
       variations: (editingProduct.variations || []).map((variation) => ({
         ...variation,
         minSelect: variation.minSelect ?? (variation.required ? 1 : 0),
         maxSelect: Math.max(variation.maxSelect ?? 1, variation.minSelect ?? 0, 1),
       })),
     };
-    if (catLabel) {
-      const catId = catLabel.toLowerCase().replace(/\s+/g, "-");
-      const hasCat = categories.some(
-        (c) => c.label.toLowerCase() === catLabel.toLowerCase() || c.id === catId
-      );
-      if (!hasCat) {
-        addCategory({
-          id: catId,
-          label: catLabel,
-          icon: "",
-          color: defaultCategoryColor,
-        });
-      }
-    }
     if (isNew) {
-      addProduct(payload);
-      const stock = initialStock;
-      setTimeout(() => saveActiveToAllRestaurants(venue), 0);
-      setSaved(editingProduct.id);
-      setTimeout(() => setSaved(null), 1500);
-      fetch("/api/inventory/adjust", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          restaurantId: venue,
-          productId: payload.id,
-          productName: payload.name,
-          delta: stock,
-          reason: "init",
-          tracked: pendingInventoryTracked,
-        }),
-      })
-        .then((res) => {
-          if (!res.ok) throw new Error("Inventory adjust failed");
-          setStockToast(
-            stock > 0
-              ? `Stavka dodana. Zaliha postavljena na ${stock}.`
-              : "Stavka dodana. Zaliha je trenutno 0 — ažurirajte u Inventaru."
-          );
-          setTimeout(() => cancelEdit(), 2500);
-          void loadInventoryRows();
-        })
-        .catch((e) => {
-          console.error("[inventory] auto-init failed", e);
-          cancelEdit();
-        });
-      return;
-    }
-    updateProduct(payload.id, payload);
-    /* Sync flat state → allRestaurants so public pages & reloads see the change */
-    setTimeout(() => saveActiveToAllRestaurants(venue), 0);
+      const stockProduct = { ...payload, initialInventory: { tracked: pendingInventoryTracked, quantity: pendingInventoryTracked ? initialStock : 0 } };
+      if (products.some(p => p.id === payload.id)) updateProduct(payload.id, stockProduct);
+      else addProduct(stockProduct);
+    } else updateProduct(payload.id, payload);
+    if (!await saveActiveToAllRestaurants(venue)) return;
     setSaved(editingProduct.id);
     setTimeout(() => setSaved(null), 1500);
+    void loadInventoryRows();
     cancelEdit();
   };
 
@@ -425,12 +397,12 @@ export default function ProductsEditor() {
       products: selectedProducts,
     };
 
-    if (happyHourForm.startTime >= happyHourForm.endTime) {
-      setHappyHourToast("Vrijeme početka mora biti prije vremena završetka.");
+    if (happyHourForm.startTime === happyHourForm.endTime) {
+      setHappyHourToast(uiText("Početak i završetak moraju biti različiti."));
       return;
     }
     if (Object.keys(happyHourForm.products).length !== selectedProducts.length) {
-      setHappyHourToast("Happy hour cijena mora biti veća od 0 za svaki odabrani proizvod.");
+      setHappyHourToast(uiText("Happy hour cijena mora biti veća od 0 za svaki odabrani proizvod."));
       return;
     }
 
@@ -439,9 +411,9 @@ export default function ProductsEditor() {
       await happyHourService.saveHappyHourSchedule(venue, input);
       await loadHappyHours();
       setHappyHourForm(null);
-      setHappyHourToast("Happy hour je spremljen.");
+      setHappyHourToast(uiText("Happy hour je spremljen."));
     } catch (err) {
-      setHappyHourToast(err instanceof Error ? err.message : "Spremanje happy houra nije uspjelo");
+      setHappyHourToast(uiText("Žao nam je, nešto nije uspjelo. Pokušajte ponovo."));
     } finally {
       setHappyHourBusy(false);
     }
@@ -452,10 +424,10 @@ export default function ProductsEditor() {
     try {
       await happyHourService.deleteHappyHourSchedule(scheduleId);
       await loadHappyHours();
-      setHappyHourToast("Happy hour je obrisan.");
+      setHappyHourToast(uiText("Happy hour je obrisan."));
       if (happyHourForm?.id === scheduleId) setHappyHourForm(null);
     } catch (err) {
-      setHappyHourToast(err instanceof Error ? err.message : "Brisanje happy houra nije uspjelo");
+      setHappyHourToast(uiText("Žao nam je, nešto nije uspjelo. Pokušajte ponovo."));
     } finally {
       setHappyHourBusy(false);
     }
@@ -477,7 +449,7 @@ export default function ProductsEditor() {
         { id: currentUser.id, name: currentUser.name }
       );
       setInventoryRows((rows) =>
-        rows.map((row) => (row.product_id === trackingConfirm.productId ? result.row : row))
+        rows.some(row => row.product_id === trackingConfirm.productId) ? rows.map((row) => (row.product_id === trackingConfirm.productId ? result.row : row)) : [...rows, result.row]
       );
       setStockToast(
         result.auditWarning ??
@@ -486,7 +458,7 @@ export default function ProductsEditor() {
             : "Stavka se više neće oduzimati iz inventara.")
       );
     } catch (err) {
-      setStockToast(err instanceof Error ? err.message : "Promjena praćenja nije uspjela");
+      setStockToast(uiText("Žao nam je, nešto nije uspjelo. Pokušajte ponovo."));
     } finally {
       setTrackingConfirm(null);
     }
@@ -587,7 +559,7 @@ export default function ProductsEditor() {
   /* ---- Reorder helpers ---- */
   const getProductsByCategory = (cat: string) =>
     products
-      .filter((p) => p.category === cat)
+      .filter((p) => categoryKey(p) === cat)
       .sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
 
   const moveProduct = (cat: string, index: number, direction: "up" | "down") => {
@@ -613,7 +585,7 @@ export default function ProductsEditor() {
     !searchQuery || p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.description.toLowerCase().includes(searchQuery.toLowerCase());
 
   const matchesCategory = (catLabel: string) =>
-    filterCategory === "all" || catLabel.toLowerCase() === categories.find((c) => c.id === filterCategory)?.label.toLowerCase();
+    filterCategory === "all" || catLabel === filterCategory;
 
   return (
     <div className="flex gap-0">
@@ -622,8 +594,8 @@ export default function ProductsEditor() {
       {/* ───────────── Header ───────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-extrabold text-dark adm-text tracking-tight">Stavke menija</h1>
-          <p className="text-sm text-muted adm-text-muted mt-1">{products.length} stavki &middot; {categories.filter((c) => c.id !== "all" && c.id !== "popular").length} vrste</p>
+          <h1 className="text-2xl font-extrabold text-dark adm-text tracking-tight">{uiText("Stavke menija")}</h1>
+          <p className="text-sm text-muted adm-text-muted mt-1">{products.length} {uiText("stavki ·")} {categories.filter((c) => c.id !== "all" && c.id !== "popular").length} {uiText("vrste")}</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -634,10 +606,10 @@ export default function ProductsEditor() {
                 ? "border-primary/20 bg-primary/5 text-primary"
                 : "border-primary/10 text-dark adm-text hover:bg-[var(--adm-surface-2)]"
             )}
-            title={showPreview ? "Sakrij pregled" : "Prikaži pregled"}
+            title={showPreview ? uiText("Sakrij pregled") : uiText("Prikaži pregled")}
           >
             {showPreview ? <PanelRightClose size={14} /> : <PanelRightOpen size={14} />}
-            <span className="hidden 2xl:inline">{showPreview ? "Sakrij pregled" : "Prikaži pregled"}</span>
+            <span className="hidden 2xl:inline">{showPreview ? uiText("Sakrij pregled") : uiText("Prikaži pregled")}</span>
           </button>
           <button
             onClick={() => setShowCatPanel(!showCatPanel)}
@@ -649,11 +621,11 @@ export default function ProductsEditor() {
             )}
           >
             <Tags size={15} />
-            Vrste
+            {uiText("Vrste")}
             <span className="text-[10px] font-bold adm-bg rounded-full px-2 py-0.5 text-muted adm-text-muted">{categories.filter((c) => c.id !== "all" && c.id !== "popular").length}</span>
           </button>
           <button onClick={() => startAdd()} className="flex items-center gap-2 bg-gradient-to-r from-primary to-amber-500 text-white px-5 py-2.5 rounded-2xl text-sm font-bold hover:brightness-105 transition shadow-glow shrink-0">
-            <Plus size={16} /> Dodaj stavku
+            <Plus size={16} /> {uiText("Dodaj stavku")}
           </button>
         </div>
       </div>
@@ -678,8 +650,8 @@ export default function ProductsEditor() {
                     <Tags size={14} className="text-primary" />
                   </div>
                   <div>
-                    <h2 className="text-sm font-extrabold text-dark adm-text">Upravljanje vrstama</h2>
-                    <p className="text-[10px] text-muted adm-text-muted">{categories.length} ukupno &middot; Promijenite redoslijed, uredite ili dodajte</p>
+                    <h2 className="text-sm font-extrabold text-dark adm-text">{uiText("Upravljanje vrstama")}</h2>
+                    <p className="text-[10px] text-muted adm-text-muted">{categories.length} {uiText("ukupno · Promijenite redoslijed, uredite ili dodajte")}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -687,7 +659,7 @@ export default function ProductsEditor() {
                     onClick={() => setShowCatAdd(true)}
                     className="flex items-center gap-1.5 bg-gradient-to-r from-primary to-amber-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold hover:brightness-105 transition shadow-glow"
                   >
-                    <Plus size={13} /> Nova vrsta
+                    <Plus size={13} /> {uiText("Nova vrsta")}
                   </button>
                   <button
                     onClick={() => setShowCatPanel(false)}
@@ -709,22 +681,22 @@ export default function ProductsEditor() {
                   >
                     <div className="px-5 py-5 border-b border-primary/10 bg-primary/[0.02]">
                       <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-[13px] font-extrabold text-dark adm-text">Kreiraj vrstu</h3>
+                        <h3 className="text-[13px] font-extrabold text-dark adm-text">{uiText("Kreiraj vrstu")}</h3>
                         <button onClick={() => setShowCatAdd(false)} className="p-1 rounded-lg hover:bg-[var(--adm-surface-2)] text-muted adm-text-muted transition"><X size={14} /></button>
                       </div>
                       <div className="grid grid-cols-2 gap-4 mb-4">
-                        <CatField label="ID (mala slova)" value={newCat.id} onChange={(v) => setNewCat((c) => ({ ...c, id: v.toLowerCase().replace(/\s/g, "-") }))} placeholder="e.g. seafood" />
+                        <CatField label="ID (mala slova)" value={newCat.id} onChange={(v) => setNewCat((c) => ({ ...c, id: v.toLowerCase().replace(/\s/g, "-") }))} placeholder={uiText("e.g. seafood")} />
                         <div>
-                          <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Naziv za prikaz</label>
+                          <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">{uiText("Naziv za prikaz")}</label>
                           <div>
-                            <input value={newCat.label} onChange={(e) => setNewCat((c) => ({ ...c, label: e.target.value }))} placeholder="e.g. Seafood" className="w-full px-3 py-2 adm-bg rounded-xl text-sm text-dark adm-text border border-primary/10 focus:border-primary focus:adm-surface adm-border border focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:adm-text-faint" />
+                            <input value={newCat.label} onChange={(e) => setNewCat((c) => ({ ...c, label: e.target.value }))} placeholder={uiText("e.g. Seafood")} className="w-full px-3 py-2 adm-bg rounded-xl text-sm text-dark adm-text border border-primary/10 focus:border-primary focus:adm-surface adm-border border focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:adm-text-faint" />
                             <BsCollapse hasValue={!!((newCat as any).label_bs)}>
-                              <input value={(newCat as any).label_bs || ""} onChange={(e) => setNewCat((c) => ({ ...c, label_bs: e.target.value }))} placeholder="npr. Morski plodovi" className="w-full px-3 py-2 adm-bg rounded-xl text-sm text-dark adm-text border border-blue-200/30 focus:border-blue-400 focus:adm-surface adm-border border focus:ring-4 focus:ring-blue-100 outline-none transition-all placeholder:adm-text-faint" />
+                              <input value={(newCat as any).label_bs || ""} onChange={(e) => setNewCat((c) => ({ ...c, label_bs: e.target.value }))} placeholder={uiText("npr. Morski plodovi")} className="w-full px-3 py-2 adm-bg rounded-xl text-sm text-dark adm-text border border-blue-200/30 focus:border-blue-400 focus:adm-surface adm-border border focus:ring-4 focus:ring-blue-100 outline-none transition-all placeholder:adm-text-faint" />
                             </BsCollapse>
                           </div>
                         </div>
                         <div className="sm:col-span-2">
-                          <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Boja</label>
+                          <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">{uiText("Boja")}</label>
                           <div className="flex flex-wrap gap-1.5">
                             {colorPresets.map((color) => (
                               <button
@@ -737,8 +709,8 @@ export default function ProductsEditor() {
                         </div>
                       </div>
                       <div className="flex gap-3">
-                        <button onClick={() => setShowCatAdd(false)} className="flex-1 py-2 rounded-xl border border-primary/10 text-xs font-semibold text-dark adm-text hover:bg-[var(--adm-surface-2)] transition">Odustani</button>
-                        <button onClick={handleCatAdd} disabled={!newCat.id || !newCat.label} className="flex-1 py-2 rounded-xl bg-gradient-to-r from-primary to-amber-500 text-white text-xs font-bold hover:brightness-105 transition disabled:opacity-40 shadow-glow">Kreiraj</button>
+                        <button onClick={() => setShowCatAdd(false)} className="flex-1 py-2 rounded-xl border border-primary/10 text-xs font-semibold text-dark adm-text hover:bg-[var(--adm-surface-2)] transition">{uiText("Odustani")}</button>
+                        <button onClick={handleCatAdd} disabled={!newCat.id || !newCat.label} className="flex-1 py-2 rounded-xl bg-gradient-to-r from-primary to-amber-500 text-white text-xs font-bold hover:brightness-105 transition disabled:opacity-40 shadow-glow">{uiText("Kreiraj")}</button>
                       </div>
                     </div>
                   </motion.div>
@@ -756,22 +728,22 @@ export default function ProductsEditor() {
                       {isEditing && catEditForm ? (
                         <div className="px-5 py-4 space-y-3">
                           <div className="flex items-center justify-between">
-                            <h4 className="text-xs font-extrabold text-dark adm-text">Editing: {cat.label}</h4>
+                            <h4 className="text-xs font-extrabold text-dark adm-text">{uiText("Editing:")} {cat.label}</h4>
                             <button onClick={cancelCatEdit} className="p-1 rounded-lg hover:bg-[var(--adm-surface-2)] text-muted adm-text-muted transition"><X size={13} /></button>
                           </div>
                           <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Naziv za prikaz</label>
+                              <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">{uiText("Naziv za prikaz")}</label>
                               <div>
-                                <input value={catEditForm.label} onChange={(e) => setCatEditForm((f) => f ? { ...f, label: e.target.value } : f)} placeholder="e.g. Seafood" className="w-full px-3 py-2 adm-bg rounded-xl text-sm text-dark adm-text border border-primary/10 focus:border-primary focus:adm-surface adm-border border focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:adm-text-faint" />
+                                <input value={catEditForm.label} onChange={(e) => setCatEditForm((f) => f ? { ...f, label: e.target.value } : f)} placeholder={uiText("e.g. Seafood")} className="w-full px-3 py-2 adm-bg rounded-xl text-sm text-dark adm-text border border-primary/10 focus:border-primary focus:adm-surface adm-border border focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:adm-text-faint" />
                                 <BsCollapse hasValue={!!(catEditForm.label_bs)}>
-                                  <input value={catEditForm.label_bs || ""} onChange={(e) => setCatEditForm((f) => f ? { ...f, label_bs: e.target.value } : f)} placeholder="npr. Morski plodovi" className="w-full px-3 py-2 adm-bg rounded-xl text-sm text-dark adm-text border border-blue-200/30 focus:border-blue-400 focus:adm-surface adm-border border focus:ring-4 focus:ring-blue-100 outline-none transition-all placeholder:adm-text-faint" />
+                                  <input value={catEditForm.label_bs || ""} onChange={(e) => setCatEditForm((f) => f ? { ...f, label_bs: e.target.value } : f)} placeholder={uiText("npr. Morski plodovi")} className="w-full px-3 py-2 adm-bg rounded-xl text-sm text-dark adm-text border border-blue-200/30 focus:border-blue-400 focus:adm-surface adm-border border focus:ring-4 focus:ring-blue-100 outline-none transition-all placeholder:adm-text-faint" />
                                 </BsCollapse>
                               </div>
                             </div>
                           </div>
                           <div>
-                            <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-1.5">Boja</label>
+                            <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-1.5">{uiText("Boja")}</label>
                             <div className="flex flex-wrap gap-1.5">
                               {colorPresets.map((color) => (
                                 <button
@@ -783,9 +755,9 @@ export default function ProductsEditor() {
                             </div>
                           </div>
                           <div className="flex gap-2 pt-1">
-                            <button onClick={cancelCatEdit} className="flex-1 py-2 rounded-xl border border-primary/10 text-xs font-semibold text-dark adm-text hover:bg-[var(--adm-surface-2)] transition">Odustani</button>
+                            <button onClick={cancelCatEdit} className="flex-1 py-2 rounded-xl border border-primary/10 text-xs font-semibold text-dark adm-text hover:bg-[var(--adm-surface-2)] transition">{uiText("Odustani")}</button>
                             <button onClick={saveCatEdit} className="flex-1 py-2 rounded-xl bg-gradient-to-r from-primary to-amber-500 text-white text-xs font-bold hover:brightness-105 flex items-center justify-center gap-1.5 shadow-glow">
-                              <Save size={12} /> Save
+                              <Save size={12} /> {uiText("Save")}
                             </button>
                           </div>
                         </div>
@@ -803,7 +775,7 @@ export default function ProductsEditor() {
                           <div className="flex-1 min-w-0">
                             <p className="text-[13px] font-semibold text-dark adm-text">{cat.label}</p>
                             <p className="text-[10px] text-muted adm-text-muted">
-                              {isSpecialCat(cat.id) ? <span className="text-primary font-medium">System</span> : `${productCount} ${productCount !== 1 ? "stavki" : "stavka"}`}
+                              {isSpecialCat(cat.id) ? <span className="text-primary font-medium">{uiText("System")}</span> : `${productCount} ${productCount !== 1 ? uiText("stavki") : uiText("stavka")}`}
                             </p>
                           </div>
                           {catSaved === cat.id && <Check size={15} className="text-accent-green shrink-0" strokeWidth={3} />}
@@ -812,8 +784,8 @@ export default function ProductsEditor() {
                             {!isSpecialCat(cat.id) && (
                               catConfirmDelete === cat.id ? (
                                 <div className="flex items-center gap-1">
-                                  <button onClick={() => handleCatDelete(cat.id)} className="px-2 py-1 rounded-lg text-[10px] font-bold bg-accent-red text-white hover:brightness-110 transition">Delete</button>
-                                  <button onClick={() => setCatConfirmDelete(null)} className="px-1.5 py-1 rounded-lg text-[10px] text-muted adm-text-muted hover:bg-[var(--adm-surface-2)] transition">No</button>
+                                  <button onClick={() => handleCatDelete(cat.id)} className="px-2 py-1 rounded-lg text-[10px] font-bold bg-accent-red text-white hover:brightness-110 transition">{uiText("Delete")}</button>
+                                  <button onClick={() => setCatConfirmDelete(null)} className="px-1.5 py-1 rounded-lg text-[10px] text-muted adm-text-muted hover:bg-[var(--adm-surface-2)] transition">{uiText("No")}</button>
                                 </div>
                               ) : (
                                 <button onClick={() => setCatConfirmDelete(cat.id)} className="p-1.5 rounded-lg adm-text-faint hover:text-accent-red hover:bg-red-50 transition"><Trash2 size={13} /></button>
@@ -841,9 +813,9 @@ export default function ProductsEditor() {
             <Clock size={16} />
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-sm font-extrabold text-dark adm-text">Happy Hour</h2>
+            <h2 className="text-sm font-extrabold text-dark adm-text">{uiText("Happy Hour")}</h2>
             <p className="text-[11px] text-muted adm-text-muted">
-              {happyHourSchedules.length} raspored(a) · ručno aktivirajte popuste po vremenu
+              {happyHourSchedules.length} {uiText("rasporeda · popusti se primjenjuju automatski u odabrano vrijeme")}
             </p>
           </div>
           <ChevronDown
@@ -875,7 +847,7 @@ export default function ProductsEditor() {
                             {schedule.label || "Happy Hour"}
                           </p>
                           <p className="text-xs text-muted adm-text-muted">
-                            {schedule.start_time.slice(0, 5)} - {schedule.end_time.slice(0, 5)} · {schedule.products.length} stavki
+                            {schedule.start_time.slice(0, 5)} - {schedule.end_time.slice(0, 5)} · {schedule.products.length} {uiText("stavki")}
                           </p>
                         </div>
                         <span
@@ -884,7 +856,7 @@ export default function ProductsEditor() {
                             schedule.active ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"
                           )}
                         >
-                          {schedule.active ? "Aktivno" : "Ugašeno"}
+                          {schedule.active ? uiText("Aktivno") : uiText("Ugašeno")}
                         </span>
                       </div>
                       <div className="mt-3 flex gap-2">
@@ -893,7 +865,7 @@ export default function ProductsEditor() {
                           onClick={() => openHappyHourForm(schedule)}
                           className="flex-1 rounded-xl adm-surface adm-border border px-3 py-2 text-xs font-bold adm-text"
                         >
-                          Uredi
+                          {uiText("Uredi")}
                         </button>
                         <button
                           type="button"
@@ -901,14 +873,14 @@ export default function ProductsEditor() {
                           onClick={() => void deleteHappyHour(schedule.id)}
                           className="rounded-xl px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 disabled:opacity-40"
                         >
-                          Obriši
+                          {uiText("Obriši")}
                         </button>
                       </div>
                     </div>
                   ))}
                   {happyHourSchedules.length === 0 && (
                     <p className="text-xs text-muted adm-text-muted py-2">
-                      Nema happy hour rasporeda.
+                      {uiText("Nema happy hour rasporeda.")}
                     </p>
                   )}
                 </div>
@@ -920,7 +892,7 @@ export default function ProductsEditor() {
                         label="Naziv"
                         value={happyHourForm.label}
                         onChange={(v) => setHappyHourForm((form) => form ? { ...form, label: v } : form)}
-                        placeholder="Jutarnji happy hour"
+                        placeholder={uiText("Jutarnji happy hour")}
                       />
                       <Field
                         label="Početak"
@@ -943,12 +915,12 @@ export default function ProductsEditor() {
                         onChange={(e) => setHappyHourForm((form) => form ? { ...form, active: e.target.checked } : form)}
                         className="h-4 w-4 accent-primary"
                       />
-                      Aktivno
+                      {uiText("Aktivno")}
                     </label>
 
                     <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
                       <p className="text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider">
-                        Proizvodi i happy hour cijene
+                        {uiText("Proizvodi i happy hour cijene")}
                       </p>
                       {products.map((product) => {
                         const selected = Object.prototype.hasOwnProperty.call(happyHourForm.products, product.id);
@@ -983,7 +955,7 @@ export default function ProductsEditor() {
                                   form ? { ...form, products: { ...form.products, [product.id]: e.target.value } } : form
                                 )
                               }
-                              placeholder="HH cijena"
+                              placeholder={uiText("HH cijena")}
                               className="w-28 rounded-xl adm-bg adm-border border px-3 py-2 text-sm adm-text disabled:opacity-40"
                             />
                           </div>
@@ -997,7 +969,7 @@ export default function ProductsEditor() {
                         onClick={() => setHappyHourForm(null)}
                         className="flex-1 rounded-xl adm-surface adm-border border px-4 py-2.5 text-sm font-bold adm-text"
                       >
-                        Odustani
+                        {uiText("Odustani")}
                       </button>
                       <button
                         type="button"
@@ -1005,7 +977,7 @@ export default function ProductsEditor() {
                         onClick={() => void saveHappyHour()}
                         className="flex-1 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white disabled:opacity-40"
                       >
-                        Spremi Happy Hour
+                        {uiText("Spremi Happy Hour")}
                       </button>
                     </div>
                   </div>
@@ -1015,7 +987,7 @@ export default function ProductsEditor() {
                     onClick={() => openHappyHourForm()}
                     className="min-h-[44px] rounded-xl bg-primary text-white px-4 text-sm font-bold"
                   >
-                    + Novi Happy Hour
+                    {uiText("+ Novi Happy Hour")}
                   </button>
                 )}
               </div>
@@ -1031,7 +1003,7 @@ export default function ProductsEditor() {
           <input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Pretraži stavke..."
+            placeholder={uiText("Pretraži stavke...")}
             className="w-full pl-10 pr-9 py-2.5 adm-surface adm-border border rounded-2xl text-sm text-dark adm-text border border-primary/10 focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all shadow-soft"
           />
           {searchQuery && (
@@ -1051,11 +1023,11 @@ export default function ProductsEditor() {
           }}
           className="px-4 py-2.5 adm-surface adm-border border rounded-2xl text-sm text-dark adm-text border border-primary/10 focus:border-primary outline-none min-w-[180px] shadow-soft"
         >
-          <option value="all">Sve vrste (samo filter)</option>
+          <option value="all">{uiText("Sve vrste (samo filter)")}</option>
           {realCategories.map((c) => (
             <option key={c.id} value={c.id}>{c.icon?.trim() ? `${c.icon} ` : ""}{c.label}</option>
           ))}
-          <option value="__create__">➕ Kreiraj novu vrstu…</option>
+          <option value="__create__">{uiText("➕ Kreiraj novu vrstu…")}</option>
         </select>
       </div>
 
@@ -1065,7 +1037,7 @@ export default function ProductsEditor() {
           if (!matchesCategory(cat)) return null;
           const catProducts = getProductsByCategory(cat).filter(matchesSearch);
           if (catProducts.length === 0 && searchQuery) return null;
-          const catObj = categories.find((c) => c.label === cat);
+          const catObj = categories.find((c) => c.id === cat);
           return (
             <div key={cat} className="adm-surface adm-border border rounded-2xl-primary/5 shadow-soft overflow-hidden">
               <div className="adm-bg border-b border-primary/5 flex items-center">
@@ -1081,15 +1053,15 @@ export default function ProductsEditor() {
                   )}
                 />
                 {catObj?.icon && <span className="text-base">{catObj.icon}</span>}
-                <h3 className="text-sm font-extrabold text-dark adm-text">{cat}</h3>
-                <span className="text-xs text-muted adm-text-muted ml-auto">{catProducts.length} {catProducts.length !== 1 ? "stavki" : "stavka"}</span>
+                <h3 className="text-sm font-extrabold text-dark adm-text">{catObj?.label ?? uiText("Bez vrste")}</h3>
+                <span className="text-xs text-muted adm-text-muted ml-auto">{catProducts.length} {catProducts.length !== 1 ? uiText("stavki") : uiText("stavka")}</span>
               </button>
               <button
                 onClick={(e) => { e.stopPropagation(); startAdd(cat); if (collapsedCategories.has(cat)) toggleCategory(cat); }}
                 className="px-3 py-2 mr-3 my-1 flex items-center gap-1 rounded-xl text-xs font-semibold text-primary hover:bg-primary/10 transition shrink-0"
-                title={`Add product to ${cat}`}
+                title={uiText("Dodaj proizvod")}
               >
-                <Plus size={13} /> Dodaj
+                <Plus size={13} /> {uiText("Dodaj")}
               </button>
               </div>
               {!collapsedCategories.has(cat) && (
@@ -1116,7 +1088,7 @@ export default function ProductsEditor() {
                         <p className="text-sm font-bold text-dark adm-text truncate">{product.name}</p>
                         {product.popular && (
                           <span className="shrink-0 bg-gradient-to-r from-primary to-amber-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                            <Flame size={8} /> Popular
+                            <Flame size={8} /> {uiText("Popular")}
                           </span>
                         )}
                         {productHappyHourMap.has(product.id) && (
@@ -1132,7 +1104,7 @@ export default function ProductsEditor() {
                               setShowHappyHourPanel(true);
                             }}
                             className="shrink-0 bg-primary/10 text-primary text-[9px] font-extrabold px-1.5 py-0.5 rounded-full flex items-center gap-0.5"
-                            title="Happy hour rasporedi"
+                            title={uiText("Happy hour rasporedi")}
                           >
                             <Clock size={8} /> HH
                           </button>
@@ -1144,7 +1116,7 @@ export default function ProductsEditor() {
                       <p className="text-xs text-muted adm-text-muted">
                         {product.price.toFixed(2)} KM
                         {product.addons && product.addons.length > 0 && (
-                          <span className="ml-1.5 text-accent-blue">{product.addons.length} addon{product.addons.length > 1 ? "s" : ""}</span>
+                          <span className="ml-1.5 text-accent-blue">{product.addons.length} {uiText("addon")}{product.addons.length > 1 ? "s" : ""}</span>
                         )}
                       </p>
                     </div>
@@ -1154,21 +1126,21 @@ export default function ProductsEditor() {
                       <button
                         onClick={() => startEdit(product)}
                         className="w-10 h-10 p-2 rounded-xl text-muted adm-text-muted hover:text-primary hover:bg-primary/10 transition flex items-center justify-center"
-                        title="Edit"
-                        aria-label={`Uredi ${product.name}`}
+                        title={uiText("Edit")}
+                        aria-label={`${uiText("Uredi")} ${product.name}`}
                       >
                         <Pencil size={18} />
                       </button>
                       {confirmDelete === product.id ? (
                         <div className="flex items-center gap-1">
-                          <button onClick={() => handleDelete(product.id)} className="px-2 py-1 rounded-lg text-[10px] font-bold bg-accent-red text-white hover:brightness-110 transition">Delete</button>
-                          <button onClick={() => setConfirmDelete(null)} className="px-1.5 py-1 rounded-lg text-[10px] text-muted adm-text-muted hover:bg-[var(--adm-surface-2)] transition">No</button>
+                          <button onClick={() => handleDelete(product.id)} className="px-2 py-1 rounded-lg text-[10px] font-bold bg-accent-red text-white hover:brightness-110 transition">{uiText("Delete")}</button>
+                          <button onClick={() => setConfirmDelete(null)} className="px-1.5 py-1 rounded-lg text-[10px] text-muted adm-text-muted hover:bg-[var(--adm-surface-2)] transition">{uiText("No")}</button>
                         </div>
                       ) : (
                         <button
                           onClick={() => setConfirmDelete(product.id)}
                           className="p-1.5 rounded-lg adm-text-faint hover:text-accent-red hover:bg-red-50 transition"
-                          title="Delete"
+                          title={uiText("Delete")}
                         >
                           <Trash2 size={14} />
                         </button>
@@ -1181,7 +1153,7 @@ export default function ProductsEditor() {
                           "p-1.5 rounded-lg transition",
                           idx === 0 ? "adm-text-faint cursor-not-allowed" : "text-muted adm-text-muted hover:text-primary hover:bg-primary/10"
                         )}
-                        title="Move up"
+                        title={uiText("Move up")}
                       >
                         <ArrowUp size={14} />
                       </button>
@@ -1192,7 +1164,7 @@ export default function ProductsEditor() {
                           "p-1.5 rounded-lg transition",
                           idx === catProducts.length - 1 ? "adm-text-faint cursor-not-allowed" : "text-muted adm-text-muted hover:text-primary hover:bg-primary/10"
                         )}
-                        title="Move down"
+                        title={uiText("Move down")}
                       >
                         <ArrowDown size={14} />
                       </button>
@@ -1209,11 +1181,11 @@ export default function ProductsEditor() {
         {products.filter(matchesSearch).length === 0 && (
           <div className="text-center py-20 adm-surface adm-border border rounded-2xl shadow-soft border border-primary/5">
             <Package size={40} className="adm-text-faint mx-auto mb-3" />
-            <p className="text-muted adm-text-muted text-sm font-medium">Nema pronađenih stavki</p>
+            <p className="text-muted adm-text-muted text-sm font-medium">{uiText("Nema pronađenih stavki")}</p>
             <p className="adm-text-faint text-xs mt-1">
               {searchQuery || filterCategory !== "all"
-                ? "Pokušajte drugi pretragu ili filter vrste"
-                : "Prvo dodajte vrstu, zatim kreirajte prvu stavku"}
+                ? uiText("Pokušajte drugi pretragu ili filter vrste")
+                : uiText("Prvo dodajte vrstu, zatim kreirajte prvu stavku")}
             </p>
           </div>
         )}
@@ -1231,12 +1203,20 @@ export default function ProductsEditor() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
               className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-50"
-              onClick={cancelEdit}
               aria-hidden
             />
             <motion.aside
               key="product-drawer"
               role="dialog"
+              ref={drawerRef}
+              tabIndex={-1}
+              onKeyDown={e => {
+                if (e.key !== 'Tab') return;
+                const controls = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),summary,[tabindex="0"]')).filter(el => el.getClientRects().length > 0);
+                const first = controls[0], last = controls[controls.length - 1];
+                if (e.shiftKey && (document.activeElement === first || document.activeElement === e.currentTarget)) { e.preventDefault(); last?.focus(); }
+                else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
+              }}
               aria-modal="true"
               aria-labelledby="product-drawer-title"
               initial={{ x: "100%" }}
@@ -1250,7 +1230,7 @@ export default function ProductsEditor() {
               <div className="shrink-0 flex items-center justify-between gap-3 px-5 py-4 border-b border-primary/10 adm-bg/90 backdrop-blur-md">
                 <div className="min-w-0">
                   <h2 id="product-drawer-title" className="text-[15px] font-extrabold text-dark adm-text truncate">
-                    {isNew ? "Nova stavka" : "Uredi stavku"}
+                    {isNew ? t("Novi proizvod", "New product") : t("Uredi proizvod", "Edit product")}
                   </h2>
                   {!isNew && (
                     <p className="text-[11px] text-muted adm-text-muted truncate mt-0.5">{editingProduct.name}</p>
@@ -1260,93 +1240,69 @@ export default function ProductsEditor() {
                   type="button"
                   onClick={cancelEdit}
                   className="p-2 rounded-xl hover:bg-[var(--adm-surface-2)] text-muted adm-text-muted transition shrink-0"
-                  aria-label="Zatvori"
+                  aria-label={uiText("Zatvori")}
                 >
                   <X size={18} />
                 </button>
               </div>
 
               {/* Scrollable body */}
-              <div
+              <fieldset disabled={savingProduct}
                 className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-5 space-y-4"
                 style={{ WebkitOverflowScrolling: "touch" }}
               >
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="sm:col-span-2">
-                    <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Naziv *</label>
-                    <div className="flex items-start gap-3">
-                      {editingProduct.image ? (
-                        <img
-                          src={editingProduct.image}
-                          alt=""
-                          className="w-12 h-12 rounded-xl object-cover shrink-0 border border-primary/10 adm-bg"
-                        />
-                      ) : null}
-                      <div className="flex-1 min-w-0">
-                        <input
-                          type="text"
-                          value={editingProduct.name}
-                          onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
-                          placeholder="e.g. Margherita Pizza"
-                          className="w-full px-3 py-2.5 adm-bg rounded-2xl text-sm text-dark adm-text border border-primary/10 focus:border-primary focus:adm-surface adm-border border focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:adm-text-faint"
-                        />
-                        <BsCollapse hasValue={!!(editingProduct.name_bs)}>
-                          <input
-                            type="text"
-                            value={editingProduct.name_bs || ""}
-                            onChange={(e) => setEditingProduct({ ...editingProduct, name_bs: e.target.value })}
-                            placeholder="npr. Margherita Pizza"
-                            className="w-full px-3 py-2.5 adm-bg rounded-2xl text-sm text-dark adm-text border border-blue-200/30 focus:border-blue-400 focus:adm-surface adm-border border focus:ring-4 focus:ring-blue-100 outline-none transition-all placeholder:adm-text-faint mt-2"
-                          />
-                        </BsCollapse>
-                      </div>
-                    </div>
-                  </div>
-                  <Field
-                    label="Cijena (KM) *"
-                    type="number"
-                    value={editingProduct.price || ""}
-                    onChange={(v) => setEditingProduct({ ...editingProduct, price: parseFloat(v) || 0 })}
-                    placeholder="12.99"
-                  />
-                  {isNew && (
-                    <div>
-                      <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">
-                        Početna zaliha
-                      </label>
-                      <input
-                        type="number"
-                        min={0}
-                        step={1}
-                        value={initialStock}
-                        onChange={(e) => {
-                          const n = parseInt(e.target.value, 10);
-                          setInitialStock(Number.isNaN(n) ? 0 : Math.max(0, n));
-                        }}
-                        placeholder="0"
-                        className="w-full px-3.5 py-2.5 adm-bg rounded-2xl text-sm text-dark adm-text border border-primary/10 focus:border-primary focus:adm-surface adm-border border focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:adm-text-faint"
-                      />
-                    </div>
-                  )}
-                </div>
-
+                <VenueSaveFeedback venue={venue} />
+                <section className="space-y-4" aria-label={t('Osnovni podaci', 'Basics')}>
+                  <label className="block text-sm font-semibold adm-text">{t('Naziv', 'Name')}
+                    <input aria-label={t('Naziv', 'Name')} value={editingProduct.name} onChange={e => setEditingProduct({ ...editingProduct, name: e.target.value })} placeholder={t('Npr. Espresso', 'For example, Espresso')} className="mt-2 min-h-12 w-full rounded-xl border adm-border adm-bg px-3 text-base" />
+                  </label>
+                  <Field label={t('Cijena (KM)', 'Price (KM)')} type="number" value={editingProduct.price} onChange={v => setEditingProduct({ ...editingProduct, price: Number(v.replace(',', '.')) })} placeholder="2.50" />
+                  <label className="block text-sm font-semibold adm-text">{t('Kategorija', 'Category')}
+                    <select className="mt-2 min-h-12 w-full rounded-xl border adm-border adm-bg px-3 text-base" value={productCategoryId(editingProduct, realCategories) ?? ''} onChange={e => {
+                      if (e.target.value === '__create__') return openProductCatModal();
+                      const c = realCategories.find(c => c.id === e.target.value);
+                      if (c) setEditingProduct({ ...editingProduct, category: c.label, categoryId: c.id });
+                    }}>
+                      <option value="" disabled>{t('Odaberite kategoriju', 'Choose a category')}</option>
+                      {realCategories.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                      <option value="__create__">{t('+ Nova kategorija', '+ New category')}</option>
+                    </select>
+                  </label>
+                  {kitchenEnabled && <label className="block text-sm font-semibold adm-text">{t('Gdje se priprema?', 'Where is it prepared?')}
+                    <select className="mt-2 min-h-12 w-full rounded-xl border adm-border adm-bg px-3 text-base" value={editingProduct.station === 'both' ? 'kitchen' : editingProduct.station ?? ''} onChange={e => setEditingProduct({ ...editingProduct, station: e.target.value as 'bar' | 'kitchen' })}>
+                      <option value="" disabled>{t('Odaberite mjesto pripreme', 'Choose preparation station')}</option><option value="bar">{t('Šank', 'Bar')}</option><option value="kitchen">{t('Kuhinja', 'Kitchen')}</option>
+                    </select>
+                  </label>}
+                </section>
+                <section className="rounded-2xl border adm-border p-4 space-y-3" aria-label={t('Zaliha', 'Stock')}>
+                  <h3 className="font-bold adm-text">{t('Kako pratite ovaj proizvod?', 'How do you track this product?')}</h3>
+                  <p className="text-sm adm-text-muted">{t('Prodane količine pratimo uvijek. Zaliha je potrebna samo kada brojite dostupne komade.', 'Sold quantities are always recorded. Stock is only needed when you count available units.')}</p>
+                  <label className="flex min-h-12 items-center gap-3 text-sm adm-text"><input type="checkbox" className="h-5 w-5" checked={currentInventoryTracked} onChange={e => isNew ? setPendingInventoryTracked(e.target.checked) : setTrackingConfirm({ productId: editingProduct.id, productName: editingProduct.name, nextTracked: e.target.checked })} />{t('Brojim zalihu (npr. boce ili gotovi kolači)', 'Count stock (for example bottles or ready-made cakes)')}</label>
+                  {!currentInventoryTracked && <p className="text-sm adm-text-muted">{t('Pratimo prodaju, bez odbrojavanja zalihe. Pogodno za kafu i jela koja pripremate po narudžbi.', 'Track sales without a stock countdown. Suitable for coffee and food prepared to order.')}</p>}
+                  {isNew && currentInventoryTracked && <Field label={t('Početna količina', 'Starting quantity')} type="number" value={initialStock} onChange={v => setInitialStock(Math.max(0, Number(v) || 0))} />}
+                  {!isNew && currentInventoryTracked && <p className="text-sm adm-text-muted">{t('Stanje:', 'On hand:')} {currentInventoryRow?.quantity ?? 0}. {t('Promjene količine unosite u zalihama.', 'Record quantity changes in inventory.')}</p>}
+                </section>
+                <details className="rounded-2xl border adm-border p-4">
+                  <summary className="min-h-11 flex items-center cursor-pointer font-bold adm-text">{t('Opis, slika i prikaz na meniju (opcionalno)', 'Description, image and menu display (optional)')}</summary>
+                  <div className="space-y-4 pt-3">
+                    <label className="block text-sm adm-text">{t('Naziv na bosanskom (opcionalno)', 'Bosnian name (optional)')}<input className="mt-2 min-h-11 w-full rounded-xl border adm-border adm-bg px-3" value={editingProduct.name_bs ?? ''} onChange={e => setEditingProduct({ ...editingProduct, name_bs: e.target.value })} /></label>
                 <div>
-                  <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Opis</label>
+                  <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">{uiText("Opis")}</label>
                   <div>
                     <textarea
                       value={editingProduct.description}
                       onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })}
                       rows={2}
-                      placeholder="Opišite jelo..."
-                      className="w-full px-3.5 py-2.5 adm-bg rounded-2xl text-sm text-dark adm-text border border-primary/10 focus:border-primary focus:adm-surface adm-border border focus:ring-4 focus:ring-primary/10 outline-none resize-none transition-all placeholder:adm-text-faint"
+                      placeholder={uiText("Opišite jelo...")}
+                      className="w-full min-h-12 px-3.5 py-2.5 adm-bg rounded-2xl text-base text-dark adm-text border border-primary/10 focus:border-primary focus:adm-surface adm-border border focus:ring-4 focus:ring-primary/10 outline-none resize-none transition-all placeholder:adm-text-faint"
                     />
                     <BsCollapse hasValue={!!(editingProduct.description_bs)}>
                       <textarea
                         value={editingProduct.description_bs || ""}
                         onChange={(e) => setEditingProduct({ ...editingProduct, description_bs: e.target.value })}
                         rows={2}
-                        placeholder="Opišite jelo..."
-                        className="w-full px-3.5 py-2.5 adm-bg rounded-2xl text-sm text-dark adm-text border border-blue-200/30 focus:border-blue-400 focus:adm-surface adm-border border focus:ring-4 focus:ring-blue-100 outline-none resize-none transition-all placeholder:adm-text-faint mt-2"
+                        placeholder={uiText("Opišite jelo...")}
+                        className="w-full min-h-12 px-3.5 py-2.5 adm-bg rounded-2xl text-base text-dark adm-text border border-blue-200/30 focus:border-blue-400 focus:adm-surface adm-border border focus:ring-4 focus:ring-blue-100 outline-none resize-none transition-all placeholder:adm-text-faint mt-2"
                       />
                     </BsCollapse>
                   </div>
@@ -1362,41 +1318,6 @@ export default function ProductsEditor() {
                     onChange={(url) => setEditingProduct({ ...editingProduct, image: url })}
                     className="min-w-0"
                   />
-                  <div>
-                    <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Vrsta *</label>
-                    <select
-                      value={editingProduct.category || ""}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        if (v === "__create__") {
-                          openProductCatModal();
-                          return;
-                        }
-                        setEditingProduct({ ...editingProduct, category: v });
-                      }}
-                      className="w-full px-3.5 py-2.5 adm-bg rounded-2xl text-sm text-dark adm-text border border-primary/10 focus:border-primary outline-none transition-all"
-                    >
-                      <option value="" disabled>
-                        {realCategories.length === 0 ? "Još nema vrsta — kreirajte jednu" : "Odaberite vrstu"}
-                      </option>
-                      {realCategories.map((c) => (
-                        <option key={c.id} value={c.label}>
-                          {c.icon?.trim() ? `${c.icon} ` : ""}{c.label}
-                        </option>
-                      ))}
-                      {menuCategories
-                        .filter((label) => !realCategories.some((c) => c.label === label))
-                        .map((label) => (
-                          <option key={`legacy-${label}`} value={label}>
-                            {label} (iz postojećih stavki)
-                          </option>
-                        ))}
-                      <option value="__create__">➕ Kreiraj novu vrstu…</option>
-                    </select>
-                    <p className="text-[10px] text-muted adm-text-muted mt-1.5">
-                      Svaka stavka mora imati svoju vrstu.
-                    </p>
-                  </div>
                 </div>
 
                 <label className="flex items-center gap-3 py-2 cursor-pointer group">
@@ -1416,64 +1337,31 @@ export default function ProductsEditor() {
                   </div>
                   <span className="text-sm font-medium text-dark adm-text flex items-center gap-1.5">
                     <Flame size={14} className={editingProduct.popular ? "text-primary" : "adm-text-faint"} />
-                    Označi kao popularno
+                    {uiText("Označi kao popularno")}
                   </span>
                 </label>
 
-                {(isNew || currentInventoryRow) && (
-                  <div className="rounded-2xl adm-bg adm-border border p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-extrabold adm-text">Prati stanje zaliha</p>
-                        <p className="text-[11px] text-muted adm-text-muted mt-0.5">
-                          {currentInventoryTracked
-                            ? "Narudžbe će skidati količinu iz inventara."
-                            : "Stavka ostaje u inventaru, ali se količina ne skida."}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setTrackingConfirm({
-                            productId: editingProduct.id,
-                            productName: editingProduct.name || "Stavka",
-                            nextTracked: !currentInventoryTracked,
-                          })
-                        }
-                        className={clsx(
-                          "relative h-7 w-12 rounded-full transition shrink-0",
-                          currentInventoryTracked ? "bg-primary" : "bg-slate-300"
-                        )}
-                        aria-pressed={currentInventoryTracked}
-                      >
-                        <span
-                          className={clsx(
-                            "absolute top-1 h-5 w-5 rounded-full bg-white shadow transition",
-                            currentInventoryTracked ? "left-6" : "left-1"
-                          )}
-                        />
-                      </button>
-                    </div>
                   </div>
-                )}
-
+                </details>
+                <details className="rounded-2xl border adm-border p-4">
+                  <summary className="min-h-11 flex items-center cursor-pointer font-bold adm-text">{t('Dodaci i varijante (opcionalno)', 'Extras and variants (optional)')} · {(editingProduct.addons?.length ?? 0) + (editingProduct.variations?.length ?? 0)}</summary>
                 {/* Addons */}
                 <div className="border-t border-primary/10 pt-5">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <Sparkles size={14} className="text-primary/50" />
-                      <h4 className="text-xs font-bold text-muted adm-text-muted uppercase tracking-wider">Dodaci / Extras</h4>
+                      <h4 className="text-xs font-bold text-muted adm-text-muted uppercase tracking-wider">{uiText("Dodaci / Extras")}</h4>
                     </div>
                     <button
                       type="button"
                       onClick={addAddon}
                       className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:brightness-110 transition"
                     >
-                      <Plus size={14} /> Dodaj extra
+                      <Plus size={14} /> {uiText("Dodaj extra")}
                     </button>
                   </div>
                   {(editingProduct.addons || []).length === 0 ? (
-                    <p className="text-xs text-muted adm-text-muted italic py-2">Još nema dodataka. Dodajte opcije za ovu stavku.</p>
+                    <p className="text-xs text-muted adm-text-muted italic py-2">{uiText("Još nema dodataka. Dodajte opcije za ovu stavku.")}</p>
                   ) : (
                     <div className="space-y-2">
                       {(editingProduct.addons || []).map((addon) => (
@@ -1483,14 +1371,14 @@ export default function ProductsEditor() {
                               <input
                                 value={addon.name}
                                 onChange={(e) => updateAddonField(addon.id, "name", e.target.value)}
-                                placeholder="Naziv dodatka"
+                                placeholder={uiText("Naziv dodatka")}
                                 className="w-full px-3 py-2 adm-surface adm-border border rounded-xl text-sm text-dark adm-text border border-primary/10 focus:border-primary outline-none transition"
                               />
                               <BsCollapse hasValue={!!(addon.name_bs)}>
                                 <input
                                   value={addon.name_bs || ""}
                                   onChange={(e) => updateAddonField(addon.id, "name_bs", e.target.value)}
-                                  placeholder="Naziv dodatka"
+                                  placeholder={uiText("Naziv dodatka")}
                                   className="w-full px-3 py-2 adm-surface adm-border border rounded-xl text-sm text-dark adm-text border border-blue-200/30 focus:border-blue-400 outline-none transition mt-1.5"
                                 />
                               </BsCollapse>
@@ -1519,13 +1407,13 @@ export default function ProductsEditor() {
                             <input
                               value={addon.groupId || ""}
                               onChange={(e) => updateAddonField(addon.id, "groupId", e.target.value)}
-                              placeholder="ID grupe"
+                              placeholder={uiText("ID grupe")}
                               className="px-3 py-2 adm-surface adm-border border rounded-xl text-xs text-dark adm-text border border-primary/10 focus:border-primary outline-none transition"
                             />
                             <input
                               value={addon.groupLabel || ""}
                               onChange={(e) => updateAddonField(addon.id, "groupLabel", e.target.value)}
-                              placeholder="Naziv grupe"
+                              placeholder={uiText("Naziv grupe")}
                               className="px-3 py-2 adm-surface adm-border border rounded-xl text-xs text-dark adm-text border border-primary/10 focus:border-primary outline-none transition"
                             />
                             <input
@@ -1533,7 +1421,7 @@ export default function ProductsEditor() {
                               min="0"
                               value={addon.minSelect ?? ""}
                               onChange={(e) => updateAddonField(addon.id, "minSelect", e.target.value === "" ? undefined : Math.max(0, Number(e.target.value)))}
-                              placeholder="Min"
+                              placeholder={uiText("Min")}
                               className="px-3 py-2 adm-surface adm-border border rounded-xl text-xs text-dark adm-text border border-primary/10 focus:border-primary outline-none transition"
                             />
                             <input
@@ -1541,7 +1429,7 @@ export default function ProductsEditor() {
                               min="0"
                               value={addon.maxSelect ?? ""}
                               onChange={(e) => updateAddonField(addon.id, "maxSelect", e.target.value === "" ? undefined : Math.max(0, Number(e.target.value)))}
-                              placeholder="Max"
+                              placeholder={uiText("Max")}
                               className="px-3 py-2 adm-surface adm-border border rounded-xl text-xs text-dark adm-text border border-primary/10 focus:border-primary outline-none transition"
                             />
                           </div>
@@ -1551,10 +1439,10 @@ export default function ProductsEditor() {
                               onChange={(e) => updateAddonField(addon.id, "dependsOn", parseDependency(e.target.value))}
                               className="w-full px-3 py-2 adm-surface adm-border border rounded-xl text-xs text-dark adm-text border border-primary/10 focus:border-primary outline-none transition"
                             >
-                              <option value="">Uvijek prikaži dodatak</option>
+                              <option value="">{uiText("Uvijek prikaži dodatak")}</option>
                               {dependencyOptions.map((option) => (
                                 <option key={`${addon.id}-${option.value}`} value={option.value}>
-                                  Prikaži ako je odabrano: {option.label}
+                                  {uiText("Prikaži ako je odabrano:")} {option.label}
                                 </option>
                               ))}
                             </select>
@@ -1570,19 +1458,19 @@ export default function ProductsEditor() {
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2 flex-wrap">
                       <Package size={14} className="text-accent-blue/50" />
-                      <h4 className="text-xs font-bold text-muted adm-text-muted uppercase tracking-wider">Varijacije</h4>
-                      <span className="text-[10px] adm-text-muted">(npr. Veličina, Okus)</span>
+                      <h4 className="text-xs font-bold text-muted adm-text-muted uppercase tracking-wider">{uiText("Varijacije")}</h4>
+                      <span className="text-[10px] adm-text-muted">{uiText("(npr. Veličina, Okus)")}</span>
                     </div>
                     <button
                       type="button"
                       onClick={addVariation}
                       className="flex items-center gap-1.5 text-xs font-semibold text-accent-blue hover:brightness-110 transition shrink-0"
                     >
-                      <Plus size={14} /> Dodaj varijaciju
+                      <Plus size={14} /> {uiText("Dodaj varijaciju")}
                     </button>
                   </div>
                   {(editingProduct.variations || []).length === 0 ? (
-                    <p className="text-xs text-muted adm-text-muted italic py-2">Nema varijacija. Dodajte veličinu, okus ili slične opcije.</p>
+                    <p className="text-xs text-muted adm-text-muted italic py-2">{uiText("Nema varijacija. Dodajte veličinu, okus ili slične opcije.")}</p>
                   ) : (
                     <div className="space-y-4">
                       {(editingProduct.variations || []).map((variation) => (
@@ -1592,14 +1480,14 @@ export default function ProductsEditor() {
                               <input
                                 value={variation.name}
                                 onChange={(e) => updateVariationField(variation.id, "name", e.target.value)}
-                                placeholder="Naziv varijacije (npr. Veličina)"
+                                placeholder={uiText("Naziv varijacije (npr. Veličina)")}
                                 className="w-full px-3 py-2 adm-surface adm-border border rounded-xl text-sm text-dark adm-text font-semibold border border-primary/10 focus:border-primary outline-none transition"
                               />
                               <BsCollapse hasValue={!!(variation.name_bs)}>
                                 <input
                                   value={variation.name_bs || ""}
                                   onChange={(e) => updateVariationField(variation.id, "name_bs", e.target.value)}
-                                  placeholder="Naziv varijacije (npr. Veličina)"
+                                  placeholder={uiText("Naziv varijacije (npr. Veličina)")}
                                   className="w-full px-3 py-2 adm-surface adm-border border rounded-xl text-sm text-dark adm-text font-semibold border border-blue-200/30 focus:border-blue-400 outline-none transition mt-1.5"
                                 />
                               </BsCollapse>
@@ -1611,7 +1499,7 @@ export default function ProductsEditor() {
                                 onChange={(e) => updateVariationField(variation.id, "required", e.target.checked)}
                                 className="w-3.5 h-3.5 accent-primary"
                               />
-                              Obavezno
+                              {uiText("Obavezno")}
                             </label>
                             <div className="hidden sm:flex items-center gap-1">
                               <input
@@ -1619,7 +1507,7 @@ export default function ProductsEditor() {
                                 min="0"
                                 value={variation.minSelect ?? ""}
                                 onChange={(e) => updateVariationField(variation.id, "minSelect", e.target.value === "" ? undefined : Math.max(0, Number(e.target.value)))}
-                                placeholder="Min"
+                                placeholder={uiText("Min")}
                                 className="w-16 px-2 py-1.5 adm-surface adm-border border rounded-lg text-xs text-dark adm-text border border-primary/10 focus:border-primary outline-none transition"
                               />
                               <input
@@ -1627,7 +1515,7 @@ export default function ProductsEditor() {
                                 min="1"
                                 value={variation.maxSelect ?? ""}
                                 onChange={(e) => updateVariationField(variation.id, "maxSelect", e.target.value === "" ? undefined : Math.max(1, Number(e.target.value)))}
-                                placeholder="Max"
+                                placeholder={uiText("Max")}
                                 className="w-16 px-2 py-1.5 adm-surface adm-border border rounded-lg text-xs text-dark adm-text border border-primary/10 focus:border-primary outline-none transition"
                               />
                             </div>
@@ -1645,7 +1533,7 @@ export default function ProductsEditor() {
                               min="0"
                               value={variation.minSelect ?? ""}
                               onChange={(e) => updateVariationField(variation.id, "minSelect", e.target.value === "" ? undefined : Math.max(0, Number(e.target.value)))}
-                              placeholder="Min odabira"
+                              placeholder={uiText("Min odabira")}
                               className="px-3 py-2 adm-surface adm-border border rounded-xl text-xs text-dark adm-text border border-primary/10 focus:border-primary outline-none transition"
                             />
                             <input
@@ -1653,7 +1541,7 @@ export default function ProductsEditor() {
                               min="1"
                               value={variation.maxSelect ?? ""}
                               onChange={(e) => updateVariationField(variation.id, "maxSelect", e.target.value === "" ? undefined : Math.max(1, Number(e.target.value)))}
-                              placeholder="Max odabira"
+                              placeholder={uiText("Max odabira")}
                               className="px-3 py-2 adm-surface adm-border border rounded-xl text-xs text-dark adm-text border border-primary/10 focus:border-primary outline-none transition"
                             />
                           </div>
@@ -1665,14 +1553,14 @@ export default function ProductsEditor() {
                                   <input
                                     value={opt.label}
                                     onChange={(e) => updateVariationOption(variation.id, opt.id, "label", e.target.value)}
-                                    placeholder="Opcija (npr. Malo)"
+                                    placeholder={uiText("Opcija (npr. Malo)")}
                                     className="w-full px-2 py-1.5 adm-surface adm-border border rounded-lg text-sm text-dark adm-text border border-primary/10 focus:border-primary outline-none transition"
                                   />
                                   <BsCollapse hasValue={!!(opt.label_bs)}>
                                     <input
                                       value={opt.label_bs || ""}
                                       onChange={(e) => updateVariationOption(variation.id, opt.id, "label_bs", e.target.value)}
-                                      placeholder="Oznaka opcije (npr. Malo)"
+                                      placeholder={uiText("Oznaka opcije (npr. Malo)")}
                                       className="w-full px-2 py-1.5 adm-surface adm-border border rounded-lg text-sm text-dark adm-text border border-blue-200/30 focus:border-blue-400 outline-none transition mt-1"
                                     />
                                   </BsCollapse>
@@ -1682,12 +1570,12 @@ export default function ProductsEditor() {
                                       onChange={(e) => updateVariationOption(variation.id, opt.id, "dependsOn", parseDependency(e.target.value))}
                                       className="w-full px-2 py-1.5 adm-surface adm-border border rounded-lg text-xs text-dark adm-text border border-primary/10 focus:border-primary outline-none transition mt-1"
                                     >
-                                      <option value="">Uvijek prikaži opciju</option>
+                                      <option value="">{uiText("Uvijek prikaži opciju")}</option>
                                       {dependencyOptions
                                         .filter((dependency) => dependency.optionId !== opt.id)
                                         .map((dependency) => (
                                           <option key={`${opt.id}-${dependency.value}`} value={dependency.value}>
-                                            Prikaži ako je odabrano: {dependency.label}
+                                            {uiText("Prikaži ako je odabrano:")} {dependency.label}
                                           </option>
                                         ))}
                                     </select>
@@ -1728,14 +1616,15 @@ export default function ProductsEditor() {
                             onClick={() => addVariationOption(variation.id)}
                             className="mt-2 ml-4 flex items-center gap-1 text-[11px] font-medium text-primary/70 hover:text-primary transition"
                           >
-                            <Plus size={11} /> Dodaj opciju
+                            <Plus size={11} /> {uiText("Dodaj opciju")}
                           </button>
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
-              </div>
+                </details>
+              </fieldset>
 
               <AnimatePresence>
                 {stockToast && (
@@ -1759,16 +1648,16 @@ export default function ProductsEditor() {
                   onClick={cancelEdit}
                   className="flex-1 py-3 rounded-2xl border border-primary/10 text-sm font-semibold text-dark adm-text hover:bg-[var(--adm-surface-2)] transition"
                 >
-                  Odustani
+                  {uiText("Odustani")}
                 </button>
                 <button
                   type="button"
                   onClick={saveProduct}
-                  disabled={!editingProduct.name || !editingProduct.price || !editingProduct.category?.trim()}
+                  disabled={savingProduct || !editingProduct.name.trim() || !Number.isFinite(editingProduct.price) || editingProduct.price < 0 || !editingProduct.category?.trim() || (kitchenEnabled && !editingProduct.station)}
                   className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-primary to-amber-500 text-white text-sm font-bold hover:brightness-105 transition disabled:opacity-40 flex items-center justify-center gap-2 shadow-glow"
                 >
                   <Save size={15} />
-                  {isNew ? "Dodaj stavku" : "Spremi"}
+                  {savingProduct ? t("Čuvanje…", "Saving…") : isNew ? t("Dodaj proizvod", "Add product") : t("Sačuvaj izmjene", "Save changes")}
                 </button>
               </div>
             </motion.aside>
@@ -1791,11 +1680,11 @@ export default function ProductsEditor() {
               className="adm-surface adm-border border rounded-3xl w-full max-w-[420px] shadow-elevated overflow-hidden"
             >
               <div className="p-6">
-                <h3 className="text-lg font-extrabold adm-text">Jeste li sigurni?</h3>
+                <h3 className="text-lg font-extrabold adm-text">{uiText("Jeste li sigurni?")}</h3>
                 <p className="mt-2 text-sm text-muted adm-text-muted leading-relaxed">
                   {trackingConfirm.nextTracked
-                    ? "Ova stavka će se ponovo oduzimati iz inventara pri narudžbi."
-                    : "Ova stavka neće više biti oduzimana iz inventara pri narudžbi."}
+                    ? uiText("Ova stavka će se ponovo oduzimati iz inventara pri narudžbi.")
+                    : uiText("Ova stavka neće više biti oduzimana iz inventara pri narudžbi.")}
                 </p>
                 <p className="mt-3 text-sm font-bold adm-text">{trackingConfirm.productName}</p>
               </div>
@@ -1805,14 +1694,14 @@ export default function ProductsEditor() {
                   onClick={() => setTrackingConfirm(null)}
                   className="flex-1 rounded-xl adm-border border py-2.5 text-sm font-bold adm-text"
                 >
-                  Otkaži
+                  {uiText("Otkaži")}
                 </button>
                 <button
                   type="button"
                   onClick={() => void confirmTrackingChange()}
                   className="flex-1 rounded-xl bg-primary py-2.5 text-sm font-bold text-white"
                 >
-                  Potvrdi
+                  {uiText("Potvrdi")}
                 </button>
               </div>
             </motion.div>
@@ -1844,8 +1733,8 @@ export default function ProductsEditor() {
                     <Tags size={18} className="text-primary" />
                   </div>
                   <div>
-                    <h3 className="text-[16px] font-extrabold text-dark adm-text">Nova vrsta</h3>
-                    <p className="text-[11px] text-muted adm-text-muted">Stavke su grupirane po vrstama u meniju</p>
+                    <h3 className="text-[16px] font-extrabold text-dark adm-text">{uiText("Nova vrsta")}</h3>
+                    <p className="text-[11px] text-muted adm-text-muted">{uiText("Stavke su grupirane po vrstama u meniju")}</p>
                   </div>
                 </div>
                 <button
@@ -1866,7 +1755,7 @@ export default function ProductsEditor() {
                       id: v.toLowerCase().replace(/[^a-z0-9-]+/g, "-"),
                     }))
                   }
-                  placeholder="e.g. pizza"
+                  placeholder={uiText("e.g. pizza")}
                 />
                 <CatField
                   label="Naziv *"
@@ -1883,10 +1772,10 @@ export default function ProductsEditor() {
                           .replace(/^-|-$/g, ""),
                     }));
                   }}
-                  placeholder="e.g. Pizza"
+                  placeholder={uiText("e.g. Pizza")}
                 />
                 <div>
-                  <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">Boja</label>
+                  <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">{uiText("Boja")}</label>
                   <div className="flex flex-wrap gap-1.5">
                     {colorPresets.map((color) => (
                       <button
@@ -1909,7 +1798,7 @@ export default function ProductsEditor() {
                   onClick={() => setShowProductCatModal(false)}
                   className="flex-1 py-2.5 rounded-xl border border adm-border text-[13px] font-bold text-dark adm-text hover:adm-surface adm-border border transition"
                 >
-                  Odustani
+                  {uiText("Odustani")}
                 </button>
                 <button
                   type="button"
@@ -1917,7 +1806,7 @@ export default function ProductsEditor() {
                   disabled={!quickNewCat.label.trim()}
                   className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-primary to-amber-500 text-white text-[13px] font-bold hover:brightness-105 transition disabled:opacity-40 shadow-glow"
                 >
-                  Kreiraj i koristi
+                  {uiText("Kreiraj i koristi")}
                 </button>
               </div>
             </motion.div>
@@ -1941,30 +1830,34 @@ export default function ProductsEditor() {
 }
 
 function Field({ label, value, onChange, placeholder, type = "text" }: { label: string; value: string | number; onChange: (v: string) => void; placeholder?: string; type?: string }) {
+  const uiText = useUiText();
   return (
     <div>
-      <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">{label}</label>
+      <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">{uiText(label)}</label>
       <input
+        aria-label={uiText(label)}
+        inputMode={type === "number" ? "decimal" : undefined}
         type={type}
         step={type === "number" ? "0.01" : undefined}
         min={type === "number" ? "0" : undefined}
-        value={value}
+        value={Number.isNaN(value) ? "" : value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full px-3.5 py-2.5 adm-bg rounded-2xl text-sm text-dark adm-text border border-primary/10 focus:border-primary focus:adm-surface adm-border border focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:adm-text-faint"
+        placeholder={placeholder ? uiText(placeholder) : undefined}
+        className="w-full min-h-12 px-3.5 py-2.5 adm-bg rounded-2xl text-base text-dark adm-text border border-primary/10 focus:border-primary focus:adm-surface adm-border border focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:adm-text-faint"
       />
     </div>
   );
 }
 
 function CatField({ label, value, onChange, placeholder }: { label?: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
+  const uiText = useUiText();
   return (
     <div>
-      {label && <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">{label}</label>}
+      {label && <label className="block text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">{uiText(label)}</label>}
       <input
-        value={value}
+        value={Number.isNaN(value) ? "" : value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
+        placeholder={placeholder ? uiText(placeholder) : undefined}
         className="w-full px-3 py-2 adm-bg rounded-xl text-sm text-dark adm-text border border-primary/10 focus:border-primary focus:adm-surface adm-border border focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:adm-text-faint"
       />
     </div>

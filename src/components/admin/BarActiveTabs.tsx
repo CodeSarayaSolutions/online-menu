@@ -1,147 +1,46 @@
 "use client";
-
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Wine, Check } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Check, Wine, ChefHat } from "lucide-react";
 import * as tabService from "@/services/tabService";
 import type { OpenTabRow } from "@/services/tabService";
-import clsx from "clsx";
+import { performAction } from "@/services/actionService";
+import { useOperationalText } from "@/hooks/useOperationalText";
 
-function clearedKey(restaurantId: string) {
-  return `bar-cleared-tabs-${restaurantId}`;
+function optionsText(value: unknown){
+ const options=value as {variations?:{optionLabel:string}[];addons?:{name:string;quantity:number}[];note?:string}|null;
+ return [...(options?.variations??[]).map(v=>v.optionLabel),...(options?.addons??[]).map(a=>a.quantity+'× '+a.name),options?.note??''].filter(Boolean).join(' · ');
 }
-
-function loadCleared(restaurantId: string): Set<string> {
-  if (typeof window === "undefined") return new Set();
-  try {
-    const raw = sessionStorage.getItem(clearedKey(restaurantId));
-    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
-  } catch {
-    return new Set();
-  }
-}
-
-function saveCleared(restaurantId: string, ids: Set<string>) {
-  sessionStorage.setItem(clearedKey(restaurantId), JSON.stringify(Array.from(ids)));
-}
-
-export default function BarActiveTabs({ restaurantId }: { restaurantId: string }) {
+export default function BarActiveTabs({ restaurantId, station = "bar" }: { restaurantId: string; station?: "bar" | "kitchen" }) {
+  const t = useOperationalText();
   const [tabs, setTabs] = useState<OpenTabRow[]>([]);
-  const [itemsByTab, setItemsByTab] = useState<Record<string, Awaited<ReturnType<typeof tabService.getTabWithItems>>>>({});
-  const [cleared, setCleared] = useState<Set<string>>(() => loadCleared(restaurantId));
-  const [loading, setLoading] = useState(true);
-
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const sequence = useRef(0);
   const refresh = useCallback(async () => {
-    try {
-      const open = await tabService.getOpenTabs(restaurantId);
-      setTabs(open);
-      const details: Record<string, Awaited<ReturnType<typeof tabService.getTabWithItems>>> = {};
-      await Promise.all(
-        open.map(async (t) => {
-          details[t.id] = await tabService.getTabWithItems(t.id);
-        })
-      );
-      setItemsByTab(details);
-    } finally {
-      setLoading(false);
-    }
+    const generation = ++sequence.current;
+    try { const result = await tabService.getOpenTabs(restaurantId); if (generation === sequence.current) { setTabs(result); setError(false); } }
+    catch { if (generation === sequence.current) setError(true); }
+    finally { if (generation === sequence.current) setLoaded(true); }
   }, [restaurantId]);
-
   useEffect(() => {
-    setCleared(loadCleared(restaurantId));
-    void refresh();
+    setTabs([]); setLoaded(false); void refresh();
+    const unsubscribe = tabService.subscribeToTabs(restaurantId, { onTabChange: () => void refresh(), onItemChange: () => void refresh() });
+    // Realtime reconnects and sleeping tablets must recover persisted acknowledgements.
+    const focused = () => { if (!document.hidden) void refresh(); };
+    window.addEventListener("hos:tabs-changed", focused); window.addEventListener("focus", focused); document.addEventListener("visibilitychange", focused);
+    const timer = window.setInterval(focused, 30000);
+    return () => { sequence.current++; unsubscribe(); clearInterval(timer); window.removeEventListener("hos:tabs-changed", focused); window.removeEventListener("focus", focused); document.removeEventListener("visibilitychange", focused); };
   }, [restaurantId, refresh]);
-
-  useEffect(() => {
-    return tabService.subscribeToTabs(restaurantId, {
-      onTabChange: () => void refresh(),
-      onItemChange: () => void refresh(),
-    });
-  }, [restaurantId, refresh]);
-
-  const barTabs = useMemo(() => {
-    return tabs.filter((tab) => {
-      if (cleared.has(tab.id)) return false;
-      const detail = itemsByTab[tab.id];
-      const items = detail?.tab_items ?? [];
-      return items.some(
-        (i) => i.fire_status === "fired" && (i.station === "bar" || i.station === "both")
-      );
-    });
-  }, [tabs, itemsByTab, cleared]);
-
-  const markClear = (tabId: string) => {
-    const next = new Set(cleared);
-    next.add(tabId);
-    setCleared(next);
-    saveCleared(restaurantId, next);
+  const pending = tabs.map(tab => ({ ...tab, lines: (tab.tab_items ?? []).filter(i => i.fire_status === "fired" && (station === "bar" || i.station === "kitchen" || i.station === "both") && i.quantity > (station === "bar" ? i.bar_done_quantity : i.kitchen_done_quantity)) })).filter(tab => tab.lines.length);
+  const done = async (tab: typeof pending[number]) => {
+    if (busy) return; setBusy(tab.id);
+    try { await performAction("station.done", restaurantId, { tabId: tab.id, station, lines: tab.lines.map(i => ({ id: i.id, quantity: i.quantity })) }); await refresh(); }
+    catch { setError(true); } finally { setBusy(null); }
   };
-
-  if (loading) {
-    return (
-      <div className="py-8 text-center text-muted adm-text-muted text-sm">Učitavanje kartica…</div>
-    );
-  }
-
-  return (
-    <section className="mt-8 border-t border adm-border pt-8">
-      <div className="flex items-center gap-2 mb-4">
-        <Wine size={18} className="text-purple-600" />
-        <h2 className="text-lg font-extrabold text-dark adm-text">Aktivne kartice (bar)</h2>
-      </div>
-      {barTabs.length === 0 ? (
-        <div className="text-center adm-surface adm-border border rounded-xl border p-6">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-muted adm-text-muted mb-2">
-            Konobar kartice
-          </p>
-          <p className="text-sm text-muted adm-text-muted">Nema aktivnih kartica za bar.</p>
-        </div>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {barTabs.map((tab) => {
-            const detail = itemsByTab[tab.id];
-            const barItems = (detail?.tab_items ?? []).filter(
-              (i) => i.fire_status === "fired" && (i.station === "bar" || i.station === "both")
-            );
-            const tableLabel = tab.table_label;
-
-            return (
-              <div
-                key={tab.id}
-                className="adm-surface adm-border border rounded-2xl border-purple-100 shadow-soft p-4"
-              >
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <h3 className="font-extrabold text-dark adm-text">{tableLabel}</h3>
-                    <p className="text-[11px] text-muted adm-text-muted">{tab.waiter_name}</p>
-                  </div>
-                  <span className="text-sm font-bold text-primary">
-                    {Number(tab.total).toFixed(2)} KM
-                  </span>
-                </div>
-                <ul className="space-y-1 mb-4 text-sm">
-                  {barItems.map((i) => (
-                    <li key={i.id} className="flex justify-between text-dark adm-text">
-                      <span>
-                        {i.quantity}× {i.product_name}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                <button
-                  type="button"
-                  onClick={() => markClear(tab.id)}
-                  className={clsx(
-                    "w-full py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5",
-                    "bg-purple-50 text-purple-800 hover:bg-purple-100 transition"
-                  )}
-                >
-                  <Check size={14} /> Jasno
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </section>
-  );
+  const Icon = station === "bar" ? Wine : ChefHat;
+  return <section className="p-4 space-y-4"><header className="flex items-center gap-2"><Icon size={22} /><h2 className="text-xl font-bold">{station === "bar" ? t("Priprema u baru", "Bar preparation") : t("Priprema u kuhinji", "Kitchen preparation")}</h2></header>
+    {error && <div role="alert" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{t("Osvježavanje nije uspjelo. Pokušajte ponovo.", "Couldn't refresh. Please try again.")} <button onClick={() => void refresh()} className="min-h-[44px] font-bold underline">{t("Ponovi", "Retry")}</button></div>}
+    {!loaded ? <p>{t("Učitavanje…", "Loading…")}</p> : !pending.length ? <p className="adm-surface border adm-border rounded-xl p-6 text-center adm-text-muted">{t("Sve je pripremljeno.", "Everything is prepared.")}</p> : <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">{pending.map(tab => <article key={tab.id} className="adm-surface border adm-border rounded-2xl p-4 space-y-4"><header><h3 className="font-extrabold text-lg">{tab.table_label}</h3><p className="text-xs adm-text-muted">{tab.waiter_name} · #{tab.id.slice(-6).toUpperCase()}</p>{tab.origin === "guest" && <p className="text-xs text-sky-700 font-semibold">{t("Narudžba gosta", "Guest order")}</p>}</header><ul className="space-y-2">{tab.lines.map(line => <li key={line.id} className="text-base"><strong>{line.quantity - (station === "bar" ? line.bar_done_quantity : line.kitchen_done_quantity)}×</strong> {line.product_name}{line.source_order_id&&<span className="block text-xs adm-text-muted">#{line.source_order_id.slice(-8).toUpperCase()}</span>}{optionsText(line.options)&&<span className="block text-sm">{optionsText(line.options)}</span>}{station === "bar" && (line.station === "kitchen" || line.station === "both") && <span className="block text-xs adm-text-muted">{line.kitchen_done_quantity >= line.quantity ? t("Kuhinja: spremno", "Kitchen: ready") : t("Kuhinja: priprema", "Kitchen: preparing")}</span>}</li>)}</ul><button disabled={!!busy} onClick={() => void done(tab)} className="w-full min-h-[48px] rounded-xl bg-emerald-600 text-white font-bold flex justify-center items-center gap-2 disabled:opacity-50"><Check size={18} />{t("Gotovo", "Done")}</button></article>)}</div>}
+  </section>;
 }

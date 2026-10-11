@@ -1,62 +1,19 @@
-const MONTHS_SHORT = [
-  "jan",
-  "feb",
-  "mar",
-  "apr",
-  "maj",
-  "jun",
-  "jul",
-  "aug",
-  "sep",
-  "okt",
-  "nov",
-  "dec",
-] as const;
-
-const WEEKDAYS_LONG = [
-  "nedjelja",
-  "ponedjeljak",
-  "utorak",
-  "srijeda",
-  "četvrtak",
-  "petak",
-  "subota",
-] as const;
-
-function parseIsoDate(dateStr: string): Date {
-  return new Date(`${dateStr}T12:00:00`);
+import { DEFAULT_TIMEZONE } from './venue-time';
+type Language = 'bs' | 'en';
+function calendar(value: string) { return new Date(`${value}T12:00:00Z`); }
+const locale = (language: Language) => language === 'bs' ? 'bs-BA' : 'en-GB';
+export function formatDateShort(date: string, language: Language = 'bs'): string {
+ return new Intl.DateTimeFormat(locale(language), {day:'numeric',month:'numeric',timeZone:'UTC'}).format(calendar(date));
 }
-
-/** e.g. 7.9. */
-export function formatDateShort(dateStr: string): string {
-  const d = parseIsoDate(dateStr);
-  return `${d.getDate()}.${d.getMonth() + 1}.`;
+export function formatDateMedium(date: string, language: Language = 'bs'): string {
+ return new Intl.DateTimeFormat(locale(language), {day:'numeric',month:'short',timeZone:'UTC'}).format(calendar(date));
 }
-
-/** e.g. 7. sep */
-export function formatDateMedium(dateStr: string): string {
-  const d = parseIsoDate(dateStr);
-  return `${d.getDate()}. ${MONTHS_SHORT[d.getMonth()]}`;
+export function formatDateLong(date: string, language: Language = 'bs'): string {
+ return new Intl.DateTimeFormat(locale(language), {weekday:'long',day:'numeric',month:'short',year:'numeric',timeZone:'UTC'}).format(calendar(date));
 }
-
-/** e.g. ponedjeljak, 7. sep 2026. */
-export function formatDateLong(dateStr: string): string {
-  const d = parseIsoDate(dateStr);
-  return `${WEEKDAYS_LONG[d.getDay()]}, ${d.getDate()}. ${MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()}.`;
+export function formatWeekRange(start: string,end: string,language: Language = 'bs'): string {
+ return `${formatDateMedium(start,language)} – ${new Intl.DateTimeFormat(locale(language),{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'}).format(calendar(end))}`;
 }
-
-/** e.g. 7. sep – 13. sep 2026. */
-export function formatWeekRange(weekStart: string, weekEnd: string): string {
-  const start = parseIsoDate(weekStart);
-  const end = parseIsoDate(weekEnd);
-  const startLabel = `${start.getDate()}. ${MONTHS_SHORT[start.getMonth()]}`;
-  const endLabel = `${end.getDate()}. ${MONTHS_SHORT[end.getMonth()]} ${end.getFullYear()}.`;
-  return `${startLabel} – ${endLabel}`;
-}
-
-export function formatDateTime(iso: string): string {
-  const d = new Date(iso);
-  const date = `${d.getDate()}. ${MONTHS_SHORT[d.getMonth()]}`;
-  const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  return `${date} ${time}`;
+export function formatDateTime(iso: string,language: Language = 'bs',timezone=DEFAULT_TIMEZONE): string {
+ return new Intl.DateTimeFormat(locale(language),{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',timeZone:timezone}).format(new Date(iso));
 }

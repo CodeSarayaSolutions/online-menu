@@ -1,5 +1,6 @@
 "use client";
 
+import { useUiText } from "@/hooks/useUiText";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
@@ -15,6 +16,7 @@ import clsx from "clsx";
 type TableRow = Tables<"restaurant_tables">;
 
 export default function WaiterFloorPage() {
+  const uiText = useUiText();
   const params = useParams();
   const router = useRouter();
   const venueSlug = typeof params.venue === "string" ? params.venue : "";
@@ -175,7 +177,7 @@ export default function WaiterFloorPage() {
     if (!currentUser) return;
     const tab = tabForTable(table.id);
     if (tab) {
-      if (tab.waiter_id === currentUser.id) {
+      if (tab.waiter_id === currentUser.id || !tab.waiter_id) {
         router.push(`/admin/${venueSlug}/waiter/${tab.id}`);
         return;
       }
@@ -226,30 +228,30 @@ export default function WaiterFloorPage() {
             <HandPlatter size={22} className="text-primary" />
           </div>
           <div className="min-w-0">
-            <h1 className="text-xl font-extrabold text-dark adm-text">Konobar</h1>
+            <h1 className="text-xl font-extrabold text-dark adm-text">{uiText("Konobar")}</h1>
             <p className="text-xs text-muted adm-text-muted truncate">
-              {currentUser?.name ?? "—"} · Odaberite stol
+              {currentUser?.name ?? "—"} {uiText("· Odaberite stol")}
             </p>
           </div>
         </div>
         <div className="shrink-0">
           {confirmEndShift ? (
             <div className="adm-surface adm-border border rounded-xl p-2 text-right max-w-[200px]">
-              <p className="text-[11px] font-semibold adm-text mb-2">Završiti smjenu?</p>
+              <p className="text-[11px] font-semibold adm-text mb-2">{uiText("Završiti smjenu?")}</p>
               <div className="flex gap-1">
                 <button
                   type="button"
                   onClick={() => void endShift()}
                   className="px-2 py-1 text-[11px] font-bold text-red-600"
                 >
-                  Da
+                  {uiText("Da")}
                 </button>
                 <button
                   type="button"
                   onClick={() => setConfirmEndShift(false)}
                   className="px-2 py-1 text-[11px] font-bold adm-text-muted"
                 >
-                  Ne
+                  {uiText("Ne")}
                 </button>
               </div>
             </div>
@@ -259,7 +261,7 @@ export default function WaiterFloorPage() {
               onClick={() => setConfirmEndShift(true)}
               className="px-3 py-2 min-h-[44px] rounded-xl adm-border border text-[11px] font-semibold text-muted adm-text-muted"
             >
-              Završi smjenu
+              {uiText("Završi smjenu")}
             </button>
           )}
         </div>
@@ -271,7 +273,7 @@ export default function WaiterFloorPage() {
 
       {tables.length === 0 ? (
         <div className="adm-surface adm-border border rounded-2xl p-10 text-center text-muted adm-text-muted text-sm">
-          Nema aktivnih stolova. Vlasnik treba dodati stolove u sekciji Stolovi.
+          {uiText("Nema aktivnih stolova. Vlasnik treba dodati stolove u sekciji Stolovi.")}
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -289,7 +291,7 @@ export default function WaiterFloorPage() {
                 onClick={() => handleTableTap(table)}
                 className={clsx(
                   "rounded-2xl border-2 p-4 text-left transition shadow-soft min-h-[120px] flex flex-col",
-                  occupied
+                  tab?.origin === "guest" ? "border-sky-500 bg-sky-50" : occupied
                     ? mine
                       ? "border-primary bg-primary/5"
                       : "border-red-300 bg-red-50/80"
@@ -308,14 +310,15 @@ export default function WaiterFloorPage() {
                 <span className="font-extrabold text-dark adm-text text-lg leading-tight">
                   {label}
                 </span>
+                {tab?.origin === "guest" && <span className="text-xs font-bold text-sky-700 mt-1">{tab.waiter_id ? uiText("Narudžba gosta") : uiText("Nova narudžba gosta · preuzmi")}</span>}
                 {occupied ? (
                   <>
                     <span className="text-[11px] text-muted adm-text-muted mt-1">
                       {tab?.waiter_name ?? "Konobar"} · {Number(tab?.total ?? 0).toFixed(2)} KM
                     </span>
-                    {!mine && (
+                    {!mine && tab?.waiter_id && (
                       <span className="text-[10px] text-red-600 font-semibold mt-1">
-                        Samo pregled
+                        {uiText("Pregled stola")}
                       </span>
                     )}
                   </>
@@ -324,7 +327,7 @@ export default function WaiterFloorPage() {
                     className="text-[11px] font-medium mt-1"
                     style={{ color: "var(--adm-success)" }}
                   >
-                    Slobodan
+                    {uiText("Slobodan")}
                   </span>
                 )}
               </motion.button>
@@ -336,9 +339,9 @@ export default function WaiterFloorPage() {
       {confirmTable && (
         <div className="fixed inset-0 bg-black/50 z-[100] flex items-end sm:items-center justify-center p-4">
           <div className="adm-surface adm-border border rounded-3xl p-6 w-full max-w-sm shadow-elevated">
-            <h3 className="text-lg font-extrabold text-dark adm-text mb-2">Otvoriti karticu?</h3>
+            <h3 className="text-lg font-extrabold text-dark adm-text mb-2">{uiText("Otvoriti karticu?")}</h3>
             <p className="text-sm text-muted adm-text-muted mb-6">
-              Stol <strong>{confirmTable.label}</strong> — započinjete novu narudžbu.
+              {uiText("Stol")} <strong>{confirmTable.label}</strong> {uiText("— započinjete novu narudžbu.")}
             </p>
             <div className="flex gap-3">
               <button
@@ -346,7 +349,7 @@ export default function WaiterFloorPage() {
                 onClick={() => setConfirmTable(null)}
                 className="flex-1 py-3 min-h-[44px] rounded-xl border font-bold text-sm adm-text"
               >
-                Odustani
+                {uiText("Odustani")}
               </button>
               <button
                 type="button"
@@ -354,7 +357,7 @@ export default function WaiterFloorPage() {
                 onClick={() => void startTab()}
                 className="flex-1 py-3 min-h-[44px] rounded-xl bg-primary text-white font-bold text-sm disabled:opacity-50"
               >
-                Otvori
+                {uiText("Otvori")}
               </button>
             </div>
           </div>
@@ -368,7 +371,7 @@ export default function WaiterFloorPage() {
             onClick={openBacklogSheet}
             className="w-full min-h-[54px] rounded-2xl bg-amber-500 text-white text-sm font-extrabold shadow-elevated"
           >
-            Na čekanju: {allBacklogItems.length} stavki — Aktiviraj
+            {uiText("Na čekanju:")} {allBacklogItems.length} {uiText("stavki — Aktiviraj")}
           </button>
         </div>
       )}
@@ -383,9 +386,9 @@ export default function WaiterFloorPage() {
             <div className="px-5 py-4 border-b adm-border">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-lg font-extrabold text-dark adm-text">Na čekanju</h3>
+                  <h3 className="text-lg font-extrabold text-dark adm-text">{uiText("Na čekanju")}</h3>
                   <p className="text-xs text-muted adm-text-muted">
-                    Odaberite stavke koje šaljete na bar.
+                    {uiText("Odaberite stavke koje šaljete na bar.")}
                   </p>
                 </div>
                 <button
@@ -393,7 +396,7 @@ export default function WaiterFloorPage() {
                   onClick={() => setShowBacklogSheet(false)}
                   className="text-sm font-bold adm-text-muted min-h-[36px] px-2"
                 >
-                  Zatvori
+                  {uiText("Zatvori")}
                 </button>
               </div>
             </div>
@@ -444,7 +447,7 @@ export default function WaiterFloorPage() {
                 onClick={() => void activateSelectedBacklog()}
                 className="w-full min-h-[52px] rounded-2xl bg-gradient-to-r from-primary to-amber-500 text-white text-sm font-extrabold disabled:opacity-50"
               >
-                Pošalji na bar ({selectedBacklogIds.size})
+                {uiText("Pošalji na bar (")}{selectedBacklogIds.size})
               </button>
             </div>
           </motion.div>

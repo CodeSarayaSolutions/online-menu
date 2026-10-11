@@ -1,8 +1,11 @@
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 import { CartItem } from "@/types/cart";
 
 type CartState = {
   items: CartItem[];
+  venue: string | null;
+  activateVenue: (venue: string) => void;
   addItem: (item: CartItem) => void;
   removeItem: (cartKey: string) => void;
   updateQuantity: (cartKey: string, qty: number) => void;
@@ -11,8 +14,10 @@ type CartState = {
   clearCart: () => void;
 };
 
-export const useCartStore = create<CartState>((set, get) => ({
+export const useCartStore = create<CartState>()(persist((set, get) => ({
   items: [],
+  venue: null,
+  activateVenue: (venue) => { if (get().venue !== venue) set({venue, items: []}); },
 
   addItem: (item) =>
     set((state) => {
@@ -52,4 +57,4 @@ export const useCartStore = create<CartState>((set, get) => ({
     get().items.reduce((sum, item) => sum + item.quantity, 0),
 
   clearCart: () => set({ items: [] }),
-}));
+}),{name:"saraya_cart_v2",storage:createJSONStorage(()=>sessionStorage),partialize:s=>({items:s.items,venue:s.venue})}));

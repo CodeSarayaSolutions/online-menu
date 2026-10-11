@@ -1,5 +1,6 @@
 "use client";
 
+import { useUiText } from "@/hooks/useUiText";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { Maximize2, Minimize2, Volume2, VolumeX } from "lucide-react";
@@ -14,9 +15,10 @@ import {
 } from "@/lib/bar-notification-sound";
 
 export default function BarStationPage() {
+  const uiText = useUiText();
   const params = useParams();
   const venueSlug = typeof params.venue === "string" ? params.venue : "";
-  const { orders, updateStatus, refreshAndReconnect } = useOrders(venueSlug);
+  const { orders, refresh, error, refreshAndReconnect } = useOrders(venueSlug);
 
   const [muted, setMuted] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
@@ -157,7 +159,7 @@ export default function BarStationPage() {
             type="button"
             onClick={toggleMute}
             className={controlBtnClass}
-            title={muted ? "Uključi zvuk" : "Isključi zvuk"}
+            title={muted ? uiText("Uključi zvuk") : uiText("Isključi zvuk")}
           >
             {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
           </button>
@@ -170,7 +172,7 @@ export default function BarStationPage() {
             type="button"
             onClick={toggleMute}
             className={controlBtnClass}
-            title={muted ? "Uključi zvuk" : "Isključi zvuk"}
+            title={muted ? uiText("Uključi zvuk") : uiText("Isključi zvuk")}
           >
             {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
           </button>
@@ -178,14 +180,14 @@ export default function BarStationPage() {
             type="button"
             onClick={() => void toggleFullscreen()}
             className={controlBtnClass}
-            title="Izađi iz cijelog ekrana"
+            title={uiText("Izađi iz cijelog ekrana")}
           >
             <Minimize2 size={18} />
           </button>
         </div>
       )}
 
-      <StationOrdersBoard mode="bar" orders={orders} updateStatus={updateStatus} compact />
+      <StationOrdersBoard venue={venueSlug} orders={orders} onChanged={refresh} error={!!error} />
       {venueSlug ? <BarActiveTabs restaurantId={venueSlug} /> : null}
 
       {!fullscreen && (
@@ -196,7 +198,7 @@ export default function BarStationPage() {
             "fixed bottom-6 right-6 z-50 w-12 h-12 rounded-2xl shadow-elevated flex items-center justify-center transition",
             "adm-surface adm-border border text-dark adm-text hover:bg-[var(--adm-surface-2)]"
           )}
-          title="Cijeli ekran"
+          title={uiText("Cijeli ekran")}
         >
           <Maximize2 size={20} />
         </button>

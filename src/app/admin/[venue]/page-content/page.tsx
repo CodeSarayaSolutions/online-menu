@@ -1,5 +1,6 @@
 "use client";
 
+import { useUiText } from "@/hooks/useUiText";
 import { useState, useEffect, useCallback } from "react";
 import {
   Save,
@@ -260,18 +261,19 @@ function ColorPicker({
   palette: typeof BG_COLORS;
   label: string;
 }) {
+  const uiText=useUiText();
   const [showCustom, setShowCustom] = useState(false);
   const isCustom = !palette.some((c) => c.value.toUpperCase() === value.toUpperCase());
 
   return (
     <div>
-      <label className="block text-xs font-semibold text-dark adm-text mb-2">{label}</label>
+      <label className="block text-xs font-semibold text-dark adm-text mb-2">{uiText(label)}</label>
       <div className="flex flex-wrap gap-1.5">
         {palette.map((c) => (
           <button
             key={c.value}
             type="button"
-            title={c.label}
+            title={uiText(c.label)}
             onClick={() => { onChange(c.value); setShowCustom(false); }}
             className={clsx(
               "w-8 h-8 rounded-xl border-2 transition-all hover:scale-110",
@@ -334,9 +336,10 @@ function OptionSelector<T extends string>({
   options: { value: T; label: string; icon?: React.ReactNode }[];
   label: string;
 }) {
+  const uiText=useUiText();
   return (
     <div>
-      <label className="block text-xs font-semibold text-dark adm-text mb-2">{label}</label>
+      <label className="block text-xs font-semibold text-dark adm-text mb-2">{uiText(label)}</label>
       <div className="flex flex-wrap gap-1.5">
         {options.map((opt) => (
           <button
@@ -351,7 +354,7 @@ function OptionSelector<T extends string>({
             )}
           >
             {opt.icon}
-            {opt.label}
+            {uiText(opt.label)}
           </button>
         ))}
       </div>
@@ -370,11 +373,12 @@ function ToggleSwitch({
   label: string;
   hint?: string;
 }) {
+  const uiText=useUiText();
   return (
     <div className="flex items-center justify-between">
       <div>
-        <span className="text-xs font-semibold text-dark adm-text">{label}</span>
-        {hint && <p className="text-[10px] text-muted adm-text-muted mt-0.5">{hint}</p>}
+        <span className="text-xs font-semibold text-dark adm-text">{uiText(label)}</span>
+        {hint && <p className="text-[10px] text-muted adm-text-muted mt-0.5">{uiText(hint)}</p>}
       </div>
       <button
         type="button"
@@ -449,6 +453,7 @@ const DESIGN_SECTIONS: DesignSectionConfig[] = [
 // ═══════════════════════════════════════════════════════════
 
 export default function PageContentEditor() {
+  const uiText = useUiText();
   const { venue } = useParams<{ venue: string }>();
   const storeContent = useCmsStore((s) => s.pageContent);
   const storeStyles = useCmsStore((s) => s.componentStyles);
@@ -532,7 +537,7 @@ export default function PageContentEditor() {
     setStyles((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     // Save current state into per-theme customizations for the active theme
     const activeThemeId = layout.activeTheme;
     themeCustomsRef.current = {
@@ -548,7 +553,7 @@ export default function PageContentEditor() {
     updateComponentStyles(styles);
     updateLayoutConfig(layout);
     updateThemeCustomizations(themeCustomsRef.current);
-    setTimeout(() => saveActiveToAllRestaurants(venue as string), 0);
+    if (!await saveActiveToAllRestaurants(venue as string)) return;
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -632,10 +637,10 @@ export default function PageContentEditor() {
       case "general":
         return (
           <div className="space-y-5">
-            <ColorPicker label="Menu Page Background" value={styles.menuPageBgColor} onChange={(v) => handleStyleChange("menuPageBgColor", v)} palette={BG_COLORS} />
-            <ColorPicker label="Cart Page Background" value={styles.cartPageBgColor} onChange={(v) => handleStyleChange("cartPageBgColor", v)} palette={BG_COLORS} />
-            <ColorPicker label="Checkout Page Background" value={styles.checkoutPageBgColor} onChange={(v) => handleStyleChange("checkoutPageBgColor", v)} palette={BG_COLORS} />
-            <OptionSelector label="Button Corner Style" value={styles.buttonStyle} onChange={(v) => handleStyleChange("buttonStyle", v)} options={[
+            <ColorPicker label={uiText("Menu Page Background")} value={styles.menuPageBgColor} onChange={(v) => handleStyleChange("menuPageBgColor", v)} palette={BG_COLORS} />
+            <ColorPicker label={uiText("Cart Page Background")} value={styles.cartPageBgColor} onChange={(v) => handleStyleChange("cartPageBgColor", v)} palette={BG_COLORS} />
+            <ColorPicker label={uiText("Checkout Page Background")} value={styles.checkoutPageBgColor} onChange={(v) => handleStyleChange("checkoutPageBgColor", v)} palette={BG_COLORS} />
+            <OptionSelector label={uiText("Button Corner Style")} value={styles.buttonStyle} onChange={(v) => handleStyleChange("buttonStyle", v)} options={[
               { value: "rounded", label: "Rounded", icon: <Square size={12} /> },
               { value: "pill", label: "Pill", icon: <Circle size={12} /> },
               { value: "square", label: "Sharp", icon: <RectangleHorizontal size={12} /> },
@@ -646,28 +651,28 @@ export default function PageContentEditor() {
       case "hero":
         return (
           <div className="space-y-5">
-            <OptionSelector label="Banner Height" value={styles.heroHeight} onChange={(v) => handleStyleChange("heroHeight", v)} options={[
+            <OptionSelector label={uiText("Banner Height")} value={styles.heroHeight} onChange={(v) => handleStyleChange("heroHeight", v)} options={[
               { value: "compact", label: "Compact" },
               { value: "normal", label: "Normal" },
               { value: "tall", label: "Tall" },
             ]} />
-            <OptionSelector label="Text Alignment" value={styles.heroTextAlign} onChange={(v) => handleStyleChange("heroTextAlign", v)} options={[
+            <OptionSelector label={uiText("Text Alignment")} value={styles.heroTextAlign} onChange={(v) => handleStyleChange("heroTextAlign", v)} options={[
               { value: "left", label: "Left", icon: <AlignLeft size={12} /> },
               { value: "center", label: "Center", icon: <AlignCenter size={12} /> },
               { value: "right", label: "Right", icon: <AlignRight size={12} /> },
             ]} />
-            <OptionSelector label="Overlay Darkness" value={styles.heroOverlay} onChange={(v) => handleStyleChange("heroOverlay", v)} options={[
+            <OptionSelector label={uiText("Overlay Darkness")} value={styles.heroOverlay} onChange={(v) => handleStyleChange("heroOverlay", v)} options={[
               { value: "light", label: "Light" },
               { value: "medium", label: "Medium" },
               { value: "dark", label: "Dark" },
             ]} />
-            <OptionSelector label="Hero Media" value={styles.heroMediaType || 'image'} onChange={(v) => handleStyleChange("heroMediaType", v)} options={[
+            <OptionSelector label={uiText("Hero Media")} value={styles.heroMediaType || 'image'} onChange={(v) => handleStyleChange("heroMediaType", v)} options={[
               { value: "image", label: "Image" },
               { value: "video", label: "Video" },
             ]} />
             {(!styles.heroMediaType || styles.heroMediaType === 'image') && (
               <ImageUploadField
-                label="Hero banner image"
+                label={uiText("Hero banner image")}
                 restaurantId={venue as string}
                 placement="page-hero"
                 value={styles.heroImageUrl || ''}
@@ -677,13 +682,13 @@ export default function PageContentEditor() {
             {(styles.heroMediaType === 'video') && (
               <div>
                 <ImageUploadField
-                  label="Hero video"
+                  label={uiText("Hero video")}
                   restaurantId={venue as string}
                   placement="video"
                   value={styles.heroVideoUrl || ''}
                   onChange={(url) => handleStyleChange("heroVideoUrl", url)}
                 />
-                <p className="text-[10px] text-muted adm-text-muted mt-1">Upload .mp4 or .webm — autoplays muted on the menu.</p>
+                <p className="text-[10px] text-muted adm-text-muted mt-1">{uiText("Upload .mp4 or .webm — autoplays muted on the menu.")}</p>
               </div>
             )}
           </div>
@@ -692,19 +697,19 @@ export default function PageContentEditor() {
       case "infobar":
         return isInfoBarVisible ? (
           <div className="space-y-5">
-            <ToggleSwitch label="Show Info Bar" value={styles.infoBarVisible} onChange={(v) => handleStyleChange("infoBarVisible", v)} hint="Toggle the welcome card below the hero" />
-            <ColorPicker label="Background Color" value={styles.infoBarBgColor} onChange={(v) => handleStyleChange("infoBarBgColor", v)} palette={BG_COLORS} />
-            <ColorPicker label="Text Color" value={styles.infoBarTextColor} onChange={(v) => handleStyleChange("infoBarTextColor", v)} palette={TEXT_COLORS} />
+            <ToggleSwitch label={uiText("Show Info Bar")} value={styles.infoBarVisible} onChange={(v) => handleStyleChange("infoBarVisible", v)} hint={uiText("Toggle the welcome card below the hero")} />
+            <ColorPicker label={uiText("Background Color")} value={styles.infoBarBgColor} onChange={(v) => handleStyleChange("infoBarBgColor", v)} palette={BG_COLORS} />
+            <ColorPicker label={uiText("Text Color")} value={styles.infoBarTextColor} onChange={(v) => handleStyleChange("infoBarTextColor", v)} palette={TEXT_COLORS} />
           </div>
         ) : (
-          <p className="text-xs text-muted adm-text-muted italic">Enable the Info Bar section in Section Order & Visibility to edit these settings.</p>
+          <p className="text-xs text-muted adm-text-muted italic">{uiText("Enable the Info Bar section in Section Order & Visibility to edit these settings.")}</p>
         );
 
       case "cards":
         return (
           <div className="space-y-5">
             <div>
-              <label className="block text-xs font-semibold text-dark adm-text mb-2">Card Layout</label>
+              <label className="block text-xs font-semibold text-dark adm-text mb-2">{uiText("Card Layout")}</label>
               <div className="flex gap-3">
                 {[
                   { layout: "horizontal" as const, imgPos: "left" as const, label: "Image Left" },
@@ -723,23 +728,23 @@ export default function PageContentEditor() {
                       className={clsx("flex flex-col items-center gap-1.5 p-2 rounded-xl border-2 transition-all", isActive ? "border-primary bg-primary/5" : "border adm-border hover:border-[var(--adm-border-strong)]")}
                     >
                       <CardLayoutPreview layout={opt.layout} imagePos={opt.imgPos} active={isActive} />
-                      <span className={clsx("text-[10px] font-semibold", isActive ? "text-primary" : "text-muted adm-text-muted")}>{opt.label}</span>
+                      <span className={clsx("text-[10px] font-semibold", isActive ? "text-primary" : "text-muted adm-text-muted")}>{uiText(opt.label)}</span>
                     </button>
                   );
                 })}
               </div>
             </div>
-            <ColorPicker label="Card Background" value={styles.cardBgColor} onChange={(v) => handleStyleChange("cardBgColor", v)} palette={BG_COLORS} />
-            <ColorPicker label="Title Color" value={styles.cardTitleColor} onChange={(v) => handleStyleChange("cardTitleColor", v)} palette={TEXT_COLORS} />
-            <ColorPicker label="Description Color" value={styles.cardDescriptionColor} onChange={(v) => handleStyleChange("cardDescriptionColor", v)} palette={TEXT_COLORS} />
-            <ColorPicker label="Price Color" value={styles.cardPriceColor} onChange={(v) => handleStyleChange("cardPriceColor", v)} palette={ACCENT_COLORS} />
-            <OptionSelector label="Corner Radius" value={styles.cardBorderRadius} onChange={(v) => handleStyleChange("cardBorderRadius", v)} options={[
+            <ColorPicker label={uiText("Card Background")} value={styles.cardBgColor} onChange={(v) => handleStyleChange("cardBgColor", v)} palette={BG_COLORS} />
+            <ColorPicker label={uiText("Title Color")} value={styles.cardTitleColor} onChange={(v) => handleStyleChange("cardTitleColor", v)} palette={TEXT_COLORS} />
+            <ColorPicker label={uiText("Description Color")} value={styles.cardDescriptionColor} onChange={(v) => handleStyleChange("cardDescriptionColor", v)} palette={TEXT_COLORS} />
+            <ColorPicker label={uiText("Price Color")} value={styles.cardPriceColor} onChange={(v) => handleStyleChange("cardPriceColor", v)} palette={ACCENT_COLORS} />
+            <OptionSelector label={uiText("Corner Radius")} value={styles.cardBorderRadius} onChange={(v) => handleStyleChange("cardBorderRadius", v)} options={[
               { value: "sm", label: "Small" },
               { value: "md", label: "Medium" },
               { value: "lg", label: "Large" },
               { value: "xl", label: "Extra Large" },
             ]} />
-            <OptionSelector label="Shadow Depth" value={styles.cardShadow} onChange={(v) => handleStyleChange("cardShadow", v)} options={[
+            <OptionSelector label={uiText("Shadow Depth")} value={styles.cardShadow} onChange={(v) => handleStyleChange("cardShadow", v)} options={[
               { value: "none", label: "None" },
               { value: "sm", label: "Subtle" },
               { value: "md", label: "Medium" },
@@ -751,81 +756,81 @@ export default function PageContentEditor() {
       case "sections":
         return (
           <div className="space-y-5">
-            <OptionSelector label="Title Alignment" value={styles.sectionTitleAlign} onChange={(v) => handleStyleChange("sectionTitleAlign", v)} options={[
+            <OptionSelector label={uiText("Title Alignment")} value={styles.sectionTitleAlign} onChange={(v) => handleStyleChange("sectionTitleAlign", v)} options={[
               { value: "left", label: "Left", icon: <AlignLeft size={12} /> },
               { value: "center", label: "Center", icon: <AlignCenter size={12} /> },
             ]} />
-            <ColorPicker label="Title Color" value={styles.sectionTitleColor} onChange={(v) => handleStyleChange("sectionTitleColor", v)} palette={TEXT_COLORS} />
-            <ColorPicker label="Subtitle Color" value={styles.sectionSubtitleColor} onChange={(v) => handleStyleChange("sectionSubtitleColor", v)} palette={TEXT_COLORS} />
-            <ColorPicker label="Divider Color" value={styles.sectionDividerColor} onChange={(v) => handleStyleChange("sectionDividerColor", v)} palette={ACCENT_COLORS} />
-            <ToggleSwitch label="Show Category Icon" value={styles.sectionShowIcon} onChange={(v) => handleStyleChange("sectionShowIcon", v)} hint="Show emoji icon next to category section titles" />
-            <ToggleSwitch label="Show Divider Line" value={styles.sectionShowDivider} onChange={(v) => handleStyleChange("sectionShowDivider", v)} />
-            <ToggleSwitch label="Show Category Headers" value={styles.sectionShowHeaders} onChange={(v) => handleStyleChange("sectionShowHeaders", v)} hint="Toggle category section headers (title, subtitle, divider). When off, items display without category grouping labels." />
+            <ColorPicker label={uiText("Title Color")} value={styles.sectionTitleColor} onChange={(v) => handleStyleChange("sectionTitleColor", v)} palette={TEXT_COLORS} />
+            <ColorPicker label={uiText("Subtitle Color")} value={styles.sectionSubtitleColor} onChange={(v) => handleStyleChange("sectionSubtitleColor", v)} palette={TEXT_COLORS} />
+            <ColorPicker label={uiText("Divider Color")} value={styles.sectionDividerColor} onChange={(v) => handleStyleChange("sectionDividerColor", v)} palette={ACCENT_COLORS} />
+            <ToggleSwitch label={uiText("Show Category Icon")} value={styles.sectionShowIcon} onChange={(v) => handleStyleChange("sectionShowIcon", v)} hint={uiText("Show emoji icon next to category section titles")} />
+            <ToggleSwitch label={uiText("Show Divider Line")} value={styles.sectionShowDivider} onChange={(v) => handleStyleChange("sectionShowDivider", v)} />
+            <ToggleSwitch label={uiText("Show Category Headers")} value={styles.sectionShowHeaders} onChange={(v) => handleStyleChange("sectionShowHeaders", v)} hint={uiText("Toggle category section headers (title, subtitle, divider). When off, items display without category grouping labels.")} />
           </div>
         );
 
       case "catbar":
         return isCategoryBarVisible ? (
           <div className="space-y-5">
-            <ColorPicker label="Background Color" value={styles.categoryBarBgColor} onChange={(v) => handleStyleChange("categoryBarBgColor", v)} palette={BG_COLORS} />
-            <ToggleSwitch label="Sticky on Scroll" value={styles.categoryBarSticky} onChange={(v) => handleStyleChange("categoryBarSticky", v)} hint="Keep category bar visible when scrolling" />
-            <ToggleSwitch label="Show Category Icons" value={styles.categoryBarShowIcons} onChange={(v) => handleStyleChange("categoryBarShowIcons", v)} hint="Display emoji icons for categories everywhere (bar, headers, product page)" />
+            <ColorPicker label={uiText("Background Color")} value={styles.categoryBarBgColor} onChange={(v) => handleStyleChange("categoryBarBgColor", v)} palette={BG_COLORS} />
+            <ToggleSwitch label={uiText("Sticky on Scroll")} value={styles.categoryBarSticky} onChange={(v) => handleStyleChange("categoryBarSticky", v)} hint={uiText("Keep category bar visible when scrolling")} />
+            <ToggleSwitch label={uiText("Show Category Icons")} value={styles.categoryBarShowIcons} onChange={(v) => handleStyleChange("categoryBarShowIcons", v)} hint={uiText("Display emoji icons for categories everywhere (bar, headers, product page)")} />
           </div>
         ) : (
-          <p className="text-xs text-muted adm-text-muted italic">Enable the Category Bar section in Section Order & Visibility to edit these settings.</p>
+          <p className="text-xs text-muted adm-text-muted italic">{uiText("Enable the Category Bar section in Section Order & Visibility to edit these settings.")}</p>
         );
 
       case "orderbar":
         return (
           <div className="space-y-5">
-            <OptionSelector label="Bar Style" value={styles.orderBarStyle} onChange={(v) => handleStyleChange("orderBarStyle", v)} options={[
+            <OptionSelector label={uiText("Bar Style")} value={styles.orderBarStyle} onChange={(v) => handleStyleChange("orderBarStyle", v)} options={[
               { value: "gradient", label: "Gradient" },
               { value: "solid", label: "Solid Color" },
               { value: "glass", label: "Glass Effect" },
             ]} />
-            <ColorPicker label="Background Color" value={styles.orderBarBgColor} onChange={(v) => handleStyleChange("orderBarBgColor", v)} palette={ACCENT_COLORS} />
-            <ColorPicker label="Text Color" value={styles.orderBarTextColor} onChange={(v) => handleStyleChange("orderBarTextColor", v)} palette={TEXT_COLORS} />
+            <ColorPicker label={uiText("Background Color")} value={styles.orderBarBgColor} onChange={(v) => handleStyleChange("orderBarBgColor", v)} palette={ACCENT_COLORS} />
+            <ColorPicker label={uiText("Text Color")} value={styles.orderBarTextColor} onChange={(v) => handleStyleChange("orderBarTextColor", v)} palette={TEXT_COLORS} />
           </div>
         );
 
       case "productpage":
         return (
           <div className="space-y-5">
-            <OptionSelector label="Image Position (Desktop)" value={styles.productImagePosition} onChange={(v) => handleStyleChange("productImagePosition", v)} options={[
+            <OptionSelector label={uiText("Image Position (Desktop)")} value={styles.productImagePosition} onChange={(v) => handleStyleChange("productImagePosition", v)} options={[
               { value: "left", label: "Left", icon: <Columns size={12} /> },
               { value: "right", label: "Right", icon: <Columns size={12} className="scale-x-[-1]" /> },
             ]} />
-            <ColorPicker label="Page Background" value={styles.productPageBgColor} onChange={(v) => handleStyleChange("productPageBgColor", v)} palette={BG_COLORS} />
-            <ColorPicker label="Info Card Background" value={styles.productCardBgColor} onChange={(v) => handleStyleChange("productCardBgColor", v)} palette={BG_COLORS} />
-            <ColorPicker label="Title Color" value={styles.productTitleColor} onChange={(v) => handleStyleChange("productTitleColor", v)} palette={TEXT_COLORS} />
-            <ColorPicker label="Description Color" value={styles.productDescriptionColor} onChange={(v) => handleStyleChange("productDescriptionColor", v)} palette={TEXT_COLORS} />
-            <ColorPicker label="Price Color" value={styles.productPriceColor} onChange={(v) => handleStyleChange("productPriceColor", v)} palette={ACCENT_COLORS} />
-            <ColorPicker label="Button Background" value={styles.productButtonBgColor} onChange={(v) => handleStyleChange("productButtonBgColor", v)} palette={ACCENT_COLORS} />
-            <ColorPicker label="Button Text Color" value={styles.productButtonTextColor} onChange={(v) => handleStyleChange("productButtonTextColor", v)} palette={TEXT_COLORS} />
-            <ColorPicker label="Sticky Bar Background" value={styles.productStickyBarBgColor} onChange={(v) => handleStyleChange("productStickyBarBgColor", v)} palette={BG_COLORS} />
-            <ColorPicker label="Add-on Background" value={styles.productAddonBgColor} onChange={(v) => handleStyleChange("productAddonBgColor", v)} palette={BG_COLORS} />
-            <ColorPicker label="Active Add-on Border" value={styles.productAddonActiveBorderColor} onChange={(v) => handleStyleChange("productAddonActiveBorderColor", v)} palette={ACCENT_COLORS} />
-            <ColorPicker label="Quantity Selector Background" value={styles.productQuantityBgColor} onChange={(v) => handleStyleChange("productQuantityBgColor", v)} palette={BG_COLORS} />
-            <ColorPicker label="Related Items Background" value={styles.productRelatedBgColor} onChange={(v) => handleStyleChange("productRelatedBgColor", v)} palette={BG_COLORS} />
+            <ColorPicker label={uiText("Page Background")} value={styles.productPageBgColor} onChange={(v) => handleStyleChange("productPageBgColor", v)} palette={BG_COLORS} />
+            <ColorPicker label={uiText("Info Card Background")} value={styles.productCardBgColor} onChange={(v) => handleStyleChange("productCardBgColor", v)} palette={BG_COLORS} />
+            <ColorPicker label={uiText("Title Color")} value={styles.productTitleColor} onChange={(v) => handleStyleChange("productTitleColor", v)} palette={TEXT_COLORS} />
+            <ColorPicker label={uiText("Description Color")} value={styles.productDescriptionColor} onChange={(v) => handleStyleChange("productDescriptionColor", v)} palette={TEXT_COLORS} />
+            <ColorPicker label={uiText("Price Color")} value={styles.productPriceColor} onChange={(v) => handleStyleChange("productPriceColor", v)} palette={ACCENT_COLORS} />
+            <ColorPicker label={uiText("Button Background")} value={styles.productButtonBgColor} onChange={(v) => handleStyleChange("productButtonBgColor", v)} palette={ACCENT_COLORS} />
+            <ColorPicker label={uiText("Button Text Color")} value={styles.productButtonTextColor} onChange={(v) => handleStyleChange("productButtonTextColor", v)} palette={TEXT_COLORS} />
+            <ColorPicker label={uiText("Sticky Bar Background")} value={styles.productStickyBarBgColor} onChange={(v) => handleStyleChange("productStickyBarBgColor", v)} palette={BG_COLORS} />
+            <ColorPicker label={uiText("Add-on Background")} value={styles.productAddonBgColor} onChange={(v) => handleStyleChange("productAddonBgColor", v)} palette={BG_COLORS} />
+            <ColorPicker label={uiText("Active Add-on Border")} value={styles.productAddonActiveBorderColor} onChange={(v) => handleStyleChange("productAddonActiveBorderColor", v)} palette={ACCENT_COLORS} />
+            <ColorPicker label={uiText("Quantity Selector Background")} value={styles.productQuantityBgColor} onChange={(v) => handleStyleChange("productQuantityBgColor", v)} palette={BG_COLORS} />
+            <ColorPicker label={uiText("Related Items Background")} value={styles.productRelatedBgColor} onChange={(v) => handleStyleChange("productRelatedBgColor", v)} palette={BG_COLORS} />
           </div>
         );
 
       case "cartpage":
         return (
           <div className="space-y-5">
-            <ColorPicker label="Page Background" value={styles.cartPageBgColor} onChange={(v) => handleStyleChange("cartPageBgColor", v)} palette={BG_COLORS} />
-            <ColorPicker label="Card Background" value={styles.cartCardBgColor} onChange={(v) => handleStyleChange("cartCardBgColor", v)} palette={BG_COLORS} />
-            <ColorPicker label="Title Color" value={styles.cartTitleColor} onChange={(v) => handleStyleChange("cartTitleColor", v)} palette={TEXT_COLORS} />
-            <ColorPicker label="Accent Color" value={styles.cartAccentColor} onChange={(v) => handleStyleChange("cartAccentColor", v)} palette={ACCENT_COLORS} />
+            <ColorPicker label={uiText("Page Background")} value={styles.cartPageBgColor} onChange={(v) => handleStyleChange("cartPageBgColor", v)} palette={BG_COLORS} />
+            <ColorPicker label={uiText("Card Background")} value={styles.cartCardBgColor} onChange={(v) => handleStyleChange("cartCardBgColor", v)} palette={BG_COLORS} />
+            <ColorPicker label={uiText("Title Color")} value={styles.cartTitleColor} onChange={(v) => handleStyleChange("cartTitleColor", v)} palette={TEXT_COLORS} />
+            <ColorPicker label={uiText("Accent Color")} value={styles.cartAccentColor} onChange={(v) => handleStyleChange("cartAccentColor", v)} palette={ACCENT_COLORS} />
           </div>
         );
 
       case "checkoutpage":
         return (
           <div className="space-y-5">
-            <ColorPicker label="Page Background" value={styles.checkoutPageBgColor} onChange={(v) => handleStyleChange("checkoutPageBgColor", v)} palette={BG_COLORS} />
-            <ColorPicker label="Card Background" value={styles.checkoutCardBgColor} onChange={(v) => handleStyleChange("checkoutCardBgColor", v)} palette={BG_COLORS} />
-            <ColorPicker label="Accent Color" value={styles.checkoutAccentColor} onChange={(v) => handleStyleChange("checkoutAccentColor", v)} palette={ACCENT_COLORS} />
+            <ColorPicker label={uiText("Page Background")} value={styles.checkoutPageBgColor} onChange={(v) => handleStyleChange("checkoutPageBgColor", v)} palette={BG_COLORS} />
+            <ColorPicker label={uiText("Card Background")} value={styles.checkoutCardBgColor} onChange={(v) => handleStyleChange("checkoutCardBgColor", v)} palette={BG_COLORS} />
+            <ColorPicker label={uiText("Accent Color")} value={styles.checkoutAccentColor} onChange={(v) => handleStyleChange("checkoutAccentColor", v)} palette={ACCENT_COLORS} />
           </div>
         );
 
@@ -845,9 +850,9 @@ export default function PageContentEditor() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-extrabold text-dark adm-text">Page Content</h2>
+          <h2 className="text-2xl font-extrabold text-dark adm-text">{uiText("Page Content")}</h2>
           <p className="text-sm text-muted adm-text-muted mt-1">
-            Edit text content and visual design for every frontend component.
+            {uiText("Edit text content and visual design for every frontend component.")}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -860,17 +865,17 @@ export default function PageContentEditor() {
                 ? "border-primary/20 bg-primary/5 text-primary"
                 : "border-primary/10 text-dark adm-text hover:bg-[var(--adm-surface-2)]"
             )}
-            title={showPreview ? "Hide Preview" : "Show Preview"}
+            title={showPreview ? uiText("Sakrij pregled") : uiText("Prikaži pregled")}
           >
             {showPreview ? <PanelRightClose size={14} /> : <PanelRightOpen size={14} />}
-            <span className="hidden 2xl:inline">{showPreview ? "Hide" : "Show"} Preview</span>
+            <span className="hidden 2xl:inline">{showPreview ? uiText("Hide") : uiText("Show")} {uiText("Preview")}</span>
           </button>
           <button
             onClick={handleResetAll}
             className="px-4 py-2 rounded-2xl border border-primary/10 text-sm font-semibold text-dark adm-text hover:bg-[var(--adm-surface-2)] transition flex items-center gap-2"
           >
             <RotateCcw size={14} />
-            Reset {activeTab === "content" ? "Text" : activeTab === "design" ? "Design" : "Layout"}
+            {uiText("Reset")} {activeTab === "content" ? uiText("Text") : activeTab === "design" ? uiText("Design") : uiText("Layout")}
           </button>
           <button
             onClick={handleSave}
@@ -884,7 +889,7 @@ export default function PageContentEditor() {
                 : "adm-bg text-muted adm-text-muted cursor-not-allowed"
             )}
           >
-            {saved ? (<><Check size={15} />Saved!</>) : (<><Save size={15} />Save Changes</>)}
+            {saved ? (<><Check size={15} />{uiText("Saved!")}</>) : (<><Save size={15} />{uiText("Save Changes")}</>)}
           </button>
         </div>
       </div>
@@ -907,7 +912,7 @@ export default function PageContentEditor() {
             )}
           >
             <tab.icon size={16} />
-            {tab.label}
+            {uiText(tab.label)}
           </button>
         ))}
       </div>
@@ -922,8 +927,8 @@ export default function PageContentEditor() {
             className="bg-primary/5 border border-primary/20 rounded-2xl px-4 py-2.5 flex items-center gap-3"
           >
             <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            <span className="text-xs text-dark adm-text font-semibold">Unsaved changes</span>
-            <button onClick={handleSave} className="ml-auto text-xs font-bold text-primary hover:underline transition">Save now</button>
+            <span className="text-xs text-dark adm-text font-semibold">{uiText("Unsaved changes")}</span>
+            <button onClick={handleSave} className="ml-auto text-xs font-bold text-primary hover:underline transition">{uiText("Save now")}</button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -949,7 +954,7 @@ export default function PageContentEditor() {
                   )}
                 >
                   <span className="flex items-center gap-1.5">
-                    {section.title}
+                    {uiText(section.title)}
                     {isModified && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
                   </span>
                 </button>
@@ -961,7 +966,7 @@ export default function PageContentEditor() {
             className="shrink-0 px-3 py-1.5 rounded-xl text-[11px] font-bold text-muted adm-text-muted hover:adm-text adm-surface adm-border border hover:bg-[var(--adm-surface-2)] transition border border adm-border flex items-center gap-1"
           >
             <ChevronsUpDown size={12} />
-            <span className="hidden sm:inline">{(activeTab === "content" ? allContentExpanded : allDesignExpanded) ? "Collapse" : "Expand"}</span>
+            <span className="hidden sm:inline">{(activeTab === "content" ? allContentExpanded : allDesignExpanded) ? uiText("Collapse") : uiText("Expand")}</span>
           </button>
         </div>
       )}
@@ -981,7 +986,7 @@ export default function PageContentEditor() {
               )}
             >
               <st.icon size={13} />
-              {st.label}
+              {uiText(st.label)}
             </button>
           ))}
         </div>
@@ -997,7 +1002,7 @@ export default function PageContentEditor() {
             <div className="flex items-center gap-3 px-1">
               <div className="flex items-center gap-1.5 text-xs text-muted adm-text-muted shrink-0">
                 <span className="font-bold text-primary">{contentModifiedCount}</span>
-                <span>of {SECTIONS.length} customized</span>
+                <span>{uiText("of")} {SECTIONS.length} {uiText("customized")}</span>
               </div>
               <div className="flex-1 h-1.5 adm-bg rounded-full overflow-hidden">
                 <motion.div
@@ -1038,16 +1043,16 @@ export default function PageContentEditor() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <h3 className="text-[15px] font-extrabold text-dark adm-text">{section.title}</h3>
+                      <h3 className="text-[15px] font-extrabold text-dark adm-text">{uiText(section.title)}</h3>
                       {isModified && (
-                        <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-[9px] font-bold text-primary uppercase tracking-wide">Edited</span>
+                        <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-[9px] font-bold text-primary uppercase tracking-wide">{uiText("Edited")}</span>
                       )}
                     </div>
-                    <p className="text-xs text-muted adm-text-muted mt-0.5">{section.description}</p>
+                    <p className="text-xs text-muted adm-text-muted mt-0.5">{uiText(section.description)}</p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="text-[10px] font-bold adm-text-faint adm-bg px-2.5 py-0.5 rounded-full">
-                      {section.fields.length} fields
+                      {section.fields.length} {uiText("fields")}
                     </span>
                     <motion.div animate={{ rotate: isExpanded ? 90 : 0 }} transition={{ duration: 0.2 }}>
                       <ChevronRight size={16} className={isExpanded ? "text-primary" : "adm-text-faint"} />
@@ -1076,7 +1081,7 @@ export default function PageContentEditor() {
                               transition={{ delay: fIdx * 0.03, duration: 0.25 }}
                             >
                               <label className="block text-xs font-semibold text-dark adm-text mb-1.5">
-                                {field.label}
+                                {uiText(field.label)}
                                 {field.key === "currencySymbol" && (
                                   <Coins size={10} className="inline ml-1 text-primary/50" />
                                 )}
@@ -1102,7 +1107,7 @@ export default function PageContentEditor() {
                                           onChange={(e) => handleChange(bsKey, e.target.value)}
                                           rows={3}
                                           className="w-full pl-8 pr-4 py-3 adm-bg border border-blue-200/30 rounded-2xl text-sm text-dark adm-text outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-400 focus:adm-surface adm-border border transition resize-none placeholder:adm-text-faint"
-                                          placeholder={`${field.label} (Bosnian)`}
+                                          placeholder={`${uiText(field.label)} (${uiText("Bosanski")})`}
                                         />
                                       </div>
                                     </BsCollapse>
@@ -1138,7 +1143,7 @@ export default function PageContentEditor() {
                                           value={String((form as any)[bsKey] ?? "")}
                                           onChange={(e) => handleChange(bsKey, e.target.value)}
                                           className="w-full pl-8 pr-4 py-2.5 adm-bg border border-blue-200/30 rounded-2xl text-sm text-dark adm-text outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-400 focus:adm-surface adm-border border transition placeholder:adm-text-faint"
-                                          placeholder={`${field.label} (Bosnian)`}
+                                          placeholder={`${uiText(field.label)} (${uiText("Bosanski")})`}
                                         />
                                       </div>
                                     </BsCollapse>
@@ -1146,7 +1151,7 @@ export default function PageContentEditor() {
                                 </div>
                               )}
                               {field.hint && (
-                                <p className="text-[11px] text-muted adm-text-muted mt-1 ml-1">{field.hint}</p>
+                                <p className="text-[11px] text-muted adm-text-muted mt-1 ml-1">{uiText(field.hint)}</p>
                               )}
                             </motion.div>
                             );
@@ -1158,7 +1163,7 @@ export default function PageContentEditor() {
                             className="text-xs text-muted adm-text-muted hover:text-accent-red transition font-medium flex items-center gap-1"
                           >
                             <RotateCcw size={11} />
-                            Reset this section
+                            {uiText("Reset this section")}
                           </button>
                         </div>
                       </div>
@@ -1199,8 +1204,8 @@ export default function PageContentEditor() {
                     <Icon size={18} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-[15px] font-extrabold text-dark adm-text">{section.title}</h3>
-                    <p className="text-xs text-muted adm-text-muted mt-0.5">{section.description}</p>
+                    <h3 className="text-[15px] font-extrabold text-dark adm-text">{uiText(section.title)}</h3>
+                    <p className="text-xs text-muted adm-text-muted mt-0.5">{uiText(section.description)}</p>
                   </div>
                   <motion.div animate={{ rotate: isExpanded ? 90 : 0 }} transition={{ duration: 0.2 }}>
                     <ChevronRight size={16} className={isExpanded ? "text-primary" : "adm-text-faint"} />
@@ -1248,9 +1253,9 @@ export default function PageContentEditor() {
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-extrabold text-dark adm-text flex items-center gap-2">
                     {at.name}
-                    <span className="px-2 py-0.5 rounded-full bg-primary/10 text-[10px] font-bold text-primary">Active Theme</span>
+                    <span className="px-2 py-0.5 rounded-full bg-primary/10 text-[10px] font-bold text-primary">{uiText("Active Theme")}</span>
                   </p>
-                  <p className="text-[11px] text-muted adm-text-muted truncate">{at.description}</p>
+                  <p className="text-[11px] text-muted adm-text-muted truncate">{uiText(at.description)}</p>
                 </div>
               </div>
             ) : null;
@@ -1265,8 +1270,8 @@ export default function PageContentEditor() {
                   <Sparkles size={18} />
                 </div>
                 <div>
-                  <h3 className="text-[15px] font-extrabold text-dark adm-text">Theme Presets</h3>
-                  <p className="text-xs text-muted adm-text-muted mt-0.5">One-click complete visual redesign — colors, fonts, layout</p>
+                  <h3 className="text-[15px] font-extrabold text-dark adm-text">{uiText("Theme Presets")}</h3>
+                  <p className="text-xs text-muted adm-text-muted mt-0.5">{uiText("One-click complete visual redesign — colors, fonts, layout")}</p>
                 </div>
               </div>
             </div>
@@ -1329,11 +1334,11 @@ export default function PageContentEditor() {
                       <div className="w-8 h-8 rounded-lg" style={{ backgroundColor: theme.preview.text }} />
                     </div>
                     <p className={clsx("text-xs font-bold", isActive ? "text-primary" : "text-dark adm-text")}>{theme.name}</p>
-                    <p className="text-[10px] text-muted adm-text-muted mt-0.5 line-clamp-2">{theme.description}</p>
+                    <p className="text-[10px] text-muted adm-text-muted mt-0.5 line-clamp-2">{uiText(theme.description)}</p>
                     {isActive && (
                       <div className="mt-2 flex items-center gap-1">
                         <Check size={10} className="text-primary" />
-                        <span className="text-[10px] font-bold text-primary">Active</span>
+                        <span className="text-[10px] font-bold text-primary">{uiText("Active")}</span>
                       </div>
                     )}
                   </motion.button>
@@ -1352,8 +1357,8 @@ export default function PageContentEditor() {
                   <Layers size={18} />
                 </div>
                 <div>
-                  <h3 className="text-[15px] font-extrabold text-dark adm-text">Section Order & Visibility</h3>
-                  <p className="text-xs text-muted adm-text-muted mt-0.5">Drag sections to reorder, toggle visibility on/off</p>
+                  <h3 className="text-[15px] font-extrabold text-dark adm-text">{uiText("Section Order & Visibility")}</h3>
+                  <p className="text-xs text-muted adm-text-muted mt-0.5">{uiText("Drag sections to reorder, toggle visibility on/off")}</p>
                 </div>
               </div>
             </div>
@@ -1413,7 +1418,7 @@ export default function PageContentEditor() {
 
                     {/* Section info */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-dark adm-text">{info.label}</p>
+                      <p className="text-sm font-bold text-dark adm-text">{uiText(info.label)}</p>
                       <p className="text-[10px] text-muted adm-text-muted">{info.desc}</p>
                     </div>
 
@@ -1456,13 +1461,13 @@ export default function PageContentEditor() {
                   <Grid3X3 size={18} />
                 </div>
                 <div>
-                  <h3 className="text-[15px] font-extrabold text-dark adm-text">Section Variants</h3>
-                  <p className="text-xs text-muted adm-text-muted mt-0.5">Choose a visual style for each section</p>
+                  <h3 className="text-[15px] font-extrabold text-dark adm-text">{uiText("Section Variants")}</h3>
+                  <p className="text-xs text-muted adm-text-muted mt-0.5">{uiText("Choose a visual style for each section")}</p>
                 </div>
               </div>
             </div>
             <div className="p-5 space-y-5">
-              <OptionSelector label="Hero Style" value={layout.heroVariant} onChange={(v) => setLayout((p) => ({ ...p, heroVariant: v }))} options={[
+              <OptionSelector label={uiText("Hero Style")} value={layout.heroVariant} onChange={(v) => setLayout((p) => ({ ...p, heroVariant: v }))} options={[
                 { value: "classic", label: "Classic" },
                 { value: "minimal", label: "Minimal" },
                 { value: "centered", label: "Centered" },
@@ -1470,7 +1475,7 @@ export default function PageContentEditor() {
                 { value: "overlay-full", label: "Full Overlay" },
               ]} />
               {isInfoBarVisible && (
-                <OptionSelector label="Info Bar Style" value={layout.infoBarVariant} onChange={(v) => setLayout((p) => ({ ...p, infoBarVariant: v }))} options={[
+                <OptionSelector label={uiText("Info Bar Style")} value={layout.infoBarVariant} onChange={(v) => setLayout((p) => ({ ...p, infoBarVariant: v }))} options={[
                   { value: "card", label: "Card" },
                   { value: "inline", label: "Inline" },
                   { value: "floating", label: "Floating" },
@@ -1478,7 +1483,7 @@ export default function PageContentEditor() {
                 ]} />
               )}
               {isSearchBarVisible && (
-                <OptionSelector label="Search Bar Style" value={layout.searchBarVariant} onChange={(v) => setLayout((p) => ({ ...p, searchBarVariant: v }))} options={[
+                <OptionSelector label={uiText("Search Bar Style")} value={layout.searchBarVariant} onChange={(v) => setLayout((p) => ({ ...p, searchBarVariant: v }))} options={[
                   { value: "default", label: "Default" },
                   { value: "minimal", label: "Minimal" },
                   { value: "pill", label: "Pill" },
@@ -1486,7 +1491,7 @@ export default function PageContentEditor() {
                 ]} />
               )}
               {isCategoryBarVisible && (
-                <OptionSelector label="Category Bar Style" value={layout.categoryBarVariant} onChange={(v) => setLayout((p) => ({ ...p, categoryBarVariant: v }))} options={[
+                <OptionSelector label={uiText("Category Bar Style")} value={layout.categoryBarVariant} onChange={(v) => setLayout((p) => ({ ...p, categoryBarVariant: v }))} options={[
                   { value: "scroll", label: "Scroll" },
                   { value: "pills", label: "Pills" },
                   { value: "underline", label: "Underline" },
@@ -1494,21 +1499,21 @@ export default function PageContentEditor() {
                   { value: "minimal", label: "Minimal" },
                 ]} />
               )}
-              <OptionSelector label="Menu Content Style" value={layout.menuContentVariant} onChange={(v) => setLayout((p) => ({ ...p, menuContentVariant: v }))} options={[
+              <OptionSelector label={uiText("Menu Content Style")} value={layout.menuContentVariant} onChange={(v) => setLayout((p) => ({ ...p, menuContentVariant: v }))} options={[
                 { value: "sections", label: "Sections" },
                 { value: "grid", label: "Grid" },
                 { value: "list", label: "List" },
                 { value: "magazine", label: "Magazine" },
                 { value: "compact", label: "Compact" },
               ]} />
-              <OptionSelector label="Order Bar Style" value={layout.orderBarVariant} onChange={(v) => setLayout((p) => ({ ...p, orderBarVariant: v }))} options={[
+              <OptionSelector label={uiText("Order Bar Style")} value={layout.orderBarVariant} onChange={(v) => setLayout((p) => ({ ...p, orderBarVariant: v }))} options={[
                 { value: "floating", label: "Floating" },
                 { value: "sticky-bottom", label: "Sticky Bottom" },
                 { value: "fab", label: "FAB Button" },
                 { value: "minimal", label: "Minimal" },
               ]} />
               {isPromoVisible && (
-                <OptionSelector label="Promo Banner Style" value={layout.promoBannerVariant} onChange={(v) => setLayout((p) => ({ ...p, promoBannerVariant: v }))} options={[
+                <OptionSelector label={uiText("Promo Banner Style")} value={layout.promoBannerVariant} onChange={(v) => setLayout((p) => ({ ...p, promoBannerVariant: v }))} options={[
                   { value: "ribbon", label: "Ribbon" },
                   { value: "card", label: "Card" },
                   { value: "floating", label: "Floating" },
@@ -1516,28 +1521,28 @@ export default function PageContentEditor() {
                 ]} />
               )}
               {isFeaturedVisible && (
-                <OptionSelector label="Featured Section Style" value={layout.featuredVariant} onChange={(v) => setLayout((p) => ({ ...p, featuredVariant: v }))} options={[
+                <OptionSelector label={uiText("Featured Section Style")} value={layout.featuredVariant} onChange={(v) => setLayout((p) => ({ ...p, featuredVariant: v }))} options={[
                   { value: "carousel", label: "Carousel" },
                   { value: "highlight", label: "Highlight" },
                   { value: "banner", label: "Banner" },
                 ]} />
               )}
               {isSocialProofVisible && (
-                <OptionSelector label="Social Proof Style" value={layout.socialProofVariant} onChange={(v) => setLayout((p) => ({ ...p, socialProofVariant: v }))} options={[
+                <OptionSelector label={uiText("Social Proof Style")} value={layout.socialProofVariant} onChange={(v) => setLayout((p) => ({ ...p, socialProofVariant: v }))} options={[
                   { value: "stars", label: "Stars" },
                   { value: "testimonial", label: "Testimonial" },
                   { value: "counter", label: "Counter" },
                 ]} />
               )}
               {isFooterVisible && (
-                <OptionSelector label="Footer Style" value={layout.footerVariant} onChange={(v) => setLayout((p) => ({ ...p, footerVariant: v }))} options={[
+                <OptionSelector label={uiText("Footer Style")} value={layout.footerVariant} onChange={(v) => setLayout((p) => ({ ...p, footerVariant: v }))} options={[
                   { value: "simple", label: "Simple" },
                   { value: "detailed", label: "Detailed" },
                   { value: "minimal", label: "Minimal" },
                   { value: "branded", label: "Branded" },
                 ]} />
               )}
-              <OptionSelector label="Product Page Style" value={layout.productPageVariant} onChange={(v) => setLayout((p) => ({ ...p, productPageVariant: v }))} options={[
+              <OptionSelector label={uiText("Product Page Style")} value={layout.productPageVariant} onChange={(v) => setLayout((p) => ({ ...p, productPageVariant: v }))} options={[
                 { value: "classic", label: "Classic" },
                 { value: "minimal", label: "Minimal" },
                 { value: "compact", label: "Compact" },
@@ -1557,33 +1562,33 @@ export default function PageContentEditor() {
                   <Monitor size={18} />
                 </div>
                 <div>
-                  <h3 className="text-[15px] font-extrabold text-dark adm-text">Page Layout & Typography</h3>
-                  <p className="text-xs text-muted adm-text-muted mt-0.5">Overall page structure, fonts, and sizing</p>
+                  <h3 className="text-[15px] font-extrabold text-dark adm-text">{uiText("Page Layout & Typography")}</h3>
+                  <p className="text-xs text-muted adm-text-muted mt-0.5">{uiText("Overall page structure, fonts, and sizing")}</p>
                 </div>
               </div>
             </div>
             <div className="p-5 space-y-5">
-              <OptionSelector label="Page Layout" value={layout.pageLayout} onChange={(v) => setLayout((p) => ({ ...p, pageLayout: v }))} options={[
+              <OptionSelector label={uiText("Page Layout")} value={layout.pageLayout} onChange={(v) => setLayout((p) => ({ ...p, pageLayout: v }))} options={[
                 { value: "standard", label: "Standard" },
                 { value: "sidebar", label: "Sidebar" },
                 { value: "magazine", label: "Magazine" },
                 { value: "compact", label: "Compact" },
                 { value: "fullWidth", label: "Full Width" },
               ]} />
-              <OptionSelector label="Heading Font" value={layout.headingFont} onChange={(v) => setLayout((p) => ({ ...p, headingFont: v }))} options={[
+              <OptionSelector label={uiText("Heading Font")} value={layout.headingFont} onChange={(v) => setLayout((p) => ({ ...p, headingFont: v }))} options={[
                 { value: "system", label: "System Default" },
                 { value: "serif", label: "Serif Elegant" },
                 { value: "mono", label: "Monospace" },
                 { value: "display", label: "Display Bold" },
                 { value: "handwritten", label: "Handwritten" },
               ]} />
-              <OptionSelector label="Body Font" value={layout.bodyFont} onChange={(v) => setLayout((p) => ({ ...p, bodyFont: v }))} options={[
+              <OptionSelector label={uiText("Body Font")} value={layout.bodyFont} onChange={(v) => setLayout((p) => ({ ...p, bodyFont: v }))} options={[
                 { value: "system", label: "System Default" },
                 { value: "serif", label: "Serif" },
                 { value: "mono", label: "Monospace" },
                 { value: "elegant", label: "Elegant" },
               ]} />
-              <OptionSelector label="Base Font Size" value={layout.baseFontSize} onChange={(v) => setLayout((p) => ({ ...p, baseFontSize: v }))} options={[
+              <OptionSelector label={uiText("Base Font Size")} value={layout.baseFontSize} onChange={(v) => setLayout((p) => ({ ...p, baseFontSize: v }))} options={[
                 { value: "sm", label: "Small" },
                 { value: "md", label: "Medium" },
                 { value: "lg", label: "Large" },
@@ -1601,25 +1606,25 @@ export default function PageContentEditor() {
                   <Zap size={18} />
                 </div>
                 <div>
-                  <h3 className="text-[15px] font-extrabold text-dark adm-text">Animation & Spacing</h3>
-                  <p className="text-xs text-muted adm-text-muted mt-0.5">Motion effects, content density, and gaps</p>
+                  <h3 className="text-[15px] font-extrabold text-dark adm-text">{uiText("Animation & Spacing")}</h3>
+                  <p className="text-xs text-muted adm-text-muted mt-0.5">{uiText("Motion effects, content density, and gaps")}</p>
                 </div>
               </div>
             </div>
             <div className="p-5 space-y-5">
-              <OptionSelector label="Animation Style" value={layout.animationStyle} onChange={(v) => setLayout((p) => ({ ...p, animationStyle: v }))} options={[
+              <OptionSelector label={uiText("Animation Style")} value={layout.animationStyle} onChange={(v) => setLayout((p) => ({ ...p, animationStyle: v }))} options={[
                 { value: "none", label: "None" },
                 { value: "subtle", label: "Subtle" },
                 { value: "smooth", label: "Smooth" },
                 { value: "playful", label: "Playful" },
                 { value: "dramatic", label: "Dramatic" },
               ]} />
-              <OptionSelector label="Content Density" value={layout.contentDensity} onChange={(v) => setLayout((p) => ({ ...p, contentDensity: v }))} options={[
+              <OptionSelector label={uiText("Content Density")} value={layout.contentDensity} onChange={(v) => setLayout((p) => ({ ...p, contentDensity: v }))} options={[
                 { value: "compact", label: "Compact" },
                 { value: "comfortable", label: "Comfortable" },
                 { value: "spacious", label: "Spacious" },
               ]} />
-              <OptionSelector label="Card Gap" value={layout.cardGap} onChange={(v) => setLayout((p) => ({ ...p, cardGap: v }))} options={[
+              <OptionSelector label={uiText("Card Gap")} value={layout.cardGap} onChange={(v) => setLayout((p) => ({ ...p, cardGap: v }))} options={[
                 { value: "tight", label: "Tight" },
                 { value: "normal", label: "Normal" },
                 { value: "wide", label: "Wide" },
@@ -1637,8 +1642,8 @@ export default function PageContentEditor() {
                   <TypeIcon size={18} />
                 </div>
                 <div>
-                  <h3 className="text-[15px] font-extrabold text-dark adm-text">Extra Section Content</h3>
-                  <p className="text-xs text-muted adm-text-muted mt-0.5">Text for promo banner, featured section, social proof, footer</p>
+                  <h3 className="text-[15px] font-extrabold text-dark adm-text">{uiText("Extra Section Content")}</h3>
+                  <p className="text-xs text-muted adm-text-muted mt-0.5">{uiText("Text for promo banner, featured section, social proof, footer")}</p>
                 </div>
               </div>
             </div>
@@ -1659,7 +1664,7 @@ export default function PageContentEditor() {
                 if (visibleFields.length === 0) {
                   return (
                     <p className="text-xs text-muted adm-text-muted italic py-2">
-                      No extra sections are currently visible. Enable sections like Promo Banner, Featured, Social Proof, or Footer in Section Order & Visibility above to edit their content here.
+                      {uiText("No extra sections are currently visible. Enable sections like Promo Banner, Featured, Social Proof, or Footer in Section Order & Visibility above to edit their content here.")}
                     </p>
                   );
                 }
@@ -1667,7 +1672,7 @@ export default function PageContentEditor() {
                   const bsKey = `${field.key}_bs` as keyof PageContent;
                   return (
                     <div key={field.key}>
-                      <label className="block text-xs font-semibold text-dark adm-text mb-1.5">{field.label}</label>
+                      <label className="block text-xs font-semibold text-dark adm-text mb-1.5">{uiText(field.label)}</label>
                       <div className="space-y-1.5">
                         <div className="relative">
                           {field.bilingual && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[9px] font-bold adm-text-muted">🇬🇧</span>}
@@ -1688,7 +1693,7 @@ export default function PageContentEditor() {
                                 value={String((form as any)[bsKey] ?? "")}
                                 onChange={(e) => handleChange(bsKey, e.target.value)}
                                 className="w-full pl-8 pr-4 py-2.5 adm-bg border border-blue-200/30 rounded-2xl text-sm text-dark adm-text outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-400 focus:adm-surface adm-border border transition placeholder:adm-text-faint"
-                                placeholder={`${field.label} (Bosnian)`}
+                                placeholder={`${uiText(field.label)} (${uiText("Bosanski")})`}
                               />
                             </div>
                           </BsCollapse>
@@ -1703,14 +1708,14 @@ export default function PageContentEditor() {
                 <div className="border-t border-bg pt-4 space-y-5">
                   {isPromoVisible && (
                     <>
-                      <ColorPicker label="Promo Banner Background" value={styles.promoBannerBgColor} onChange={(v) => handleStyleChange("promoBannerBgColor", v)} palette={ACCENT_COLORS} />
-                      <ColorPicker label="Promo Banner Text Color" value={styles.promoBannerTextColor} onChange={(v) => handleStyleChange("promoBannerTextColor", v)} palette={TEXT_COLORS} />
+                      <ColorPicker label={uiText("Promo Banner Background")} value={styles.promoBannerBgColor} onChange={(v) => handleStyleChange("promoBannerBgColor", v)} palette={ACCENT_COLORS} />
+                      <ColorPicker label={uiText("Promo Banner Text Color")} value={styles.promoBannerTextColor} onChange={(v) => handleStyleChange("promoBannerTextColor", v)} palette={TEXT_COLORS} />
                     </>
                   )}
                   {isFooterVisible && (
                     <>
-                      <ColorPicker label="Footer Background" value={styles.footerBgColor} onChange={(v) => handleStyleChange("footerBgColor", v)} palette={BG_COLORS} />
-                      <ColorPicker label="Footer Text Color" value={styles.footerTextColor} onChange={(v) => handleStyleChange("footerTextColor", v)} palette={TEXT_COLORS} />
+                      <ColorPicker label={uiText("Footer Background")} value={styles.footerBgColor} onChange={(v) => handleStyleChange("footerBgColor", v)} palette={BG_COLORS} />
+                      <ColorPicker label={uiText("Footer Text Color")} value={styles.footerTextColor} onChange={(v) => handleStyleChange("footerTextColor", v)} palette={TEXT_COLORS} />
                     </>
                   )}
                 </div>

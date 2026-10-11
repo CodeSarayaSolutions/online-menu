@@ -1,5 +1,6 @@
 "use client";
 
+import { useUiText } from "@/hooks/useUiText";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -32,6 +33,7 @@ const VENUE_COLORS: Record<VenueType, string> = {
 };
 
 export default function VenuePickerPage() {
+  const uiText = useUiText();
   const allRestaurants = useCmsStore((s) => s.allRestaurants);
   const [hydrated, setHydrated] = useState(false);
   const [search, setSearch] = useState("");
@@ -84,10 +86,10 @@ export default function VenuePickerPage() {
               <span className="text-xs font-bold tracking-wide uppercase">Saraya</span>
             </div>
             <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight leading-tight">
-              Discover Restaurants
+              {uiText("Discover Restaurants")}
             </h1>
             <p className="text-sm md:text-base text-white/70 mt-3 max-w-md mx-auto">
-              Browse menus from our collection of restaurants and venues
+              {uiText("Browse menus from our collection of restaurants and venues")}
             </p>
           </motion.div>
         </div>
@@ -102,7 +104,7 @@ export default function VenuePickerPage() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search venues..."
+              placeholder={uiText("Search venues...")}
               className="w-full pl-12 pr-10 py-4 bg-transparent rounded-2xl outline-none text-sm text-gray-800 placeholder:text-gray-400"
             />
             <AnimatePresence>
@@ -123,8 +125,8 @@ export default function VenuePickerPage() {
             <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
               <Store size={24} className="text-gray-400" />
             </div>
-            <p className="text-sm font-semibold text-gray-500">No venues found</p>
-            <p className="text-xs text-gray-400 mt-1">Try a different search term</p>
+            <p className="text-sm font-semibold text-gray-500">{uiText("No venues found")}</p>
+            <p className="text-xs text-gray-400 mt-1">{uiText("Try a different search term")}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
@@ -189,9 +191,9 @@ export default function VenuePickerPage() {
                           )}
                         </div>
                         <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
-                          <span className="text-[10px] font-semibold text-gray-400">{productCount} items</span>
+                          <span className="text-[10px] font-semibold text-gray-400">{productCount} {uiText("items")}</span>
                           <span className="text-gray-200">·</span>
-                          <span className="text-[10px] font-semibold text-gray-400">{categoryCount} categories</span>
+                          <span className="text-[10px] font-semibold text-gray-400">{categoryCount} {uiText("categories")}</span>
                         </div>
                       </div>
                     </div>
@@ -205,7 +207,7 @@ export default function VenuePickerPage() {
 
       {/* Footer */}
       <footer className="py-8 text-center border-t border-gray-100">
-        <p className="text-xs text-gray-400">Saraya — digitalni meni</p>
+        <p className="text-xs text-gray-400">{uiText("Saraya — digitalni meni")}</p>
       </footer>
     </div>
   );

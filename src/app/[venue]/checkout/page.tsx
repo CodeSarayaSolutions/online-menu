@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import {
   ArrowLeft,
@@ -15,7 +15,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useCartStore } from "@/store/cartStore";
 import { useTableSessionStore } from "@/store/tableSessionStore";
-import * as orderService from "@/services/orderService";
+
 import { useCmsData } from "@/hooks/useCmsData";
 import { useTranslation } from "@/hooks/useTranslation";
 import { isDark, mutedText, subtleBorder, subtleSurface, contrastText } from "@/lib/color-utils";
@@ -30,24 +30,39 @@ export default function CheckoutPage() {
   const getTotal = useCartStore((s) => s.getTotal);
   const getItemCount = useCartStore((s) => s.getItemCount);
   const clearCart = useCartStore((s) => s.clearCart);
+  const tableId = useTableSessionStore((s) => s.tableId);
   const tableNumber = useTableSessionStore((s) => s.tableNumber);
   const tableValid = useTableSessionStore((s) => s.isValid());
   const clearTable = useTableSessionStore((s) => s.clearTable);
   const { pageContent, componentStyles: cs } = useCmsData();
-  const { t } = useTranslation();
+  const { text, t } = useTranslation();
 
   // Redirect to menu in view-only mode
   useEffect(() => {
     if (cs.viewOnlyMode) router.replace(`/${venueSlug}`);
   }, [cs.viewOnlyMode, router, venueSlug]);
 
-  if (cs.viewOnlyMode) return null;
-
+  const [sendError,setSendError]=useState(false);
   const [confirmedTable, setConfirmedTable] = useState("");
   const [note, setNote] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [isPlaced, setIsPlaced] = useState(false);
+  const [placedOrder,setPlacedOrder]=useState<{id:string;status:string;total:number;estimated_minutes?:number|null}|null>(null);
+  useEffect(()=>{
+    if(items.length)return;
+    try{const saved=JSON.parse(sessionStorage.getItem('onm_receipt:'+venueSlug)??'null');if(!saved||Date.now()-saved.createdAt>7200000)return;
+      let cancelled=false;void fetch('/api/guest/orders?'+new URLSearchParams({venue:venueSlug,id:saved.id}),{credentials:'include',cache:'no-store'}).then(async response=>{if(!response.ok)return;const order=await response.json();if(!cancelled){setPlacedOrder(order);setConfirmedTable(saved.table);setIsPlaced(true);}}).catch(()=>{});return()=>{cancelled=true;};
+    }catch{}
+  },[venueSlug,items.length]);
+  const attempt=useRef<{payload:string;key:string}|null>(null);
+  useEffect(()=>{
+    if(!placedOrder?.id)return;
+    const poll=()=>{if(document.hidden)return;void fetch('/api/guest/orders?'+new URLSearchParams({venue:venueSlug,id:placedOrder.id}),{credentials:'include',cache:'no-store'}).then(async r=>{if(r.ok)setPlacedOrder(await r.json());}).catch(()=>{});};
+    const timer=setInterval(poll,10000);window.addEventListener('focus',poll);return()=>{clearInterval(timer);window.removeEventListener('focus',poll);};
+  },[placedOrder?.id,venueSlug]);
   const [isSending, setIsSending] = useState(false);
+
+  if (cs.viewOnlyMode) return null;
 
   const total = getTotal();
   const count = getItemCount();
@@ -81,25 +96,22 @@ export default function CheckoutPage() {
   const disabledText = cardIsDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.3)";
 
   const handleConfirm = async () => {
-    if (!venueSlug || !tableValid || !tableNumber) return;
+    if (!venueSlug || !tableValid || !tableNumber || !tableId || !items.length || isSending) return;
     setIsSending(true);
+    setSendError(false);
     try {
-      const id = `ORD-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-      await orderService.createOrder({
-        id,
-        restaurantId: venueSlug,
-        items: [...items],
-        tableNumber,
-        kitchenNote: note.trim(),
-        paymentMethod,
-        total,
-        itemCount: count,
-      });
+      const payload=JSON.stringify({venue:venueSlug,tableId,items,note:note.trim()});
+      if(attempt.current?.payload!==payload)attempt.current={payload,key:crypto.randomUUID()};
+      const response=await fetch('/api/guest/orders',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({...JSON.parse(payload),requestKey:attempt.current.key})});
+      if(!response.ok){if(response.status===401)clearTable();throw new Error('Order unavailable');}
+      const saved=await response.json();setPlacedOrder(saved);
+      sessionStorage.setItem("onm_receipt:"+venueSlug,JSON.stringify({id:saved.id,table:tableNumber,createdAt:Date.now()}));
       setConfirmedTable(tableNumber);
       setIsPlaced(true);
       clearCart();
       clearTable();
     } catch {
+      setSendError(true);
       setIsSending(false);
       return;
     }
@@ -111,161 +123,7 @@ export default function CheckoutPage() {
   // ══════════════════════════════════════════════
   // ORDER CONFIRMED SCREEN
   // ══════════════════════════════════════════════
-  if (isPlaced) {
-    // Use a gradient that respects the theme
-    const confirmBg = pageIsDark
-      ? `linear-gradient(to bottom, ${pageBg}, ${cardBg})`
-      : `linear-gradient(to bottom, rgba(34,197,94,0.06), ${pageBg})`;
-    const confirmTitleColor = contrastText(pageBg);
-    const confirmMuted = mutedText(pageBg);
-    const confirmCardBg = cardBg;
-    const confirmCardMuted = mutedText(cardBg);
-    const confirmStepDone = "#22C55E";
-
-    return (
-      <div
-        className="min-h-screen flex items-center justify-center p-6 md:p-10"
-        style={{ background: confirmBg }}
-      >
-        <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ type: "spring", damping: 20 }}
-          className="text-center max-w-sm md:max-w-md w-full"
-        >
-          {/* Success icon */}
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.15, type: "spring", stiffness: 200 }}
-            className="w-28 h-28 md:w-32 md:h-32 rounded-full flex items-center justify-center mx-auto mb-6"
-            style={{ backgroundColor: confirmStepDone, boxShadow: "0 8px 32px rgba(34,197,94,0.3)" }}
-          >
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.35, type: "spring" }}
-            >
-              <Check size={56} className="md:w-16 md:h-16" strokeWidth={3} style={{ color: "#FFFFFF" }} />
-            </motion.div>
-          </motion.div>
-
-          {/* Confetti emoji */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4 }}
-            className="flex justify-center gap-2 mb-4 items-center"
-          >
-            <PartyPopper size={24} style={{ color: accent }} />
-            <span className="text-2xl md:text-3xl font-extrabold" style={{ color: confirmTitleColor }}>{t(pageContent, "orderSentTitle")}</span>
-            <PartyPopper size={24} style={{ color: accent, transform: "scaleX(-1)" }} />
-          </motion.div>
-
-          {/* Status card */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="rounded-3xl p-6 md:p-8 mt-4"
-            style={{ backgroundColor: confirmCardBg, boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }}
-          >
-            {/* Timeline */}
-            <div className="space-y-4 text-left">
-              {/* Step 1: Order received */}
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5" style={{ backgroundColor: confirmStepDone }}>
-                  <Check size={14} className="text-white" strokeWidth={3} />
-                </div>
-                <div>
-                  <p className="text-sm md:text-base font-bold" style={{ color: contrastText(confirmCardBg) }}>{t(pageContent, "orderReceivedText")}</p>
-                  <p className="text-[11px] mt-0.5" style={{ color: confirmCardMuted }}>{t(pageContent, "orderReceivedDesc")}</p>
-                </div>
-              </div>
-
-              {/* Connection line */}
-              <div className="ml-4 w-px h-4" style={{ background: `linear-gradient(to bottom, ${confirmStepDone}, ${accent})` }} />
-
-              {/* Step 2: Preparing */}
-              <div className="flex items-start gap-3">
-                <motion.div
-                  animate={{ rotate: [0, 10, -10, 0] }}
-                  transition={{ repeat: Infinity, duration: 2 }}
-                  className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5"
-                  style={{ backgroundColor: accent + "20" }}
-                >
-                  <ChefHat size={16} style={{ color: accent }} />
-                </motion.div>
-                <div>
-                  <p className="text-sm md:text-base font-bold" style={{ color: contrastText(confirmCardBg) }}>{t(pageContent, "preparingFoodText")}</p>
-                  <p className="text-[11px] mt-0.5" style={{ color: confirmCardMuted }}>{t(pageContent, "preparingFoodDesc")}</p>
-                </div>
-              </div>
-
-              {/* Connection line */}
-              <div className="ml-4 w-px h-4" style={{ background: `linear-gradient(to bottom, ${accent}, ${cardBorder})` }} />
-
-              {/* Step 3: Delivery to table */}
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5" style={{ backgroundColor: cardSurface }}>
-                  <Utensils size={14} style={{ color: cardMuted }} />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold" style={{ color: cardMuted }}>{t(pageContent, "comingToTableText")}</p>
-                  <p className="text-[11px] mt-0.5" style={{ color: cardMuted }}>
-                    A waiter will bring it to{" "}
-                    <span className="font-bold" style={{ color: contrastText(confirmCardBg) }}>Stol {displayTable}</span>
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Estimated time */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.8 }}
-              className="mt-5 rounded-2xl p-3 flex items-center justify-center gap-2"
-              style={{ backgroundColor: cardSurface }}
-            >
-              <Clock size={14} style={{ color: accent }} />
-              <span className="text-xs font-bold" style={{ color: contrastText(confirmCardBg) }}>
-                {t(pageContent, "estimatedWaitText")}
-              </span>
-            </motion.div>
-          </motion.div>
-
-          {/* Back to menu */}
-          <motion.button
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.9 }}
-            whileTap={{ scale: 0.97 }}
-            onClick={() => router.push(`/${venueSlug}`)}
-            className="mt-6 px-8 py-4 md:py-5 rounded-2xl font-extrabold w-full text-sm md:text-base"
-            style={{
-              background: `linear-gradient(to right, ${accent}, ${accent}CC)`,
-              color: "#FFFFFF",
-              boxShadow: `0 0 20px ${accent}40`,
-            }}
-          >
-            {t(pageContent, "backToMenuText")}
-          </motion.button>
-
-          {/* Order more note */}
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 1 }}
-            className="text-[11px] mt-3"
-            style={{ color: confirmMuted }}
-          >
-            {t(pageContent, "orderMoreNote")}
-          </motion.p>
-        </motion.div>
-      </div>
-    );
-  }
+  if(isPlaced&&placedOrder)return <main className="min-h-screen p-6 flex items-center justify-center" style={{background:pageBg,color:titleColor}}><div className="max-w-md w-full rounded-3xl p-6 space-y-5" style={{background:cardBg}}><h1 className="text-2xl font-bold">{placedOrder.status==='cancelled'?text('Narudžba nije prihvaćena','Order not accepted'):placedOrder.status==='pending'?text('Narudžba je poslana','Order sent'):placedOrder.status==='ready'?text('Narudžba je spremna','Order ready'):text('Narudžba je prihvaćena','Order accepted')}</h1><p>{text('Stol','Table')} {displayTable} · #{placedOrder.id.slice(-8).toUpperCase()}</p><p>{placedOrder.status==='pending'?text('Osoblje će potvrditi narudžbu.','Staff will confirm your order.'):placedOrder.status==='cancelled'?text('Molimo obratite se osoblju.','Please speak to a member of staff.'):placedOrder.estimated_minutes?text('Procijenjena priprema:','Estimated preparation:')+' '+placedOrder.estimated_minutes+' min':''}</p><p className="font-bold">{Number(placedOrder.total).toFixed(2)} KM</p><p className="text-sm">{text('Plaćanje kod osoblja. Ova potvrda ne znači da je račun plaćen.','Pay with a member of staff. This confirmation does not mean the bill is paid.')}</p><button className="w-full min-h-[48px] rounded-xl bg-primary text-white font-bold" onClick={()=>router.push('/'+venueSlug)}>{text('Nazad na meni','Back to menu')}</button></div></main>;
 
   // ══════════════════════════════════════════════
   // CONFIRM ORDER SCREEN
@@ -286,7 +144,7 @@ export default function CheckoutPage() {
           <div>
             <h1 className="text-xl md:text-2xl lg:text-3xl font-extrabold" style={{ color: titleColor }}>{t(pageContent, "confirmOrderTitle")}</h1>
             <p className="text-[11px] md:text-xs font-medium mt-0.5" style={{ color: cardMuted }}>
-              {t(pageContent, "confirmOrderSubtitle")}
+              {text("Provjerite narudžbu i broj stola.","Review your order and table number.")}
             </p>
           </div>
         </div>
@@ -298,14 +156,14 @@ export default function CheckoutPage() {
               <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: stepDoneBg }}>
                 <Check size={12} strokeWidth={3} style={{ color: "#FFFFFF" }} />
               </div>
-              <span className="text-[11px] font-semibold" style={{ color: stepDoneBg }}>Menu</span>
+              <span className="text-[11px] font-semibold" style={{ color: stepDoneBg }}>{text("Meni","Menu")}</span>
             </div>
             <div className="h-px flex-1" style={{ backgroundColor: stepDoneBg }} />
             <div className="flex items-center gap-1.5">
               <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: stepDoneBg }}>
                 <Check size={12} strokeWidth={3} style={{ color: "#FFFFFF" }} />
               </div>
-              <span className="text-[11px] font-semibold" style={{ color: stepDoneBg }}>Order</span>
+              <span className="text-[11px] font-semibold" style={{ color: stepDoneBg }}>{text("Narudžba","Order")}</span>
             </div>
             <div className="h-px flex-1" style={{ backgroundColor: tableValid ? stepDoneBg : cardBorder }} />
             <div className="flex items-center gap-1.5">
@@ -319,7 +177,7 @@ export default function CheckoutPage() {
                 3
               </div>
               <span className="text-[11px] font-semibold" style={{ color: tableValid ? accent : cardMuted }}>
-                Confirm
+                {text("Potvrda","Confirm")}
               </span>
             </div>
           </div>
@@ -350,10 +208,10 @@ export default function CheckoutPage() {
                   <QrCode size={22} className="shrink-0 mt-0.5" style={{ color: accent }} />
                   <div>
                     <p className="text-sm font-bold" style={{ color: titleColor }}>
-                      Skenirajte QR kod na stolu da biste naručili
+                      {text("Skenirajte QR kod na stolu da biste naručili","Scan the QR code on your table to order")}
                     </p>
                     <p className="text-[11px] mt-1" style={{ color: cardMuted }}>
-                      Broj stola se automatski prepoznaje nakon skeniranja QR koda na stolu.
+                      {text("Broj stola se automatski prepoznaje nakon skeniranja QR koda na stolu.","Your table is identified when you scan its QR code.")}
                     </p>
                   </div>
                 </motion.div>
@@ -370,10 +228,10 @@ export default function CheckoutPage() {
                   </div>
                   <div>
                     <p className="text-lg font-extrabold" style={{ color: titleColor }}>
-                      Stol {tableNumber}
+                      {text("Stol","Table")} {tableNumber}
                     </p>
                     <p className="text-[11px] font-medium" style={{ color: serviceTextSub }}>
-                      Sesija aktivna · spremno za narudžbu
+                      {text("Sesija aktivna · spremno za narudžbu","Session active · ready to order")}
                     </p>
                   </div>
                 </motion.div>
@@ -389,7 +247,7 @@ export default function CheckoutPage() {
                   className="text-[10px] md:text-xs px-2 py-0.5 rounded-full ml-auto"
                   style={{ color: cardMuted, backgroundColor: cardSurface }}
                 >
-                  Optional
+                  {text("Neobavezno","Optional")}
                 </span>
               </div>
               <p className="text-[11px] md:text-xs mb-3 ml-6" style={{ color: cardMuted }}>
@@ -421,7 +279,7 @@ export default function CheckoutPage() {
 
               <div className="space-y-2.5">
                 {items.map((item) => (
-                  <div key={item.id} className="flex items-center gap-3">
+                  <div key={item.cartKey || item.id} className="flex items-center gap-3">
                     <img
                       src={item.image}
                       alt={item.name}
@@ -429,7 +287,7 @@ export default function CheckoutPage() {
                     />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold line-clamp-1" style={{ color: titleColor }}>{item.name}</p>
-                      <p className="text-[11px]" style={{ color: cardMuted }}>Qty: {item.quantity}</p>
+                      <p className="text-[11px]" style={{ color: cardMuted }}>{text("Količina:","Qty:")} {item.quantity}</p>
                     </div>
                     <span className="text-sm font-bold shrink-0" style={{ color: titleColor }}>
                       {(item.price * item.quantity).toFixed(2)} {pageContent.currencySymbol}
@@ -452,7 +310,7 @@ export default function CheckoutPage() {
 
               {/* Total */}
               <div className="flex justify-between items-baseline pt-1">
-                <span className="text-base md:text-lg font-extrabold" style={{ color: titleColor }}>Total</span>
+                <span className="text-base md:text-lg font-extrabold" style={{ color: titleColor }}>{text("Ukupno","Total")}</span>
                 <span className="text-2xl md:text-3xl font-extrabold" style={{ color: accent }}>
                   {total.toFixed(2)} {pageContent.currencySymbol}
                 </span>
@@ -485,7 +343,7 @@ export default function CheckoutPage() {
             >
               <Check size={12} style={{ color: accent }} />
               <span>
-                Stol <strong style={{ color: titleColor }}>{tableNumber}</strong> · {count} item{count !== 1 ? "s" : ""} · <strong style={{ color: accent }}>{total.toFixed(2)} {pageContent.currencySymbol}</strong>
+                {text("Stol","Table")} <strong style={{ color: titleColor }}>{tableNumber}</strong> · {count} {text("stavki","items")} · <strong style={{ color: accent }}>{total.toFixed(2)} {pageContent.currencySymbol}</strong>
               </span>
             </motion.div>
           )}
@@ -502,7 +360,7 @@ export default function CheckoutPage() {
               color: paymentMethod === "cash" ? accent : cardMuted,
             }}
           >
-            💵 Gotovina
+            {text("💵 Gotovina","💵 Cash")}
           </button>
           <button
             type="button"
@@ -510,17 +368,18 @@ export default function CheckoutPage() {
             className="flex-1 py-3 rounded-xl border-2 font-semibold text-sm opacity-40 cursor-not-allowed relative"
             style={{ borderColor: "#888", color: "#888" }}
           >
-            💳 Online plaćanje
+            {text("💳 Online plaćanje","💳 Online payment")}
             <span className="absolute -top-2 -right-2 bg-primary text-white text-[9px] px-1.5 py-0.5 rounded-full">
-              Uskoro
+              {text("Uskoro","Coming soon")}
             </span>
           </button>
         </div>
 
+        {sendError && <p role="alert" className="mb-3 text-sm">{text("Žao nam je, narudžba nije poslana. Pokušajte ponovo ili se obratite osoblju.","Sorry, your order could not be sent. Please try again or speak to staff.")}</p>}
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={handleConfirm}
-          disabled={!tableValid || isSending}
+          disabled={!tableValid || isSending || !items.length}
           className="w-full py-4 md:py-5 rounded-2xl text-base md:text-lg font-extrabold transition-all duration-300 flex items-center justify-center gap-2"
           style={
             !tableValid
@@ -544,12 +403,12 @@ export default function CheckoutPage() {
           ) : tableValid ? (
             <>
               <ChefHat size={18} />
-              {t(pageContent, "sendToKitchenText")}
+              {text("Pošalji narudžbu","Send order")}
             </>
           ) : (
             <>
               <QrCode size={18} />
-              Skenirajte QR kod
+              {text("Skenirajte QR kod","Scan the QR code")}
             </>
           )}
         </motion.button>

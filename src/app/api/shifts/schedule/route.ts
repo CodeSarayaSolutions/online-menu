@@ -1,3 +1,4 @@
+import { actionFailure, sameOrigin } from '@/lib/hos-server';
 import { NextResponse } from 'next/server';
 import { getSessionUserFromRequest } from '@/lib/auth/require-session';
 import { canManageShifts, canViewShiftSummary } from '@/lib/auth/shift-access';
@@ -34,12 +35,12 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ schedule, eligibleStaff }, { status: 200 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to load schedule';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return actionFailure(err, 'shift.schedule', user.id, restaurantId);
   }
 }
 
 export async function PUT(request: Request) {
+  if (!sameOrigin(request)) return NextResponse.json({}, { status: 403 });
   const user = await getSessionUserFromRequest(request);
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -64,10 +65,9 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const schedule = await saveDaySchedule(restaurantId, day, supabaseAdmin);
+    const schedule = await saveDaySchedule(restaurantId, day, user.id, supabaseAdmin);
     return NextResponse.json({ schedule }, { status: 200 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to save day schedule';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return actionFailure(err, 'shift.schedule', user.id, restaurantId);
   }
 }

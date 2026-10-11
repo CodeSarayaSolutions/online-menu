@@ -22,3 +22,13 @@ next-env.d.ts
 
 # supabase local
 supabase/.temp/
+
+# Local database inspection, backups and disposable test credentials
+.local/
+
+# Machine-local credentials and Python bytecode
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]

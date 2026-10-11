@@ -28,6 +28,7 @@ export interface ThemeCustomization {
 }
 
 export interface RestaurantData {
+  revision?: number;
   venueType: VenueType;
   restaurant: RestaurantInfo;
   categories: CategoryInfo[];
@@ -4048,10 +4049,10 @@ interface CmsState {
   resetToDefaults: () => void;
 
   // ── Multi-restaurant actions ──
-  createRestaurant: (id: string, name: string, venueType?: VenueType) => void;
-  deleteRestaurant: (id: string) => void;
+  createRestaurant: (id: string, name: string, venueType?: VenueType, config?: { language: 'bs' | 'en'; timezone: string; kitchenEnabled: boolean }) => Promise<boolean>;
+  deleteRestaurant: (id: string) => Promise<void>;
   switchRestaurant: (fromId: string, toId: string) => void;
-  saveActiveToAllRestaurants: (id: string) => void;
+  saveActiveToAllRestaurants: (id: string) => Promise<boolean>;
   loadVenuePublic: (slug: string) => boolean;
   getRestaurantIds: () => string[];
   getRestaurantData: (id: string) => RestaurantData | undefined;
@@ -4239,7 +4240,7 @@ export const useCmsStore = create<CmsState>()((set, get) => ({
       // ══════════════════════════════════════════════════════
 
       /** Create a new restaurant with default data, 1 sample category, and 3 sample products */
-      createRestaurant: (id, name, venueType) => {
+      createRestaurant: async (id, name, venueType, config = { language: 'bs', timezone: 'Europe/Sarajevo', kitchenEnabled: false }) => {
         set((s) => {
           const vt = venueType || 'restaurant';
 
@@ -4332,6 +4333,7 @@ export const useCmsStore = create<CmsState>()((set, get) => ({
               [id]: {
                 venueType: vt,
                 restaurant: {
+                  ...config,
                   name,
                   tagline: 'Welcome to ' + name,
                   image: defaults.heroImg,
@@ -4355,7 +4357,9 @@ export const useCmsStore = create<CmsState>()((set, get) => ({
                   description_bs: p.desc_bs,
                   price: p.price,
                   image: p.img,
-                  category: defaults.catId,
+                  category: defaults.catLabel,
+                  categoryId: defaults.catId,
+                  station: "bar",
                   popular: i === 0, // first product is marked popular
                   addons: [],
                   variations: [],
@@ -4371,12 +4375,12 @@ export const useCmsStore = create<CmsState>()((set, get) => ({
           };
         });
         const bundle = get().allRestaurants[id];
-        if (bundle) void saveVenueToCloud(id, bundle);
+        return bundle ? queueSaveVenueToCloud(id, bundle) : false;
       },
 
       /** Delete a restaurant's data */
-      deleteRestaurant: (id) => {
-        void deleteVenueFromCloud(id);
+      deleteRestaurant: async (id) => {
+        await deleteVenueFromCloud(id);
         set((s) => {
           const { [id]: _, ...rest } = s.allRestaurants;
           return { allRestaurants: rest };
@@ -4393,6 +4397,7 @@ export const useCmsStore = create<CmsState>()((set, get) => ({
           const updated = {
             ...s.allRestaurants,
             [fromId]: {
+              revision: s.allRestaurants[fromId]?.revision,
               venueType: s.allRestaurants[fromId]?.venueType || 'restaurant' as VenueType,
               restaurant: { ...s.restaurant },
               categories: [...s.categories],
@@ -4418,27 +4423,18 @@ export const useCmsStore = create<CmsState>()((set, get) => ({
         }),
 
       /** Save active flat data into allRestaurants under the given id (without switching) */
-      saveActiveToAllRestaurants: (id) =>
-        set((s) => {
-          const bundle: RestaurantData = {
-            venueType: s.allRestaurants[id]?.venueType || ('restaurant' as VenueType),
-            restaurant: { ...s.restaurant },
-            categories: [...s.categories],
-            products: [...s.products],
-            pageContent: { ...s.pageContent },
-            componentStyles: { ...s.componentStyles },
-            layoutConfig: { ...s.layoutConfig },
-            themeCustomizations: { ...s.themeCustomizations },
-            createdAt: s.allRestaurants[id]?.createdAt || new Date().toISOString(),
-          };
-          queueSaveVenueToCloud(id, bundle);
-          return {
-            allRestaurants: {
-              ...s.allRestaurants,
-              [id]: bundle,
-            },
-          };
-        }),
+      saveActiveToAllRestaurants: async (id) => {
+        const s = get();
+        const bundle: RestaurantData = {
+          revision: s.allRestaurants[id]?.revision,
+          venueType: s.allRestaurants[id]?.venueType || 'restaurant',
+          restaurant: { ...s.restaurant }, categories: [...s.categories], products: [...s.products],
+          pageContent: { ...s.pageContent }, componentStyles: { ...s.componentStyles }, layoutConfig: { ...s.layoutConfig },
+          themeCustomizations: { ...s.themeCustomizations }, createdAt: s.allRestaurants[id]?.createdAt || new Date().toISOString(),
+        };
+        set({ allRestaurants: { ...s.allRestaurants, [id]: bundle } });
+        return queueSaveVenueToCloud(id, bundle);
+      },
 
       /** Load a venue's data into flat fields for public pages (no save-back) */
       loadVenuePublic: (slug) => {

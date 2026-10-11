@@ -1,5 +1,6 @@
 "use client";
 
+import { useUiText } from "@/hooks/useUiText";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -27,6 +28,8 @@ import {
   Settings2,
 } from "lucide-react";
 import clsx from "clsx";
+import { useCmsStore } from "@/store/cmsStore";
+import { localParts, venueInstant } from "@/lib/venue-time";
 import type {
   DateRoster,
   DayOfWeek,
@@ -60,12 +63,6 @@ type RosterSegmentDraft = {
   assigneeIds: Set<string>;
 };
 
-function todayIso(): string {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
 function isoFromDate(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -95,23 +92,17 @@ function jsDayToIsoDay(dateStr: string): DayOfWeek {
   return (js === 0 ? 7 : js) as DayOfWeek;
 }
 
-function exportSummaryCsv(summary: ShiftSummary, venueSlug: string) {
+function exportSummaryCsv(summary: ShiftSummary, venueSlug: string, language: "bs" | "en") {
+  const text = (bs: string, en: string) => language === "bs" ? bs : en;
+  const cell = (value: string | number) => `"${String(value).replace(/^[=+@-]/, "\'$&").replaceAll('"', '""')}"`;
   const seg = summary.segment;
   const lines = [
-    "Datum,Dan,Smjena,Od,Do,Ukupno KM,Kartice KM,Gotovina KM,Konobarske kartice,QR narudzbe,Stavki",
-    `${summary.date},${summary.dayLabel},"${seg.label}",${summary.window.from},${summary.window.to},${summary.totals.revenue.toFixed(2)},${summary.totals.cardTotal.toFixed(2)},${summary.totals.cashTotal.toFixed(2)},${summary.totals.closedTabsCount},${summary.totals.qrOrdersCount},${summary.totals.itemsSold}`,
-    "",
-    "Po konobaru,Konobarske kartice,Prihod KM,Stavki,Stolovi",
-    ...summary.byWaiter.map(
-      (w) =>
-        `"${w.waiterName}",${w.closedTabs},${w.revenue.toFixed(2)},${w.itemsSold},"${w.tables.join("; ")}"`
-    ),
-    "",
-    "Po stolu,Kartice,Prihod KM,Konobari",
-    ...summary.byTable.map(
-      (t) =>
-        `"${t.tableLabel}",${t.closedTabs},${t.revenue.toFixed(2)},"${t.waiters.join("; ")}"`
-    ),
+    text("Datum,Dan,Smjena,Od,Do,Ukupno KM,Kartice KM,Gotovina KM,Računi,QR narudžbe,Stavki", "Date,Day,Shift,From,To,Total KM,Card KM,Cash KM,Bills,QR orders,Items"),
+    [summary.date, formatDateLong(summary.date,language),seg.label,summary.window.from,summary.window.to,summary.totals.revenue.toFixed(2),summary.totals.cardTotal.toFixed(2),summary.totals.cashTotal.toFixed(2),summary.totals.closedTabsCount,summary.totals.qrOrdersCount,summary.totals.itemsSold].map(cell).join(','),
+    "", text("Po konobaru,Računi,Prihod KM,Stavki,Stolovi", "By waiter,Bills,Revenue KM,Items,Tables"),
+    ...summary.byWaiter.map(w => [w.waiterName,w.closedTabs,w.revenue.toFixed(2),w.itemsSold,w.tables.join('; ')].map(cell).join(',')),
+    "", text("Po stolu,Računi,Prihod KM,Konobari", "By table,Bills,Revenue KM,Waiters"),
+    ...summary.byTable.map(t => [t.tableLabel,t.closedTabs,t.revenue.toFixed(2),t.waiters.join('; ')].map(cell).join(',')),
   ];
   const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -133,9 +124,14 @@ function rosterToDrafts(roster: DateRoster): RosterSegmentDraft[] {
 }
 
 export default function ShiftsPage() {
+  const uiText = useUiText();
   const params = useParams();
   const venueSlug = typeof params.venue === "string" ? params.venue : "";
 
+  const language = useCmsStore(s => s.allRestaurants[venueSlug]?.restaurant.language ?? 'bs');
+  const timezone = useCmsStore(s => s.allRestaurants[venueSlug]?.restaurant.timezone ?? 'Europe/Sarajevo');
+  const [clock, setClock] = useState(Date.now());
+  const todayIso = () => localParts(new Date(clock), timezone).date;
   const [schedule, setSchedule] = useState<WeeklyShiftSchedule | null>(null);
   const [eligibleStaff, setEligibleStaff] = useState<EligibleShiftStaff[]>([]);
   const [loading, setLoading] = useState(true);
@@ -185,7 +181,7 @@ export default function ShiftsPage() {
       setSchedule(data?.schedule ?? null);
       setEligibleStaff(data?.eligibleStaff ?? []);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Učitavanje rasporeda nije uspjelo");
+      setError(uiText("Žao nam je, nešto nije uspjelo. Pokušajte ponovo."));
     } finally {
       setLoading(false);
     }
@@ -209,7 +205,7 @@ export default function ShiftsPage() {
       setRosterDraft(next ? rosterToDrafts(next) : []);
       setSummarySegmentId(next?.segments[0]?.segmentId ?? "");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Učitavanje smjene nije uspjelo");
+      setError(uiText("Žao nam je, nešto nije uspjelo. Pokušajte ponovo."));
     } finally {
       setRosterLoading(false);
     }
@@ -232,7 +228,7 @@ export default function ShiftsPage() {
       if (!res.ok) throw new Error(data?.error ?? "Učitavanje historije nije uspjelo");
       setHistory(data?.history ?? []);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Učitavanje historije nije uspjelo");
+      setError(uiText("Žao nam je, nešto nije uspjelo. Pokušajte ponovo."));
     } finally {
       setHistoryLoading(false);
     }
@@ -325,7 +321,7 @@ export default function ShiftsPage() {
       setTimeout(() => setRosterSaved(false), 2000);
       void loadHistory();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Spremanje smjene nije uspjelo");
+      setError(uiText("Žao nam je, nešto nije uspjelo. Pokušajte ponovo."));
     } finally {
       setRosterBusy(false);
     }
@@ -347,7 +343,7 @@ export default function ShiftsPage() {
     if (!venueSlug) return;
     const changeError = validateChangeTimes(opensAt, closesAt, shiftChangeTimes);
     if (!isClosed && changeError) {
-      setError(changeError);
+      setError(uiText(changeError));
       return;
     }
     setSettingsBusy(true);
@@ -385,7 +381,7 @@ export default function ShiftsPage() {
       setTimeout(() => setSettingsSaved(false), 2000);
       void loadRoster();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Spremanje postavki nije uspjelo");
+      setError(uiText("Žao nam je, nešto nije uspjelo. Pokušajte ponovo."));
     } finally {
       setSettingsBusy(false);
     }
@@ -411,7 +407,7 @@ export default function ShiftsPage() {
       if (!res.ok) throw new Error(data?.error ?? "Sažetak nije učitan");
       setSummary(data?.summary ?? null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Sažetak nije učitan");
+      setError(uiText("Žao nam je, nešto nije uspjelo. Pokušajte ponovo."));
     } finally {
       setSummaryLoading(false);
     }
@@ -426,7 +422,16 @@ export default function ShiftsPage() {
     }
   };
 
-  const isSelectedPast = selectedDate < todayIso();
+  const shiftEnded = (endsAt: string) => {
+    try { return +venueInstant(selectedDate, endsAt, timezone) <= clock; } catch { return false; }
+  };
+  useEffect(() => {
+    const futureEnds = rosterDraft.map(s => { try { return +venueInstant(selectedDate, s.endsAt, timezone); } catch { return 0; } }).filter(time => time > clock);
+    const delay = Math.min(60000, ...futureEnds.map(time => time - clock + 50));
+    const timer = setTimeout(() => setClock(Date.now()), delay);
+    const check = () => setClock(Date.now()); window.addEventListener('focus',check);
+    return () => { clearTimeout(timer); window.removeEventListener('focus',check); };
+  }, [clock, rosterDraft, selectedDate, timezone]);
 
   return (
     <div className="p-5 lg:p-8 max-w-[1100px]">
@@ -434,10 +439,10 @@ export default function ShiftsPage() {
         <div>
           <h1 className="text-2xl lg:text-3xl font-extrabold text-dark adm-text tracking-tight flex items-center gap-2">
             <CalendarClock size={28} className="text-primary" />
-            Smjene
+            {uiText("Smjene")}
           </h1>
           <p className="text-sm text-muted adm-text-muted mt-1">
-            Planirajte smjene po datumu — radno vrijeme i granice smjena postavite jednom u dnu stranice
+            {uiText("Planirajte smjene po datumu — radno vrijeme i granice smjena postavite jednom u dnu stranice")}
           </p>
         </div>
         <button
@@ -450,7 +455,7 @@ export default function ShiftsPage() {
           className="flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-semibold border adm-border text-muted adm-text-muted hover:adm-text transition self-start"
         >
           <RefreshCw size={14} />
-          Osvježi
+          {uiText("Osvježi")}
         </button>
       </div>
 
@@ -473,13 +478,13 @@ export default function ShiftsPage() {
                 type="button"
                 onClick={() => goToWeek(-1)}
                 className="p-2 rounded-xl border adm-border hover:adm-bg transition"
-                aria-label="Prethodna sedmica"
+                aria-label={uiText("Prethodna sedmica")}
               >
                 <ChevronLeft size={18} />
               </button>
               <div className="text-center">
                 <p className="text-[13px] font-bold text-dark adm-text">
-                  {formatWeekRange(weekStart, addDays(weekStart, 6))}
+                  {formatWeekRange(weekStart, addDays(weekStart, 6), language)}
                 </p>
                 <button
                   type="button"
@@ -490,14 +495,14 @@ export default function ShiftsPage() {
                   }}
                   className="text-[11px] text-primary font-semibold mt-0.5 hover:underline"
                 >
-                  Danas
+                  {uiText("Danas")}
                 </button>
               </div>
               <button
                 type="button"
                 onClick={() => goToWeek(1)}
                 className="p-2 rounded-xl border adm-border hover:adm-bg transition"
-                aria-label="Sljedeća sedmica"
+                aria-label={uiText("Sljedeća sedmica")}
               >
                 <ChevronRight size={18} />
               </button>
@@ -532,10 +537,10 @@ export default function ShiftsPage() {
                         isSelected ? "text-white/90" : "text-muted adm-text-muted"
                       )}
                     >
-                      {DAY_LABELS_SHORT[dow]}
+                      {uiText(DAY_LABELS_SHORT[dow])}
                     </span>
                     <span className="text-sm sm:text-base font-extrabold mt-0.5">
-                      {formatDateMedium(date)}
+                      {formatDateMedium(date, language)}
                     </span>
                     {isToday && !isSelected && (
                       <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-primary" />
@@ -549,7 +554,7 @@ export default function ShiftsPage() {
                       />
                     )}
                     {closed && (
-                      <span className="text-[9px] mt-0.5 opacity-70">Zatv.</span>
+                      <span className="text-[9px] mt-0.5 opacity-70">{uiText("Zatv.")}</span>
                     )}
                   </button>
                 );
@@ -567,19 +572,19 @@ export default function ShiftsPage() {
             <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
               <div>
                 <h2 className="text-[15px] font-extrabold text-dark adm-text capitalize">
-                  {formatDateLong(selectedDate)}
+                  {formatDateLong(selectedDate, language)}
                 </h2>
                 <p className="text-[12px] text-muted adm-text-muted mt-0.5">
                   {roster?.hasSavedRoster
-                    ? "Sačuvan raspored osoblja za ovaj datum"
-                    : isSelectedPast
-                      ? "Nema sačuvanog rasporeda za ovaj datum"
-                      : "Dodijelite osoblje po smjenama — promjene sačuvajte prije početka smjene"}
+                    ? uiText("Sačuvan raspored osoblja za ovaj datum")
+                    : selectedDate < todayIso()
+                      ? uiText("Nema sačuvanog rasporeda za ovaj datum")
+                      : uiText("Dodijelite osoblje po smjenama — promjene sačuvajte prije početka smjene")}
                 </p>
               </div>
               {roster?.hasSavedRoster && (
                 <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
-                  Sačuvano
+                  {uiText("Sačuvano")}
                 </span>
               )}
             </div>
@@ -590,12 +595,12 @@ export default function ShiftsPage() {
               </div>
             ) : roster?.isClosed ? (
               <p className="text-sm text-muted adm-text-muted italic py-6 text-center">
-                Restoran je zatvoren ovog dana prema sedmičnim postavkama.
+                {uiText("Restoran je zatvoren ovog dana prema sedmičnim postavkama.")}
               </p>
             ) : rosterDraft.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-sm text-muted adm-text-muted mb-3">
-                  Nema definisanih smjena za {DAY_LABELS[jsDayToIsoDay(selectedDate)].toLowerCase()}.
+                  {uiText("Nema definisanih smjena za")} {uiText(DAY_LABELS[jsDayToIsoDay(selectedDate)]).toLowerCase()}.
                 </p>
                 <button
                   type="button"
@@ -605,7 +610,7 @@ export default function ShiftsPage() {
                   }}
                   className="text-[13px] font-bold text-primary hover:underline"
                 >
-                  Postavite smjene u postavkama ↓
+                  {uiText("Postavite smjene u postavkama ↓")}
                 </button>
               </div>
             ) : (
@@ -614,27 +619,27 @@ export default function ShiftsPage() {
                   <div key={seg.segmentId} className="rounded-xl border adm-border p-4 adm-bg">
                     <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                       <div>
-                        <p className="font-bold text-dark adm-text">{seg.label}</p>
+                        <p className="font-bold text-dark adm-text">{uiText(seg.label)}</p>
                         <p className="text-[12px] text-muted adm-text-muted flex items-center gap-1">
                           <Clock size={12} />
                           {seg.startsAt} – {seg.endsAt}
                         </p>
                       </div>
-                      {isSelectedPast && (
+                      {shiftEnded(seg.endsAt) && (
                         <button
                           type="button"
                           onClick={() => void openSummary(seg.segmentId)}
                           className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold text-primary border border-primary/20 hover:bg-primary/5"
                         >
                           <FileText size={12} />
-                          Sažetak
+                          {uiText("Sažetak")}
                         </button>
                       )}
                     </div>
 
                     {eligibleStaff.length === 0 ? (
                       <p className="text-[12px] text-muted adm-text-muted italic">
-                        Nema dostupnog osoblja.
+                        {uiText("Nema dostupnog osoblja.")}
                       </p>
                     ) : (
                       <div className="flex flex-wrap gap-2">
@@ -644,6 +649,8 @@ export default function ShiftsPage() {
                             <button
                               key={member.userId}
                               type="button"
+                              aria-pressed={selected}
+                              disabled={shiftEnded(seg.endsAt)}
                               onClick={() => toggleRosterAssignee(index, member.userId)}
                               className={clsx(
                                 "text-[11px] font-semibold px-2.5 py-1 rounded-full border transition",
@@ -652,7 +659,7 @@ export default function ShiftsPage() {
                                   : "adm-border text-muted adm-text-muted hover:adm-text"
                               )}
                             >
-                              {member.name} · {restaurantRoleLabel(member.role)}
+                              {member.name} · {uiText(restaurantRoleLabel(member.role))}
                             </button>
                           );
                         })}
@@ -671,11 +678,11 @@ export default function ShiftsPage() {
                     "Spremanje…"
                   ) : rosterSaved ? (
                     <>
-                      <Check size={16} /> Sačuvano
+                      <Check size={16} /> {uiText("Sačuvano")}
                     </>
                   ) : (
                     <>
-                      <Save size={16} /> Sačuvaj raspored za {formatDateMedium(selectedDate)}
+                      <Save size={16} /> {uiText("Sačuvaj raspored za")} {formatDateMedium(selectedDate, language)}
                     </>
                   )}
                 </button>
@@ -687,10 +694,10 @@ export default function ShiftsPage() {
           <section className="adm-surface adm-border border rounded-2xl p-5 shadow-soft mb-6">
             <div className="flex items-center gap-2 mb-4">
               <History size={18} className="text-primary" />
-              <h2 className="text-[15px] font-extrabold text-dark adm-text">Historija smjena</h2>
+              <h2 className="text-[15px] font-extrabold text-dark adm-text">{uiText("Historija smjena")}</h2>
             </div>
             <p className="text-[12px] text-muted adm-text-muted mb-4">
-              Ko je radio u kojoj smjeni — posljednjih 90 dana
+              {uiText("Ko je radio u kojoj smjeni — posljednjih 90 dana")}
             </p>
 
             {historyLoading ? (
@@ -699,7 +706,7 @@ export default function ShiftsPage() {
               </div>
             ) : history.length === 0 ? (
               <p className="text-sm text-muted adm-text-muted italic text-center py-6">
-                Još nema sačuvanih rasporeda.
+                {uiText("Još nema sačuvanih rasporeda.")}
               </p>
             ) : (
               <div className="space-y-3 max-h-[420px] overflow-y-auto">
@@ -715,7 +722,7 @@ export default function ShiftsPage() {
                   >
                     <div className="flex items-center justify-between gap-2 mb-2">
                       <p className="font-bold text-dark adm-text text-sm capitalize">
-                        {entry.dayLabel}, {formatDateMedium(entry.date)}
+                        {uiText(entry.dayLabel)}, {formatDateMedium(entry.date, language)}
                       </p>
                       <span className="text-[10px] text-muted adm-text-muted">{entry.date}</span>
                     </div>
@@ -723,12 +730,12 @@ export default function ShiftsPage() {
                       {entry.segments.map((seg) => (
                         <div key={seg.segmentId} className="flex flex-wrap gap-x-2 text-[12px]">
                           <span className="font-semibold text-dark adm-text shrink-0">
-                            {seg.label} ({seg.startsAt}–{seg.endsAt}):
+                            {uiText(seg.label)} ({seg.startsAt}–{seg.endsAt}):
                           </span>
                           <span className="text-muted adm-text-muted">
                             {seg.staffNames.length > 0
                               ? seg.staffNames.join(", ")
-                              : "— niko dodijeljen"}
+                              : uiText("— niko dodijeljen")}
                           </span>
                         </div>
                       ))}
@@ -750,10 +757,10 @@ export default function ShiftsPage() {
                 <Settings2 size={18} className="text-muted adm-text-muted" />
                 <div>
                   <h2 className="text-[15px] font-extrabold text-dark adm-text">
-                    Postavke smjena
+                    {uiText("Postavke smjena")}
                   </h2>
                   <p className="text-[12px] text-muted adm-text-muted">
-                    Radno vrijeme i granice smjena po danu u sedmici — rijetko se mijenja
+                    {uiText("Radno vrijeme i granice smjena po danu u sedmici — rijetko se mijenja")}
                   </p>
                 </div>
               </div>
@@ -783,13 +790,13 @@ export default function ShiftsPage() {
                               : "adm-border border text-muted adm-text-muted hover:adm-text"
                           )}
                         >
-                          {DAY_LABELS_SHORT[day]}
+                          {uiText(DAY_LABELS_SHORT[day])}
                         </button>
                       ))}
                     </div>
 
                     <h3 className="text-sm font-extrabold text-dark adm-text mb-3">
-                      {DAY_LABELS[settingsDay]}
+                      {uiText(DAY_LABELS[settingsDay])}
                     </h3>
 
                     <label className="flex items-center gap-2 mb-4 text-sm">
@@ -800,7 +807,7 @@ export default function ShiftsPage() {
                         className="rounded"
                       />
                       <span className="font-medium text-dark adm-text">
-                        Restoran zatvoren ovog dana
+                        {uiText("Restoran zatvoren ovog dana")}
                       </span>
                     </label>
 
@@ -809,7 +816,7 @@ export default function ShiftsPage() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
                           <div>
                             <label className="text-[11px] font-bold text-muted adm-text-muted uppercase">
-                              Otvara
+                              {uiText("Otvara")}
                             </label>
                             <input
                               type="time"
@@ -820,7 +827,7 @@ export default function ShiftsPage() {
                           </div>
                           <div>
                             <label className="text-[11px] font-bold text-muted adm-text-muted uppercase">
-                              Zatvara
+                              {uiText("Zatvara")}
                             </label>
                             <input
                               type="time"
@@ -835,10 +842,10 @@ export default function ShiftsPage() {
                           <div className="flex items-center justify-between gap-3 mb-2">
                             <div>
                               <p className="text-[12px] font-bold text-dark adm-text">
-                                Vrijeme promjene smjene
+                                {uiText("Vrijeme promjene smjene")}
                               </p>
                               <p className="text-[11px] text-muted adm-text-muted mt-0.5">
-                                Npr. 15:00 znači prva smjena do 15:00, druga od 15:00 do zatvaranja
+                                {uiText("Npr. 15:00 znači prva smjena do 15:00, druga od 15:00 do zatvaranja")}
                               </p>
                             </div>
                             <button
@@ -848,7 +855,7 @@ export default function ShiftsPage() {
                               className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold text-primary border border-primary/20 shrink-0 disabled:opacity-40"
                             >
                               <Plus size={12} />
-                              Još jedna
+                              {uiText("Još jedna")}
                             </button>
                           </div>
 
@@ -856,14 +863,14 @@ export default function ShiftsPage() {
                             {shiftChangeTimes.length === 0 ? (
                               <div className="rounded-xl border adm-border p-4 adm-bg text-center">
                                 <p className="text-[12px] text-muted adm-text-muted mb-2">
-                                  Cjelodnevna smjena — bez promjene unutar dana
+                                  {uiText("Cjelodnevna smjena — bez promjene unutar dana")}
                                 </p>
                                 <button
                                   type="button"
                                   onClick={() => setShiftChangeTimes(["15:00"])}
                                   className="text-[12px] font-bold text-primary hover:underline"
                                 >
-                                  Dodaj vrijeme promjene smjene
+                                  {uiText("Dodaj vrijeme promjene smjene")}
                                 </button>
                               </div>
                             ) : (
@@ -873,7 +880,7 @@ export default function ShiftsPage() {
                                   className="flex items-center gap-2 rounded-xl border adm-border p-3 adm-bg"
                                 >
                                   <span className="text-[12px] font-semibold text-muted adm-text-muted shrink-0">
-                                    Promjena {index + 1}
+                                    {uiText("Promjena")} {index + 1}
                                   </span>
                                   <input
                                     type="time"
@@ -885,7 +892,7 @@ export default function ShiftsPage() {
                                     type="button"
                                     onClick={() => removeChangeTime(index)}
                                     className="p-1.5 rounded-lg text-red-500 hover:bg-red-50"
-                                    title="Ukloni"
+                                    title={uiText("Ukloni")}
                                   >
                                     <Trash2 size={14} />
                                   </button>
@@ -897,12 +904,12 @@ export default function ShiftsPage() {
                           {segmentPreview.length > 0 && (
                             <div className="rounded-xl border adm-border p-3 adm-bg space-y-1.5">
                               <p className="text-[11px] font-bold text-muted adm-text-muted uppercase mb-2">
-                                Rezultat ({segmentPreview.length}{" "}
-                                {segmentPreview.length === 1 ? "smjena" : "smjene"})
+                                {uiText("Rezultat (")}{segmentPreview.length}{" "}
+                                {segmentPreview.length === 1 ? uiText("smjena") : uiText("smjene")})
                               </p>
                               {segmentPreview.map((seg) => (
-                                <p key={`${seg.label}-${seg.startsAt}`} className="text-[13px] text-dark adm-text">
-                                  <span className="font-bold">{seg.label}:</span>{" "}
+                                <p key={`${uiText(seg.label)}-${seg.startsAt}`} className="text-[13px] text-dark adm-text">
+                                  <span className="font-bold">{uiText(seg.label)}:</span>{" "}
                                   {seg.startsAt} – {seg.endsAt}
                                 </p>
                               ))}
@@ -922,11 +929,11 @@ export default function ShiftsPage() {
                         "Spremanje…"
                       ) : settingsSaved ? (
                         <>
-                          <Check size={16} /> Sačuvano
+                          <Check size={16} /> {uiText("Sačuvano")}
                         </>
                       ) : (
                         <>
-                          <Save size={16} /> Sačuvaj {DAY_LABELS_SHORT[settingsDay]}
+                          <Save size={16} /> {uiText("Sačuvaj")} {uiText(DAY_LABELS_SHORT[settingsDay])}
                         </>
                       )}
                     </button>
@@ -957,10 +964,10 @@ export default function ShiftsPage() {
             >
               <div className="sticky top-0 adm-header border-b adm-border px-6 py-4 flex items-center justify-between z-10">
                 <div>
-                  <h2 className="text-lg font-extrabold text-dark adm-text">Sažetak smjene</h2>
+                  <h2 className="text-lg font-extrabold text-dark adm-text">{uiText("Sažetak smjene")}</h2>
                   {summary && (
                     <p className="text-[11px] text-muted adm-text-muted mt-0.5">
-                      {summary.dayLabel}, {summary.date} · {summary.segment.label} (
+                      {uiText(summary.dayLabel)}, {summary.date} · {uiText(summary.segment.label)} (
                       {summary.segment.startsAt}–{summary.segment.endsAt})
                     </p>
                   )}
@@ -969,7 +976,7 @@ export default function ShiftsPage() {
                   {summary && (
                     <button
                       type="button"
-                      onClick={() => exportSummaryCsv(summary, venueSlug)}
+                      onClick={() => exportSummaryCsv(summary, venueSlug, language)}
                       className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-semibold text-primary border border-primary/20"
                     >
                       <Download size={12} /> CSV
@@ -1000,24 +1007,24 @@ export default function ShiftsPage() {
                       { label: "Gotovina", value: `${summary.totals.cashTotal.toFixed(2)} KM`, icon: Banknote },
                       { label: "Kartica", value: `${summary.totals.cardTotal.toFixed(2)} KM`, icon: CreditCard },
                     ].map((stat) => (
-                      <div key={stat.label} className="p-3 rounded-xl adm-bg">
+                      <div key={uiText(stat.label)} className="p-3 rounded-xl adm-bg">
                         <stat.icon size={14} className="text-primary mb-1" />
                         <p className="text-base font-extrabold text-dark adm-text">{stat.value}</p>
-                        <p className="text-[10px] text-muted adm-text-muted">{stat.label}</p>
+                        <p className="text-[10px] text-muted adm-text-muted">{uiText(stat.label)}</p>
                       </div>
                     ))}
                   </div>
 
                   {summary.segment.assignments.length > 0 && (
                     <div>
-                      <h3 className="text-sm font-extrabold text-dark adm-text mb-2">Dodijeljeno osoblje</h3>
+                      <h3 className="text-sm font-extrabold text-dark adm-text mb-2">{uiText("Dodijeljeno osoblje")}</h3>
                       <div className="flex flex-wrap gap-1.5">
                         {summary.segment.assignments.map((a) => (
                           <span
                             key={a.id}
                             className="text-[11px] font-semibold px-2.5 py-1 rounded-full adm-surface-2 border adm-border"
                           >
-                            {a.userName} · {restaurantRoleLabel(a.restaurantRole)}
+                            {a.userName} · {uiText(restaurantRoleLabel(a.restaurantRole))}
                           </span>
                         ))}
                       </div>
@@ -1026,19 +1033,19 @@ export default function ShiftsPage() {
 
                   <p className="text-[11px] text-muted adm-text-muted flex items-center gap-1">
                     <Clock size={12} />
-                    {formatDateTime(summary.window.from)} — {formatDateTime(summary.window.to)}
+                    {new Intl.DateTimeFormat(language === "bs" ? "bs-BA" : "en-GB", { timeZone: summary.timezone, dateStyle: "short", timeStyle: "short" }).format(new Date(summary.window.from))} — {new Intl.DateTimeFormat(language === "bs" ? "bs-BA" : "en-GB", { timeZone: summary.timezone, dateStyle: "short", timeStyle: "short" }).format(new Date(summary.window.to))} ({summary.timezone})
                   </p>
 
                   {summary.byWaiter.length > 0 && (
                     <div>
-                      <h3 className="text-sm font-extrabold text-dark adm-text mb-2">Po konobaru</h3>
+                      <h3 className="text-sm font-extrabold text-dark adm-text mb-2">{uiText("Po konobaru")}</h3>
                       <div className="space-y-2">
                         {summary.byWaiter.map((w) => (
                           <div key={w.waiterId} className="p-3 rounded-xl adm-bg flex justify-between gap-2">
                             <div>
                               <p className="font-bold text-dark adm-text">{w.waiterName}</p>
                               <p className="text-[11px] text-muted adm-text-muted">
-                                {w.closedTabs} kartica · {w.itemsSold} stavki
+                                {w.closedTabs} {uiText("kartica ·")} {w.itemsSold} {uiText("stavki")}
                               </p>
                             </div>
                             <p className="font-extrabold text-primary">{w.revenue.toFixed(2)} KM</p>
@@ -1050,7 +1057,7 @@ export default function ShiftsPage() {
 
                   {summary.byTable.length > 0 && (
                     <div>
-                      <h3 className="text-sm font-extrabold text-dark adm-text mb-2">Po stolu</h3>
+                      <h3 className="text-sm font-extrabold text-dark adm-text mb-2">{uiText("Po stolu")}</h3>
                       <div className="space-y-2">
                         {summary.byTable.map((t) => (
                           <div key={t.tableLabel} className="p-3 rounded-xl adm-bg flex justify-between">
@@ -1067,7 +1074,7 @@ export default function ShiftsPage() {
 
                   {summary.closedTabs.length > 0 && (
                     <div>
-                      <h3 className="text-sm font-extrabold text-dark adm-text mb-2">Konobarske kartice</h3>
+                      <h3 className="text-sm font-extrabold text-dark adm-text mb-2">{uiText("Računi (najnovijih 50)")}</h3>
                       <div className="space-y-3">
                         {summary.closedTabs.map((tab) => (
                           <div key={tab.id} className="p-3 rounded-xl border adm-border">
@@ -1094,12 +1101,12 @@ export default function ShiftsPage() {
 
                   {summary.qrOrders.length > 0 && (
                     <div>
-                      <h3 className="text-sm font-extrabold text-dark adm-text mb-2">QR narudžbe</h3>
+                      <h3 className="text-sm font-extrabold text-dark adm-text mb-2">{uiText("QR narudžbe")}</h3>
                       <div className="space-y-3">
                         {summary.qrOrders.map((order) => (
                           <div key={order.id} className="p-3 rounded-xl border adm-border">
                             <div className="flex justify-between mb-2">
-                              <p className="font-bold text-dark adm-text">Stol {order.tableNumber}</p>
+                              <p className="font-bold text-dark adm-text">{uiText("Stol")} {order.tableNumber}</p>
                               <p className="font-extrabold text-primary">{order.total.toFixed(2)} KM</p>
                             </div>
                             {order.items.map((item, idx) => (

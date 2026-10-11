@@ -1,97 +1,31 @@
 import { NextResponse } from 'next/server';
-import { getSessionUserFromRequest } from '@/lib/auth/require-session';
 import { supabaseAdmin } from '@/lib/supabase-server';
-import {
-  discardEmptyTab,
-  discardStaleEmptyOpenTabs,
-  getTabWithItems,
-} from '@/services/tabService';
-
-type RequestBody = {
-  tabId?: unknown;
-  restaurantId?: unknown;
-  olderThanMs?: unknown;
-};
-
-async function getRestaurantRole(userId: string, restaurantId: string): Promise<string | null> {
-  const { data, error } = await supabaseAdmin
-    .from('restaurant_access')
-    .select('role')
-    .eq('user_id', userId)
-    .eq('restaurant_id', restaurantId)
-    .maybeSingle();
-
-  if (error) throw error;
-  return data?.role ?? null;
-}
-
-function canCleanVenue(platformRole: string, restaurantRole: string | null): boolean {
-  return platformRole === 'admin' || restaurantRole === 'owner' || restaurantRole === 'manager';
-}
+import { getSessionUserFromRequest } from '@/lib/auth/require-session';
+import { runAction, actionFailure, sameOrigin } from '@/lib/hos-server';
 
 export async function POST(request: Request) {
+  if (!sameOrigin(request)) return NextResponse.json({}, { status: 403 });
   const user = await getSessionUserFromRequest(request);
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  let body: RequestBody;
+  if (!user) return NextResponse.json({}, { status: 401 });
   try {
-    body = (await request.json()) as RequestBody;
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
-
-  const tabId = typeof body.tabId === 'string' ? body.tabId : '';
-  const restaurantId = typeof body.restaurantId === 'string' ? body.restaurantId : '';
-  const olderThanMs =
-    typeof body.olderThanMs === 'number' &&
-    Number.isFinite(body.olderThanMs) &&
-    body.olderThanMs > 0
-      ? body.olderThanMs
-      : undefined;
-
-  if (!tabId && !restaurantId) {
-    return NextResponse.json({ error: 'tabId or restaurantId is required' }, { status: 400 });
-  }
-
-  try {
-    if (tabId) {
-      const tab = await getTabWithItems(tabId, supabaseAdmin);
-      if (!tab) {
-        return NextResponse.json({ error: 'Tab not found' }, { status: 404 });
-      }
-
-      const role = await getRestaurantRole(user.id, tab.restaurant_id);
-      const isOwnTab = tab.waiter_id === user.id;
-      if (!isOwnTab && !canCleanVenue(user.platform_role, role)) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-      }
-
-      await discardEmptyTab(
-        tabId,
-        canCleanVenue(user.platform_role, role) ? undefined : user.id,
-        supabaseAdmin
-      );
-      return NextResponse.json({ ok: true, discarded: 1 }, { status: 200 });
+    const body = await request.json();
+    let query = supabaseAdmin.from('table_tabs').select('id,restaurant_id').eq('status', 'open');
+    if (typeof body.tabId === 'string') query = query.eq('id', body.tabId);
+    else if (typeof body.restaurantId === 'string') {
+      // Automatic cleanup is limited to the caller's abandoned empty bills.
+      query = query.eq('restaurant_id', body.restaurantId).eq('waiter_id', user.id).lt('created_at', new Date(Date.now() - 120000).toISOString());
+    } else return NextResponse.json({}, { status: 400 });
+    const { data: tabs, error } = await query.limit(100);
+    if (error) throw error;
+    let discarded = 0;
+    for (const tab of tabs ?? []) {
+      const { count, error: countError } = await supabaseAdmin.from('tab_items').select('id', { count: 'exact', head: true }).eq('tab_id', tab.id);
+      if (countError) throw countError;
+      if (count) continue;
+      // The transaction rechecks emptiness under the same lock used by additions.
+      try { await runAction(user.id, 'tab.discard', tab.restaurant_id, { tabId: tab.id, intervention: body.intervention === true }); discarded++; }
+      catch (error) { if (body.tabId) throw error; }
     }
-
-    const role = await getRestaurantRole(user.id, restaurantId);
-    if (user.platform_role !== 'admin' && !role) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
-    const discarded = await discardStaleEmptyOpenTabs(
-      restaurantId,
-      {
-        olderThanMs,
-        waiterId: canCleanVenue(user.platform_role, role) ? undefined : user.id,
-      },
-      supabaseAdmin
-    );
-    return NextResponse.json({ ok: true, discarded }, { status: 200 });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Discard empty tab failed';
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
+    return NextResponse.json({ ok: true, discarded });
+  } catch (error) { return actionFailure(error, 'tab.discard', user.id); }
 }

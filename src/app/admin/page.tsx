@@ -1,5 +1,7 @@
 "use client";
 
+import { useLanguageStore } from "@/store/languageStore";
+import { useUiText } from "@/hooks/useUiText";
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -40,6 +42,8 @@ import { useAuthStore } from "@/store/authStore";
 import * as authService from "@/services/authService";
 import { getDefaultVenuePath } from "@/lib/permissions";
 import clsx from "clsx";
+import VenueLocaleFields from "@/components/admin/VenueLocaleFields";
+import { isTimeZone } from "@/lib/venue-time";
 
 // ─── Venue type config ──────────────────────────────────
 const VENUE_TYPES: { value: VenueType; label: string; icon: typeof Store; emoji: string; desc: string }[] = [
@@ -65,10 +69,13 @@ const VENUE_COLORS: Record<VenueType, { bg: string; text: string; border: string
 };
 
 export default function AdminDashboard() {
+  const uiText = useUiText();
   const router = useRouter();
+  const language = useLanguageStore(s => s.language);
 
   const allRestaurants = useCmsStore((s) => s.allRestaurants);
   const createRestaurant = useCmsStore((s) => s.createRestaurant);
+  const [deleteError, setDeleteError] = useState(false);
   const deleteRestaurant = useCmsStore((s) => s.deleteRestaurant);
   const switchRestaurant = useCmsStore((s) => s.switchRestaurant);
   const loadVenuePublic = useCmsStore((s) => s.loadVenuePublic);
@@ -104,6 +111,8 @@ export default function AdminDashboard() {
   const [newSlug, setNewSlug] = useState("");
   const [newVenueType, setNewVenueType] = useState<VenueType>("restaurant");
 
+  const [newConfig, setNewConfig] = useState<{ language: 'bs' | 'en'; timezone: string; kitchenEnabled: boolean }>({language:'bs',timezone:'Europe/Sarajevo',kitchenEnabled:false});
+  const [creating,setCreating] = useState(false),[createError,setCreateError] = useState(false);
   const isAdmin = currentUser?.platformRole === "admin";
   const restaurantIds = useMemo(() => {
     const all = Object.keys(allRestaurants);
@@ -163,32 +172,25 @@ export default function AdminDashboard() {
     return { all: venueUsers, admins, managers, employees };
   };
 
-  const handleCreate = () => {
-    if (!newName.trim() || !newSlug.trim()) return;
+  const handleCreate = async () => {
+    if (creating || !isAdmin || !newName.trim() || !newSlug.trim() || !isTimeZone(newConfig.timezone)) return;
     const slug = newSlug
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "");
-    if (allRestaurants[slug]) {
-      alert("A venue with this ID already exists.");
-      return;
-    }
-    createRestaurant(slug, newName.trim(), newVenueType);
-
-    if (currentUser) {
-      void authService
-        .assignRestaurantRole(currentUser.id, slug, "owner")
-        .then(() => assignRestaurantRole(currentUser.id, slug, "owner"))
-        .catch(console.error);
-    }
-
+    if (allRestaurants[slug]?.revision !== undefined) { setCreateError(true); return; }
+    setCreating(true);setCreateError(false);
+    const ok = await createRestaurant(slug, newName.trim(), newVenueType, newConfig);
+    setCreating(false);
+    if (!ok) { setCreateError(true); return; }
     setNewName("");
     setNewSlug("");
     setNewVenueType("restaurant");
     setShowCreateModal(false);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
+    try { await deleteRestaurant(id); } catch { setDeleteError(true); return; }
     if (id === activeRestaurantId) {
       const other = restaurantIds.find((r) => r !== id);
       if (other && activeRestaurantId) {
@@ -196,7 +198,7 @@ export default function AdminDashboard() {
         setActiveRestaurant(other);
       }
     }
-    deleteRestaurant(id);
+    setDeleteError(false);
     setDeleteTarget(null);
   };
 
@@ -204,9 +206,9 @@ export default function AdminDashboard() {
   const formatDate = (iso: string) => {
     try {
       const d = new Date(iso);
-      return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      return d.toLocaleDateString(language === "bs" ? "bs-BA" : "en-GB", { month: "short", day: "numeric", year: "numeric" });
     } catch {
-      return "Unknown";
+      return uiText("Nepoznato");
     }
   };
 
@@ -216,11 +218,11 @@ export default function AdminDashboard() {
       const now = new Date();
       const diffMs = now.getTime() - d.getTime();
       const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-      if (diffDays === 0) return "today";
-      if (diffDays === 1) return "yesterday";
-      if (diffDays < 30) return `${diffDays}d ago`;
-      if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`;
-      return `${Math.floor(diffDays / 365)}y ago`;
+      if (diffDays === 0) return uiText("danas");
+      if (diffDays === 1) return uiText("jučer");
+      if (diffDays < 30) return new Intl.RelativeTimeFormat(language === "bs" ? "bs" : "en").format(-diffDays,"day");
+      if (diffDays < 365) return new Intl.RelativeTimeFormat(language === "bs" ? "bs" : "en").format(-Math.floor(diffDays/30),"month");
+      return new Intl.RelativeTimeFormat(language === "bs" ? "bs" : "en").format(-Math.floor(diffDays/365),"year");
     } catch {
       return "";
     }
@@ -231,6 +233,7 @@ export default function AdminDashboard() {
   // ═══════════════════════════════════════════════════════════
   return (
     <div>
+      {isAdmin && <a href="/admin/support" className="inline-flex min-h-11 items-center rounded-xl border adm-border px-4 mb-4 adm-text">{uiText("Podrška: aktivnosti i poteškoće")}</a>}
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -8 }}
@@ -238,9 +241,9 @@ export default function AdminDashboard() {
         className="flex items-center justify-between mb-6"
       >
         <div>
-          <h1 className="text-xl lg:text-2xl font-extrabold text-dark adm-text tracking-tight">Lokali</h1>
+          <h1 className="text-xl lg:text-2xl font-extrabold text-dark adm-text tracking-tight">{uiText("Lokali")}</h1>
           <p className="text-[13px] text-muted adm-text-muted mt-1">
-            Upravljajte restoranima, kafićima i barovima
+            {uiText("Upravljajte restoranima, kafićima i barovima")}
           </p>
         </div>
         <motion.button
@@ -250,7 +253,7 @@ export default function AdminDashboard() {
           className="flex items-center gap-2 bg-gradient-to-r from-primary to-amber-500 text-white px-5 py-2.5 rounded-2xl text-[13px] font-bold shadow-glow hover:brightness-105 transition"
         >
           <Plus size={15} />
-          Novi lokal
+          {uiText("Novi lokal")}
         </motion.button>
       </motion.div>
 
@@ -269,7 +272,7 @@ export default function AdminDashboard() {
             </div>
             <div>
               <p className="text-lg font-extrabold text-dark adm-text leading-none">{restaurantIds.length}</p>
-              <p className="text-[11px] text-muted adm-text-muted mt-0.5">Lokala</p>
+              <p className="text-[11px] text-muted adm-text-muted mt-0.5">{uiText("Lokala")}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -278,7 +281,7 @@ export default function AdminDashboard() {
             </div>
             <div>
               <p className="text-lg font-extrabold text-dark adm-text leading-none">{globalStats.totalProducts}</p>
-              <p className="text-[11px] text-muted adm-text-muted mt-0.5">Proizvoda</p>
+              <p className="text-[11px] text-muted adm-text-muted mt-0.5">{uiText("Proizvoda")}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -287,7 +290,7 @@ export default function AdminDashboard() {
             </div>
             <div>
               <p className="text-lg font-extrabold text-dark adm-text leading-none">{globalStats.totalUsers}</p>
-              <p className="text-[11px] text-muted adm-text-muted mt-0.5">Korisnika</p>
+              <p className="text-[11px] text-muted adm-text-muted mt-0.5">{uiText("Korisnika")}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -296,7 +299,7 @@ export default function AdminDashboard() {
             </div>
             <div>
               <p className="text-lg font-extrabold text-dark adm-text leading-none">{globalStats.totalPopular}</p>
-              <p className="text-[11px] text-muted adm-text-muted mt-0.5">Popularnih stavki</p>
+              <p className="text-[11px] text-muted adm-text-muted mt-0.5">{uiText("Popularnih stavki")}</p>
             </div>
           </div>
         </div>
@@ -308,7 +311,7 @@ export default function AdminDashboard() {
         <div className="flex flex-wrap gap-x-6 gap-y-2">
           {/* Venue type chips */}
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider">Po tipu:</span>
+            <span className="text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider">{uiText("Po tipu:")}</span>
             {Object.entries(globalStats.venueTypeCounts).map(([type, count]) => {
               const vConf = VENUE_TYPES.find((v) => v.value === type);
               const vColor = VENUE_COLORS[type as VenueType];
@@ -325,21 +328,21 @@ export default function AdminDashboard() {
 
           {/* User role chips */}
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider">Osoblje:</span>
+            <span className="text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider">{uiText("Osoblje:")}</span>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-700">
-              <Crown size={10} /> {globalStats.platformAdmins} Admin{globalStats.platformAdmins !== 1 ? "s" : ""}
+              <Crown size={10} /> {globalStats.platformAdmins} {uiText("Admin")}{globalStats.platformAdmins !== 1 ? "s" : ""}
             </span>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-700">
-              <ShieldCheck size={10} /> {globalStats.managers} Manager{globalStats.managers !== 1 ? "s" : ""}
+              <ShieldCheck size={10} /> {globalStats.managers} {uiText("Manager")}{globalStats.managers !== 1 ? "s" : ""}
             </span>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-500/10 text-green-700">
-              <Shield size={10} /> {globalStats.employees} Employee{globalStats.employees !== 1 ? "s" : ""}
+              <Shield size={10} /> {globalStats.employees} {uiText("Employee")}{globalStats.employees !== 1 ? "s" : ""}
             </span>
           </div>
 
           {/* Total categories */}
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider">Vrste:</span>
+            <span className="text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider">{uiText("Vrste:")}</span>
             <span className="text-[11px] font-bold text-dark adm-text">{globalStats.totalCategories}</span>
           </div>
         </div>
@@ -381,7 +384,7 @@ export default function AdminDashboard() {
                 {isActive && isLoggedIn && (
                   <div className="absolute top-3 right-3 bg-primary text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm flex items-center gap-1">
                     <div className="w-1.5 h-1.5 adm-surface adm-border border rounded-full animate-pulse" />
-                    Active
+                    {uiText("Active")}
                   </div>
                 )}
                 <div className="absolute top-3 left-3">
@@ -402,32 +405,32 @@ export default function AdminDashboard() {
                   <div className="flex items-center gap-1.5 text-[11px]">
                     <Package size={12} className="text-primary" />
                     <span className="font-bold text-dark adm-text">{productCount}</span>
-                    <span className="text-muted adm-text-muted">products</span>
+                    <span className="text-muted adm-text-muted">{uiText("products")}</span>
                   </div>
                   <div className="flex items-center gap-1.5 text-[11px]">
                     <Tags size={12} className="text-accent-blue" />
                     <span className="font-bold text-dark adm-text">{categoryCount}</span>
-                    <span className="text-muted adm-text-muted">categories</span>
+                    <span className="text-muted adm-text-muted">{uiText("categories")}</span>
                   </div>
                   {popularCount > 0 && (
                     <div className="flex items-center gap-1.5 text-[11px]">
                       <Star size={12} className="text-amber-500" />
                       <span className="font-bold text-dark adm-text">{popularCount}</span>
-                      <span className="text-muted adm-text-muted">popular</span>
+                      <span className="text-muted adm-text-muted">{uiText("popular")}</span>
                     </div>
                   )}
                   <div className="flex items-center gap-1.5 text-[11px]">
                     <UserCog size={12} className="text-accent-green" />
                     <span className="font-bold text-dark adm-text">{venueBreakdown.all.length}</span>
-                    <span className="text-muted adm-text-muted">users</span>
+                    <span className="text-muted adm-text-muted">{uiText("users")}</span>
                   </div>
                 </div>
 
                 {/* Row 2: Meta info (created, address, hours, theme) */}
                 <div className="flex items-center gap-3 flex-wrap text-[10px] text-muted adm-text-muted">
-                  <div className="flex items-center gap-1" title={`Created ${formatDate(createdAt)}`}>
+                  <div className="flex items-center gap-1" title={`${uiText("Kreirano")} ${formatDate(createdAt)}`}>
                     <Calendar size={10} className="adm-text-muted" />
-                    <span>Created {formatTimeAgo(createdAt)}</span>
+                    <span>{uiText("Created")} {formatTimeAgo(createdAt)}</span>
                     <span className="adm-text-faint">({formatDate(createdAt)})</span>
                   </div>
                   {data.restaurant.address && (
@@ -444,13 +447,13 @@ export default function AdminDashboard() {
                   )}
                   <div className="flex items-center gap-1">
                     <Palette size={10} className="adm-text-muted" />
-                    <span className="capitalize">{activeTheme === "custom" ? "Custom Theme" : activeTheme.replace(/-/g, " ")}</span>
+                    <span className="capitalize">{activeTheme === "custom" ? uiText("Custom Theme") : activeTheme.replace(/-/g, " ")}</span>
                   </div>
                 </div>
 
                 {/* Row 3: Staff breakdown — users with emails */}
                 <div className="adm-surface-2/80 rounded-xl p-3 space-y-1.5">
-                  <p className="text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-1">Staff & Access</p>
+                  <p className="text-[10px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-1">{uiText("Staff & Access")}</p>
 
                   {venueBreakdown.admins.length > 0 && (
                     <div className="space-y-1">
@@ -460,7 +463,7 @@ export default function AdminDashboard() {
                           <span className="font-semibold text-dark adm-text">{u.name}</span>
                           <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-700 text-[9px] font-bold">
                             <Crown size={8} />
-                            Admin
+                            {uiText("Admin")}
                           </span>
                           <span className="flex items-center gap-1 text-muted adm-text-muted ml-auto">
                             <Mail size={9} />
@@ -479,7 +482,7 @@ export default function AdminDashboard() {
                           <span className="font-semibold text-dark adm-text">{u.name}</span>
                           <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-700 text-[9px] font-bold">
                             <ShieldCheck size={8} />
-                            Manager
+                            {uiText("Manager")}
                           </span>
                           <span className="flex items-center gap-1 text-muted adm-text-muted ml-auto">
                             <Mail size={9} />
@@ -498,7 +501,7 @@ export default function AdminDashboard() {
                           <span className="font-semibold text-dark adm-text">{u.name}</span>
                           <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-700 text-[9px] font-bold">
                             <Shield size={8} />
-                            Employee
+                            {uiText("Employee")}
                           </span>
                           <span className="flex items-center gap-1 text-muted adm-text-muted ml-auto">
                             <Mail size={9} />
@@ -510,7 +513,7 @@ export default function AdminDashboard() {
                   )}
 
                   {venueBreakdown.all.length === 0 && (
-                    <p className="text-[11px] adm-text-muted italic">No users assigned</p>
+                    <p className="text-[11px] adm-text-muted italic">{uiText("No users assigned")}</p>
                   )}
                 </div>
 
@@ -518,7 +521,7 @@ export default function AdminDashboard() {
                 <div className="flex items-center gap-2 text-[10px] adm-text-muted">
                   <span className="font-mono adm-surface-2 px-1.5 py-0.5 rounded">/{id}</span>
                   <span>&middot;</span>
-                  <span>{data.categories.length} total cat. (incl. All & Popular)</span>
+                  <span>{data.categories.length} {uiText("total cat. (incl. All & Popular)")}</span>
                 </div>
 
                 {/* CTA */}
@@ -533,7 +536,7 @@ export default function AdminDashboard() {
                     )}
                   >
                     <Store size={14} />
-                    Uđi u lokal
+                    {uiText("Uđi u lokal")}
                   </button>
                   {restaurantIds.length > 1 && (
                     <button
@@ -559,14 +562,14 @@ export default function AdminDashboard() {
           <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
             <Building2 size={28} className="text-primary/40" />
           </div>
-          <p className="text-[14px] font-semibold text-dark adm-text">Nema lokala</p>
-          <p className="text-[12px] text-muted adm-text-muted mt-1.5">Kreirajte prvi restoran, kafić ili bar</p>
+          <p className="text-[14px] font-semibold text-dark adm-text">{uiText("Nema lokala")}</p>
+          <p className="text-[12px] text-muted adm-text-muted mt-1.5">{uiText("Kreirajte prvi restoran, kafić ili bar")}</p>
           <button
             onClick={() => setShowCreateModal(true)}
             className="mt-5 inline-flex items-center gap-2 bg-gradient-to-r from-primary to-amber-500 text-white px-5 py-2.5 rounded-2xl text-[13px] font-bold shadow-glow hover:brightness-105 transition"
           >
             <Plus size={15} />
-            Kreiraj lokal
+            {uiText("Kreiraj lokal")}
           </button>
         </motion.div>
       )}
@@ -586,7 +589,8 @@ export default function AdminDashboard() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.92, y: 24 }}
               transition={{ type: "spring", damping: 28, stiffness: 320 }}
-              className="adm-surface adm-border border rounded-3xl max-w-[520px] w-full shadow-elevated overflow-hidden"
+              role="dialog" aria-modal="true" aria-label={uiText("Novi lokal")}
+              className="adm-surface adm-border border rounded-3xl max-w-[520px] w-full shadow-elevated max-h-[calc(100dvh-2rem)] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
@@ -597,8 +601,8 @@ export default function AdminDashboard() {
                       <Sparkles size={18} className="text-primary" />
                     </div>
                     <div>
-                      <h3 className="text-[16px] font-extrabold text-dark adm-text tracking-tight">Novi lokal</h3>
-                      <p className="text-[11px] text-muted adm-text-muted mt-0.5">Odaberite tip i unesite naziv</p>
+                      <h3 className="text-[16px] font-extrabold text-dark adm-text tracking-tight">{uiText("Novi lokal")}</h3>
+                      <p className="text-[11px] text-muted adm-text-muted mt-0.5">{uiText("Odaberite tip i unesite naziv")}</p>
                     </div>
                   </div>
                   <button
@@ -614,7 +618,7 @@ export default function AdminDashboard() {
               <div className="px-6 py-5 space-y-5 max-h-[calc(100vh-220px)] overflow-y-auto">
                 {/* Venue type selector — 2x4 grid */}
                 <div>
-                  <label className="block text-[11px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2.5">Tip lokala</label>
+                  <label className="block text-[11px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-2.5">{uiText("Tip lokala")}</label>
                   <div className="grid grid-cols-4 gap-2">
                     {VENUE_TYPES.map((vt) => {
                       const isSelected = newVenueType === vt.value;
@@ -639,7 +643,7 @@ export default function AdminDashboard() {
                             />
                           )}
                           <span className="text-xl leading-none">{vt.emoji}</span>
-                          <span className="text-[10px] font-bold leading-tight mt-0.5">{vt.label}</span>
+                          <span className="text-[10px] font-bold leading-tight mt-0.5">{uiText(vt.label)}</span>
                         </motion.button>
                       );
                     })}
@@ -664,7 +668,7 @@ export default function AdminDashboard() {
 
                 {/* Name */}
                 <div>
-                  <label className="block text-[11px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-1.5">Naziv lokala</label>
+                  <label className="block text-[11px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-1.5">{uiText("Naziv lokala")}</label>
                   <input
                     type="text"
                     value={newName}
@@ -693,36 +697,37 @@ export default function AdminDashboard() {
 
                 {/* Slug */}
                 <div>
-                  <label className="block text-[11px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-1.5">ID lokala (slug)</label>
+                  <label className="block text-[11px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-1.5">{uiText("ID lokala (slug)")}</label>
                   <div className="relative">
                     <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[11px] adm-text-faint font-mono">/</div>
                     <input
                       type="text"
                       value={newSlug}
                       onChange={(e) => setNewSlug(e.target.value)}
-                      placeholder="auto-generated-from-name"
+                      placeholder={uiText("auto-generated-from-name")}
                       className="w-full pl-7 pr-4 py-3 rounded-xl border border adm-border adm-surface-2/50 text-dark adm-text text-[13px] font-mono focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary focus:adm-surface adm-border border placeholder:adm-text-faint transition"
                     />
                   </div>
-                  <p className="text-[10px] adm-text-muted mt-1.5">Unique identifier — lowercase, no spaces</p>
+                  <p className="text-[10px] adm-text-muted mt-1.5">{uiText("Unique identifier — lowercase, no spaces")}</p>
                 </div>
               </div>
 
               {/* Footer */}
-              <div className="px-6 py-4 border-t border adm-border adm-surface-2/50 flex items-center gap-3">
+              <div className="px-6 pb-4"><VenueLocaleFields value={newConfig} onChange={setNewConfig} />{createError && <p role="alert" className="mt-3 text-sm text-red-700">{uiText("Žao nam je, lokal nije sačuvan. Provjerite podatke i pokušajte ponovo.")}</p>}</div>
+              <div className="sticky bottom-0 px-6 py-4 border-t adm-border adm-surface flex items-center gap-3">
                 <button
                   onClick={() => setShowCreateModal(false)}
                   className="flex-1 py-2.5 rounded-xl border border adm-border text-[13px] font-bold text-dark adm-text hover:adm-surface adm-border border transition"
                 >
-                  Cancel
+                  {uiText("Cancel")}
                 </button>
                 <button
                   onClick={handleCreate}
-                  disabled={!newName.trim() || !newSlug.trim()}
+                  disabled={creating || !newName.trim() || !newSlug.trim() || !isTimeZone(newConfig.timezone)}
                   className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-primary to-amber-500 text-white text-[13px] font-bold hover:brightness-105 transition shadow-glow disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   <Plus size={14} />
-                  Create {VENUE_TYPES.find((v) => v.value === newVenueType)?.label}
+                  {creating ? uiText("Čuvanje…") : uiText("Kreiraj lokal")}
                 </button>
               </div>
             </motion.div>
@@ -749,15 +754,16 @@ export default function AdminDashboard() {
               <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
                 <AlertTriangle size={22} className="text-accent-red" />
               </div>
-              <h3 className="text-lg font-extrabold text-dark adm-text text-center">Delete Venue?</h3>
+              <h3 className="text-lg font-extrabold text-dark adm-text text-center">{uiText("Delete Venue?")}</h3>
               <p className="text-sm text-muted adm-text-muted mt-2 text-center leading-relaxed">
-                This will permanently delete{" "}
+                {uiText("This will permanently delete")}{" "}
                 <span className="font-bold text-dark adm-text">{allRestaurants[deleteTarget]?.restaurant.name}</span>
-                {" "}and all its data. This cannot be undone.
+                {" "}{uiText("and all its data. This cannot be undone.")}
               </p>
               <div className="flex gap-3 mt-6">
-                <button onClick={() => setDeleteTarget(null)} className="flex-1 py-3 rounded-2xl border border adm-border text-sm font-bold text-dark adm-text hover:bg-[var(--adm-surface-2)] transition">Cancel</button>
-                <button onClick={() => handleDelete(deleteTarget)} className="flex-1 py-3 rounded-2xl bg-accent-red text-white text-sm font-bold hover:brightness-110 transition shadow-lg shadow-red-200">Delete</button>
+                <button onClick={() => setDeleteTarget(null)} className="flex-1 py-3 rounded-2xl border border adm-border text-sm font-bold text-dark adm-text hover:bg-[var(--adm-surface-2)] transition">{uiText("Cancel")}</button>
+                {deleteError && <p role="alert" className="text-sm text-red-600">{uiText('Brisanje nije uspjelo. Objekat s historijom poslovanja nije moguće obrisati.')}</p>}
+                  <button onClick={() => void handleDelete(deleteTarget)} className="flex-1 py-3 rounded-2xl bg-accent-red text-white text-sm font-bold hover:brightness-110 transition shadow-lg shadow-red-200">{uiText("Delete")}</button>
               </div>
             </motion.div>
           </motion.div>

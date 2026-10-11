@@ -1,276 +1,63 @@
 "use client";
-
-import { useState } from "react";
-import { LogIn, Mail, Lock, Eye, EyeOff, Loader2, KeyRound, ArrowRight } from "lucide-react";
+import { useUiText } from "@/hooks/useUiText";
+import { useRef, useState } from "react";
+import { ArrowRight, Check, Loader2 } from "lucide-react";
 import * as authService from "@/services/authService";
-import clsx from "clsx";
-import {
-  BTN_ACTIVATE,
-  BTN_CONTINUE,
-  BTN_DIFFERENT_EMAIL,
-  BTN_SIGN_IN,
-  INVITE_HELP,
-  LOGIN_EMAIL_SUBTITLE,
-} from "@/lib/admin-branding";
+import { useOperationalText } from "@/hooks/useOperationalText";
+import PinPad from "@/components/admin/PinPad";
 
-export type LoginMode = "email" | "password" | "invite";
-
-type Props = {
-  onSuccess: (session: authService.SessionPayload) => void;
-  title?: string;
-  subtitle?: string;
-};
-
-export default function AdminLoginForm({
-  onSuccess,
-  title = "Prijava",
-  subtitle = LOGIN_EMAIL_SUBTITLE,
-}: Props) {
-  const [step, setStep] = useState<LoginMode>("email");
-  const [displayName, setDisplayName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [otp, setOtp] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
+type Step = "email" | "pin" | "welcome" | "new-pin" | "confirm" | "done";
+type Props = { onSuccess: (session: authService.SessionPayload) => void; title?: string; subtitle?: string; initialEmail?: string };
+export default function AdminLoginForm({ onSuccess, title, subtitle, initialEmail = "" }: Props) {
+  const uiText = useUiText();
+  const t = useOperationalText();
+  const form = useRef<HTMLFormElement>(null);
+  const [step, setStep] = useState<Step>(initialEmail ? "pin" : "email");
+  const [email, setEmail] = useState(initialEmail);
+  const [pin, setPin] = useState("");
+  const [newPin, setNewPin] = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const resetToEmail = () => {
-    setStep("email");
-    setPassword("");
-    setOtp("");
-    setNewPassword("");
-    setConfirmPassword("");
-    setError("");
+  const [busy, setBusy] = useState(false);
+  const [session, setSession] = useState<authService.SessionPayload | null>(null);
+  const headings: Record<Step, string> = {
+    email: title ?? t("Prijava", "Sign in"), pin: t("Unesite PIN", "Enter your PIN"),
+    welcome: t("Dobrodošli", "Welcome"), "new-pin": t("Postavite svoj PIN", "Choose your PIN"),
+    confirm: t("Ponovite svoj PIN", "Repeat your PIN"), done: t("Sve je spremno", "You're ready"),
   };
-
-  const handleEmailContinue = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const next = async (event: React.FormEvent) => {
+    event.preventDefault(); if (busy) return;
     setError("");
-    if (!email.trim()) {
-      setError("Enter your email");
-      return;
-    }
-    setLoading(true);
+    if (step === "email") { setStep("pin"); return; }
+    if (step === "welcome") { setPin(""); setStep("new-pin"); return; }
+    if (step === "done" && session) { onSuccess(session); return; }
+    if (!/^\d{3}$/.test(pin)) { setError(t("Unesite tri cifre.", "Enter three digits.")); return; }
+    if (step === "new-pin") { setNewPin(pin); setPin(""); setStep("confirm"); return; }
+    if (step === "confirm" && pin !== newPin) { setError(t("PIN se ne podudara. Pokušajte ponovo.", "The PINs don't match. Please try again.")); setPin(""); return; }
+    setBusy(true);
     try {
-      const result = await authService.checkLoginMode(email.trim());
-      if (result.mode === "not_found") {
-        setError("Račun za ovaj email nije registrovan.");
-        return;
+      if (step === "pin") {
+        const result = await authService.signIn(email, { pin });
+        setPin("");
+        if ("onboarding" in result) setStep("welcome");
+        else onSuccess(result);
+      } else {
+        setSession(await authService.completeOnboarding(newPin, pin));
+        setPin(""); setNewPin(""); setStep("done");
       }
-      setDisplayName(result.name ?? "");
-      setStep(result.mode);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not check email");
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { setError(t("Prijava nije uspjela. Provjerite podatke i pokušajte ponovo.", "Sign-in failed. Check your details and try again.")); }
+    finally { setBusy(false); }
   };
-
-  const handlePasswordLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-    try {
-      const session = await authService.signIn(email.trim(), { password });
-      onSuccess(session);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleInviteActivate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    if (newPassword !== confirmPassword) {
-      setError("Passwords do not match");
-      return;
-    }
-    if (newPassword.length < 8) {
-      setError("Password must be at least 8 characters");
-      return;
-    }
-    setLoading(true);
-    try {
-      const session = await authService.signIn(email.trim(), {
-        otp: otp.trim(),
-        newPassword,
-      });
-      onSuccess(session);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Activation failed");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div>
-      <div className="text-center mb-6">
-        <h2 className="text-xl font-extrabold text-dark adm-text">{title}</h2>
-        <p className="text-[13px] text-muted adm-text-muted mt-1">
-          {step === "invite"
-            ? `Dobrodošli${displayName ? `, ${displayName}` : ""} — unesite kod od administratora`
-            : step === "password"
-            ? `Dobrodošli natrag${displayName ? `, ${displayName}` : ""}`
-            : subtitle}
-        </p>
-      </div>
-
-      {step === "email" && (
-        <form onSubmit={handleEmailContinue} className="space-y-4">
-          <div>
-            <label className="block text-[11px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-1.5">
-              Email
-            </label>
-            <div className="relative">
-              <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 adm-text-faint" />
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 rounded-xl border adm-input text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/30"
-                placeholder="you@example.com"
-                required
-                disabled={loading}
-                autoComplete="email"
-              />
-            </div>
-          </div>
-          {error && <ErrorBox message={error} />}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3.5 rounded-xl bg-gradient-to-r from-primary to-amber-500 text-white font-bold text-[14px] flex items-center justify-center gap-2 disabled:opacity-60"
-          >
-            {loading ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} />}
-            {BTN_CONTINUE}
-          </button>
-        </form>
-      )}
-
-      {step === "password" && (
-        <form onSubmit={handlePasswordLogin} className="space-y-4">
-          <p className="text-[12px] text-muted adm-text-muted adm-bg rounded-lg px-3 py-2">{email}</p>
-          <div>
-            <label className="block text-[11px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-1.5">
-              Lozinka
-            </label>
-            <div className="relative">
-              <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 adm-text-faint" />
-              <input
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-10 py-3 rounded-xl border adm-input text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/30"
-                required
-                disabled={loading}
-                autoFocus
-                autoComplete="current-password"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted adm-text-muted"
-              >
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            </div>
-          </div>
-          {error && <ErrorBox message={error} />}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3.5 rounded-xl bg-gradient-to-r from-primary to-amber-500 text-white font-bold text-[14px] flex items-center justify-center gap-2 disabled:opacity-60"
-          >
-            {loading ? <Loader2 size={18} className="animate-spin" /> : <LogIn size={18} />}
-            {BTN_SIGN_IN}
-          </button>
-          <button type="button" onClick={resetToEmail} className="w-full text-[12px] text-muted adm-text-muted hover:adm-text">
-            {BTN_DIFFERENT_EMAIL}
-          </button>
-        </form>
-      )}
-
-      {step === "invite" && (
-        <form onSubmit={handleInviteActivate} className="space-y-4">
-          <p className="text-[12px] text-muted adm-text-muted bg-amber-50 border border-amber-200/60 rounded-lg px-3 py-2">
-            {INVITE_HELP} <span className="font-semibold text-dark adm-text">{email}</span>
-          </p>
-          <div>
-            <label className="block text-[11px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-1.5">
-              Pozivni kod
-            </label>
-            <div className="relative">
-              <KeyRound size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 adm-text-faint" />
-              <input
-                type="text"
-                inputMode="numeric"
-                maxLength={6}
-                value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                className="w-full pl-10 pr-4 py-3 rounded-xl border adm-input text-[13px] tracking-[0.3em] font-mono font-bold focus:outline-none focus:ring-2 focus:ring-primary/30"
-                placeholder="000000"
-                required
-                disabled={loading}
-                autoFocus
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-[11px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-1.5">
-              Nova lozinka
-            </label>
-            <input
-              type={showPassword ? "text" : "password"}
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border adm-input text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/30"
-              minLength={8}
-              required
-              disabled={loading}
-              autoComplete="new-password"
-            />
-          </div>
-          <div>
-            <label className="block text-[11px] font-bold text-muted adm-text-muted uppercase tracking-wider mb-1.5">
-              Potvrdi lozinku
-            </label>
-            <input
-              type={showPassword ? "text" : "password"}
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border adm-input text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/30"
-              minLength={8}
-              required
-              disabled={loading}
-              autoComplete="new-password"
-            />
-          </div>
-          {error && <ErrorBox message={error} />}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3.5 rounded-xl bg-gradient-to-r from-primary to-amber-500 text-white font-bold text-[14px] flex items-center justify-center gap-2 disabled:opacity-60"
-          >
-            {loading ? <Loader2 size={18} className="animate-spin" /> : <LogIn size={18} />}
-            {BTN_ACTIVATE}
-          </button>
-          <button type="button" onClick={resetToEmail} className="w-full text-[12px] text-muted adm-text-muted hover:adm-text">
-            {BTN_DIFFERENT_EMAIL}
-          </button>
-        </form>
-      )}
+  return <form ref={form} onSubmit={next} className="space-y-5">
+    <div className="text-center">
+      {step === "done" && <Check className="mx-auto mb-3 text-emerald-600" size={40} />}
+      <h2 className="text-xl font-extrabold adm-text">{headings[step]}</h2>
+      <p className="mt-2 text-sm adm-text-muted">{step === "email" ? subtitle ?? t("Prijavite se svojom email adresom.", "Sign in with your email address.") : step === "welcome" ? t("Prije početka postavite svoj trocifreni PIN. Njime ćete se prijavljivati na posao.", "Before you start, choose your own three-digit PIN. You'll use it to sign in at work.") : step === "done" ? t("Vaš PIN je sačuvan. Možete početi.", "Your PIN is saved. You're ready to start.") : email}</p>
     </div>
-  );
-}
-
-function ErrorBox({ message }: { message: string }) {
-  return (
-    <p className="text-[12px] text-red-600 font-medium bg-red-50 px-3 py-2 rounded-lg">{message}</p>
-  );
+    {step === "email" && <label className="block text-sm font-semibold">{uiText("Email")}<input autoFocus type="email" autoComplete="email" required maxLength={254} value={email} onChange={e => setEmail(e.target.value)} className="mt-2 w-full rounded-xl border adm-input p-3 min-h-[48px]" /></label>}
+    {["pin", "new-pin", "confirm"].includes(step) && <PinPad key={step} value={pin} onChange={value => { setPin(value); setError(""); }} loading={busy} onComplete={() => form.current?.requestSubmit()} />}
+    {error && <p role="alert" className="rounded-xl bg-red-50 text-red-700 p-3 text-sm">{error}</p>}
+    <button disabled={busy || (["pin", "new-pin", "confirm"].includes(step) && pin.length !== 3)} className="min-h-[48px] w-full rounded-xl bg-primary text-white font-bold flex items-center justify-center gap-2 disabled:opacity-50">{busy ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} />}{step === "done" ? t("Gotovo", "Done") : t("Dalje", "Next")}</button>
+    {step === "pin" && <><button type="button" onClick={() => { setStep("email"); setPin(""); setError(""); }} className="w-full min-h-[44px] text-sm adm-text-muted">{t("Druga email adresa", "Use another email")}</button><p className="text-xs text-center adm-text-muted">{t("Zaboravili ste PIN? Voditelj vam može izdati privremeni PIN.", "Forgot your PIN? Ask your manager for a temporary PIN.")}</p></>}
+    {step === "confirm" && <button type="button" onClick={() => { setPin(""); setStep("new-pin"); setError(""); }} className="w-full min-h-[44px] text-sm">{t("Odaberite drugi PIN", "Choose a different PIN")}</button>}
+  </form>;
 }

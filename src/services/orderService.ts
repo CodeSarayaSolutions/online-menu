@@ -14,86 +14,16 @@ export type OrderRow = Tables<'orders'>;
 
 // ─── CRUD ────────────────────────────────────────────────
 
-export async function getOrders(restaurantId: string): Promise<OrderRow[]> {
-  const { data, error } = await supabase
-    .from('orders')
-    .select('*')
-    .eq('restaurant_id', restaurantId)
-    .order('created_at', { ascending: false });
-
-  if (error) throw error;
-  return data ?? [];
+export async function getOrders(restaurantId:string):Promise<OrderRow[]>{
+ const rows:OrderRow[]=[];
+ for(let offset=0;;offset+=100){
+  const {data,error}=await supabase.from('orders').select('*').eq('restaurant_id',restaurantId).eq('status','pending').order('created_at').order('id').range(offset,offset+99);
+  if(error)throw error;rows.push(...data??[]);if(!data||data.length<100)return rows;
+ }
 }
-
-export async function getOrdersByStatus(
-  restaurantId: string,
-  status: OrderStatus
-): Promise<OrderRow[]> {
-  const { data, error } = await supabase
-    .from('orders')
-    .select('*')
-    .eq('restaurant_id', restaurantId)
-    .eq('status', status)
-    .order('created_at', { ascending: false });
-
-  if (error) throw error;
-  return data ?? [];
-}
-
-export async function createOrder(order: {
-  id: string;
-  restaurantId: string;
-  items: CartItem[];
-  tableNumber: string;
-  kitchenNote: string;
-  paymentMethod: string;
-  total: number;
-  itemCount: number;
-}): Promise<OrderRow> {
-  const { data, error } = await supabase
-    .from('orders')
-    .insert({
-      id: order.id,
-      restaurant_id: order.restaurantId,
-      items: order.items as any,
-      table_number: order.tableNumber,
-      kitchen_note: order.kitchenNote,
-      payment_method: order.paymentMethod,
-      total: order.total,
-      item_count: order.itemCount,
-      status: 'pending' as const,
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-export async function updateOrderStatus(orderId: string, status: OrderStatus) {
-  const { data, error } = await supabase
-    .from('orders')
-    .update({ status })
-    .eq('id', orderId)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-export async function deleteOrder(orderId: string) {
-  const { error } = await supabase.from('orders').delete().eq('id', orderId);
-  if (error) throw error;
-}
-
-export async function clearAllOrders(restaurantId: string) {
-  const { error } = await supabase
-    .from('orders')
-    .delete()
-    .eq('restaurant_id', restaurantId);
-
-  if (error) throw error;
+export async function decideOrder(venue:string,orderId:string,accept:boolean,minutes:number){
+ const response=await fetch('/api/orders/decision',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({venue,orderId,accept,minutes})});
+ if(!response.ok)throw new Error('Order decision unavailable');return response.json();
 }
 
 // ─── Realtime Subscription ───────────────────────────────
@@ -148,26 +78,3 @@ export function subscribeToOrders(
   };
 }
 
-// ─── Analytics helpers ───────────────────────────────────
-
-export async function getTodayOrderStats(restaurantId: string) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const { data, error } = await supabase
-    .from('orders')
-    .select('id, total, status, created_at')
-    .eq('restaurant_id', restaurantId)
-    .gte('created_at', today.toISOString());
-
-  if (error) throw error;
-
-  const orders = data ?? [];
-  return {
-    totalOrders: orders.length,
-    activeOrders: orders.filter((o) => ['pending', 'preparing', 'ready'].includes(o.status)).length,
-    todayRevenue: orders
-      .filter((o) => o.status !== 'cancelled')
-      .reduce((sum, o) => sum + Number(o.total), 0),
-  };
-}

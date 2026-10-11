@@ -1,5 +1,6 @@
 "use client";
 
+import { useUiText } from "@/hooks/useUiText";
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -16,6 +17,7 @@ interface BsCollapseProps {
 }
 
 export default function BsCollapse({ children, hasValue, className, defaultOpen = false }: BsCollapseProps) {
+  const uiText = useUiText();
   const [open, setOpen] = useState(defaultOpen);
 
   return (
@@ -33,7 +35,7 @@ export default function BsCollapse({ children, hasValue, className, defaultOpen 
         )}
       >
         <span>🇧🇦</span>
-        <span>Bosnian</span>
+        <span>{uiText("Bosnian")}</span>
         {hasValue && !open && (
           <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
         )}

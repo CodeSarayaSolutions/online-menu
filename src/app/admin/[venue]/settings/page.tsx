@@ -1,13 +1,16 @@
 "use client";
 
+import { useUiText } from "@/hooks/useUiText";
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Settings, ShoppingBag, Eye, Check, Loader2 } from "lucide-react";
 import clsx from "clsx";
+import VenuePlatformSettings from "@/components/admin/VenuePlatformSettings";
 import { useCmsStore } from "@/store/cmsStore";
 
 export default function VenueSettingsPage() {
+  const uiText = useUiText();
   const { venue } = useParams<{ venue: string }>();
   const venueSlug = typeof venue === "string" ? venue : "";
 
@@ -25,12 +28,7 @@ export default function VenueSettingsPage() {
     setSaved(false);
     updateComponentStyles({ viewOnlyMode: !enabled });
     try {
-      await new Promise<void>((resolve) => {
-        setTimeout(() => {
-          saveActiveToAllRestaurants(venueSlug);
-          resolve();
-        }, 0);
-      });
+      if (!await saveActiveToAllRestaurants(venueSlug)) return;
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } finally {
@@ -43,10 +41,10 @@ export default function VenueSettingsPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-extrabold text-dark adm-text tracking-tight flex items-center gap-2">
           <Settings size={26} className="text-primary" />
-          Postavke
+          {uiText("Postavke")}
         </h1>
         <p className="text-sm text-muted adm-text-muted mt-1">
-          Upravljajte ponašanjem online menija za goste
+          {uiText("Upravljajte ponašanjem online menija za goste")}
         </p>
       </div>
 
@@ -56,9 +54,9 @@ export default function VenueSettingsPage() {
         className="adm-surface adm-border border rounded-2xl shadow-soft overflow-hidden"
       >
         <div className="px-5 py-4 border-b adm-border">
-          <h2 className="text-[15px] font-extrabold text-dark adm-text">Online meni</h2>
+          <h2 className="text-[15px] font-extrabold text-dark adm-text">{uiText("Online meni")}</h2>
           <p className="text-[12px] text-muted adm-text-muted mt-0.5">
-            Odredite da li gosti mogu naručivati ili samo pregledavati meni
+            {uiText("Odredite da li gosti mogu naručivati ili samo pregledavati meni")}
           </p>
         </div>
 
@@ -83,12 +81,12 @@ export default function VenueSettingsPage() {
                 </div>
                 <div>
                   <p className="text-[14px] font-extrabold text-dark adm-text">
-                    {orderingEnabled ? "Narudžbe su uključene" : "Samo pregled menija"}
+                    {orderingEnabled ? uiText("Narudžbe su uključene") : uiText("Samo pregled menija")}
                   </p>
                   <p className="text-[12px] text-muted adm-text-muted mt-1 leading-relaxed">
                     {orderingEnabled
-                      ? "Gosti mogu dodavati stavke u korpu, pregledati narudžbu i poslati je u kuhinju (uz QR kod stola)."
-                      : "Gosti mogu pregledavati meni, ali ne vide dugmad za narudžbu, korpu ni checkout."}
+                      ? uiText("Gosti mogu dodavati stavke u korpu, pregledati narudžbu i poslati je baru uz QR kod stola.")
+                      : uiText("Gosti mogu pregledavati meni, bez naručivanja.")}
                   </p>
                 </div>
               </div>
@@ -118,24 +116,23 @@ export default function VenueSettingsPage() {
             {saving && (
               <>
                 <Loader2 size={14} className="animate-spin" />
-                Spremanje…
+                {uiText("Spremanje…")}
               </>
             )}
             {!saving && saved && (
               <>
                 <Check size={14} className="text-emerald-500" />
-                <span className="text-emerald-600 font-semibold">Sačuvano</span>
+                <span className="text-emerald-600 font-semibold">{uiText("Sačuvano")}</span>
               </>
             )}
           </div>
 
           <div className="rounded-xl adm-bg px-4 py-3 text-[11px] text-muted adm-text-muted leading-relaxed">
-            <strong className="text-dark adm-text">Napomena:</strong> promjena se odmah primjenjuje na
-            javni meni (<code className="text-[10px]">/{venueSlug || "venue"}</code>). Gosti koji već imaju
-            stavke u korpi neće moći završiti narudžbu dok je pregled uključen.
+            <strong className="text-dark adm-text">{uiText("Napomena:")}</strong>{" "}{uiText("promjena se odmah primjenjuje na javni meni (")}<code className="text-[10px]">/{venueSlug}</code>{uiText("). Gosti koji već imaju stavke u korpi neće moći završiti narudžbu dok je pregled uključen.")}
           </div>
         </div>
       </motion.section>
+      <VenuePlatformSettings key={venueSlug} venue={venueSlug} />
     </div>
   );
 }

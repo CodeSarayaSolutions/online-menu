@@ -1,3 +1,4 @@
+import { actionFailure, sameOrigin } from '@/lib/hos-server';
 import { NextResponse } from 'next/server';
 import { getSessionUserFromRequest } from '@/lib/auth/require-session';
 import { canViewShiftSummary } from '@/lib/auth/shift-access';
@@ -27,7 +28,6 @@ export async function GET(request: Request) {
     const history = await getRosterHistory(restaurantId, from, to, supabaseAdmin);
     return NextResponse.json({ history }, { status: 200 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to load history';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return actionFailure(err, 'shift.history', user.id, restaurantId);
   }
 }

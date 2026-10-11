@@ -1,5 +1,6 @@
 "use client";
 
+import { useUiText } from "@/hooks/useUiText";
 import { useState, useEffect } from "react";
 import { Save, Check, MapPin, Clock, Wifi, Phone, Image, Type, FileText } from "lucide-react";
 import { motion } from "framer-motion";
@@ -11,6 +12,7 @@ import ImageUploadField from "@/components/admin/ImageUploadField";
 import clsx from "clsx";
 
 export default function RestaurantEditor() {
+  const uiText = useUiText();
   const { venue } = useParams<{ venue: string }>();
   const restaurant = useCmsStore((s) => s.restaurant);
   const componentStyles = useCmsStore((s) => s.componentStyles);
@@ -29,9 +31,9 @@ export default function RestaurantEditor() {
     setForm((f) => ({ ...f, [field]: value }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     updateRestaurant(form);
-    setTimeout(() => saveActiveToAllRestaurants(venue), 0);
+    if (!await saveActiveToAllRestaurants(venue)) return;
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -64,8 +66,8 @@ export default function RestaurantEditor() {
   return (
     <div className="max-w-3xl w-full px-0 sm:px-0">
       <div className="mb-8">
-        <h1 className="text-2xl font-extrabold text-dark adm-text tracking-tight">Informacije o restoranu</h1>
-        <p className="text-sm text-muted adm-text-muted mt-1">Prilagodite kako vaš restoran izgleda na meniju</p>
+        <h1 className="text-2xl font-extrabold text-dark adm-text tracking-tight">{uiText("Informacije o restoranu")}</h1>
+        <p className="text-sm text-muted adm-text-muted mt-1">{uiText("Prilagodite kako vaš restoran izgleda na meniju")}</p>
       </div>
 
       {/* Live preview card */}
@@ -102,7 +104,7 @@ export default function RestaurantEditor() {
             </div>
           </div>
           <div className="absolute top-3 right-3 glass px-2.5 py-1 rounded-full text-[10px] font-semibold text-dark adm-text">
-            Live Preview
+            {uiText("Live Preview")}
           </div>
         </div>
       </motion.div>
@@ -127,7 +129,7 @@ export default function RestaurantEditor() {
                   : "text-muted adm-text-muted hover:adm-text"
               )}
             >
-              {tab === "general" ? "Opšte" : "Kontakt i radno vrijeme"}
+              {tab === "general" ? uiText("Opšte") : uiText("Kontakt i radno vrijeme")}
               {activeTab === tab && (
                 <motion.div
                   layoutId="restaurantTab"
@@ -150,24 +152,24 @@ export default function RestaurantEditor() {
               {!f.upload && (
                 <label className="flex items-center gap-2 text-xs font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">
                   <f.icon size={12} className="text-primary/50" />
-                  {f.label}
+                  {uiText(f.label)}
                 </label>
               )}
               {f.upload ? (
                 <ImageUploadField
-                  label={f.label}
+                  label={uiText(f.label)}
                   restaurantId={venue}
                   placement={f.upload}
-                  value={form[f.key] ?? ""}
+                  value={String(form[f.key] ?? "")}
                   onChange={(url) => handleChange(f.key, url)}
                 />
               ) : f.bilingual ? (
                 <div>
                   <input
                     type="text"
-                    value={form[f.key]}
+                    value={String(form[f.key] ?? "")}
                     onChange={(e) => handleChange(f.key, e.target.value)}
-                    placeholder={f.placeholder}
+                    placeholder={uiText(f.placeholder)}
                     className="w-full px-4 py-3 adm-bg rounded-2xl text-sm text-dark adm-text outline-none border border-primary/10 focus:border-primary focus:adm-surface adm-border border focus:ring-4 focus:ring-primary/10 transition-all placeholder:adm-text-faint"
                   />
                   <BsCollapse hasValue={!!((form as any)[`${f.key}_bs`])}>
@@ -175,7 +177,7 @@ export default function RestaurantEditor() {
                       type="text"
                       value={(form as any)[`${f.key}_bs`] || ""}
                       onChange={(e) => handleChange(`${f.key}_bs` as keyof RestaurantInfo, e.target.value)}
-                      placeholder={`${f.placeholder} (Bosanski)`}
+                      placeholder={`${uiText(f.placeholder)} (${uiText("Bosanski")})`}
                       className="w-full px-4 py-3 adm-bg rounded-2xl text-sm text-dark adm-text outline-none border border-blue-200/30 focus:border-blue-400 focus:adm-surface adm-border border focus:ring-4 focus:ring-blue-100 transition-all placeholder:adm-text-faint"
                     />
                   </BsCollapse>
@@ -183,9 +185,9 @@ export default function RestaurantEditor() {
               ) : (
                 <input
                   type="text"
-                  value={form[f.key]}
+                  value={String(form[f.key] ?? "")}
                   onChange={(e) => handleChange(f.key, e.target.value)}
-                  placeholder={f.placeholder}
+                  placeholder={uiText(f.placeholder)}
                   className="w-full px-4 py-3 adm-bg rounded-2xl text-sm text-dark adm-text outline-none border border-primary/10 focus:border-primary focus:adm-surface adm-border border focus:ring-4 focus:ring-primary/10 transition-all placeholder:adm-text-faint"
                 />
               )}
@@ -207,12 +209,12 @@ export default function RestaurantEditor() {
             {saved ? (
               <>
                 <Check size={16} strokeWidth={3} />
-                Uspješno sačuvano
+                {uiText("Uspješno sačuvano")}
               </>
             ) : (
               <>
                 <Save size={16} />
-                Spremi izmjene
+                {uiText("Spremi izmjene")}
               </>
             )}
           </button>

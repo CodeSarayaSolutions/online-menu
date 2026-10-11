@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useCmsStore } from "@/store/cmsStore";
 import { loadAllVenuesIntoStore } from "@/lib/venue-cloud/sync";
 
 const VENUE_LOAD_TIMEOUT_MS = 20000;
@@ -49,7 +50,7 @@ export function useVenueCloudSync(enabled: boolean) {
     return () => {
       cancelled = true;
     };
-  }, [enabled]);
+  }, [enabled, useCmsStore]);
 
   return { venuesReady, loading, error };
 }

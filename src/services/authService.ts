@@ -1,3 +1,4 @@
+import { performAction } from './actionService';
 // ─── Auth Service ────────────────────────────────────────
 // App-owned accounts in sarayamenu.users + sarayamenu.sessions
 // Does NOT use Supabase Auth (auth.users).
@@ -25,54 +26,27 @@ export type SessionPayload = {
 
 // ─── Authentication (Next.js API + session header) ───────
 
-export type LoginModeResult =
-  | { mode: 'password'; name?: string }
-  | { mode: 'invite'; name?: string }
-  | { mode: 'not_found' };
-
-export async function checkLoginMode(email: string): Promise<LoginModeResult> {
-  const res = await fetch('/api/auth/login-mode', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email }),
-    credentials: 'include',
-  });
+export type LoginResult = SessionPayload | { onboarding: true };
+export async function signIn(email: string, creds: { pin: string }): Promise<LoginResult> {
+  const res = await fetch('/api/auth/login', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, pin: creds.pin }) });
   const body = await res.json();
-  if (body.mode === 'password' || body.mode === 'invite' || body.mode === 'not_found') {
-    return body as LoginModeResult;
-  }
-  if (!res.ok) throw new Error(body.error ?? body.hint ?? 'Could not verify email');
-  return body as LoginModeResult;
+  if (!res.ok) throw new Error(body.error ?? 'Prijava nije uspjela. Pokušajte ponovo.');
+  if (body.sessionToken) setAppSessionToken(body.sessionToken);
+  return body as LoginResult;
 }
-
-export async function signIn(
-  email: string,
-  creds: { password?: string; otp?: string; newPassword?: string }
-) {
-  const res = await fetch('/api/auth/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      email,
-      password: creds.password,
-      otp: creds.otp,
-      newPassword: creds.newPassword,
-    }),
-    credentials: 'include',
-  });
-
+export async function completeOnboarding(pin: string, confirmation: string): Promise<SessionPayload> {
+  const res = await fetch('/api/auth/onboard', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin, confirmation }) });
   const body = await res.json();
-  if (!res.ok) {
-    throw new Error(body.error ?? 'Login failed');
-  }
-
+  if (!res.ok) throw new Error(body.error ?? 'Pokušajte ponovo.');
   setAppSessionToken(body.sessionToken);
   return body as SessionPayload;
 }
 
 export type InviteUserPayload = {
   email: string;
-  name: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
   platformRole?: 'admin' | 'user';
   restaurantId?: string;
   restaurantRole?: 'owner' | 'manager' | 'kitchen' | 'bar' | 'employee';
@@ -91,7 +65,9 @@ export async function inviteUser(payload: InviteUserPayload): Promise<InviteUser
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       email: payload.email,
-      name: payload.name,
+      firstName: payload.firstName,
+      lastName: payload.lastName,
+      phone: payload.phone,
       platformRole: payload.platformRole ?? 'user',
       restaurantId: payload.restaurantId,
       restaurantRole: payload.restaurantRole ?? 'owner',
@@ -271,25 +247,9 @@ export async function assignRestaurantRole(
   restaurantId: string,
   role: RestaurantRole
 ) {
-  const { data, error } = await supabase
-    .from('restaurant_access')
-    .upsert(
-      { user_id: userId, restaurant_id: restaurantId, role },
-      { onConflict: 'user_id,restaurant_id' }
-    )
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
+  return performAction('staff.role', restaurantId, { userId, role });
 }
 
 export async function removeRestaurantAccess(userId: string, restaurantId: string) {
-  const { error } = await supabase
-    .from('restaurant_access')
-    .delete()
-    .eq('user_id', userId)
-    .eq('restaurant_id', restaurantId);
-
-  if (error) throw error;
+  await performAction('staff.remove', restaurantId, { userId });
 }

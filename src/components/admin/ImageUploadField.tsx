@@ -4,6 +4,8 @@ import { useRef, useState } from "react";
 import { Image as ImageIcon, Loader2, Upload, X } from "lucide-react";
 import type { ImagePlacement } from "@/lib/storage/constants";
 import clsx from "clsx";
+import { useUiText } from "@/hooks/useUiText";
+import { useOperationalText } from "@/hooks/useOperationalText";
 
 type Props = {
   label: string;
@@ -25,6 +27,8 @@ export default function ImageUploadField({
   className,
   hidePreview = false,
 }: Props) {
+  const t = useOperationalText();
+  const uiText = useUiText();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
@@ -48,7 +52,7 @@ export default function ImageUploadField({
       if (!res.ok) throw new Error(json.error ?? "Upload failed");
       onChange(json.url);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Upload failed");
+      setError(t("Žao nam je, slika nije učitana. Pokušajte ponovo.", "Sorry, the image could not be uploaded. Please try again."));
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";
@@ -59,7 +63,7 @@ export default function ImageUploadField({
     <div className={className}>
       <label className="flex items-center gap-2 text-xs font-bold text-muted adm-text-muted uppercase tracking-wider mb-2">
         <ImageIcon size={12} className="text-primary/50" />
-        {label}
+        {uiText(label)}
       </label>
 
       {value && !hidePreview ? (
@@ -69,7 +73,7 @@ export default function ImageUploadField({
             type="button"
             onClick={() => onChange("")}
             className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70"
-            title="Remove"
+            title={t("Ukloni sliku", "Remove image")} aria-label={t("Ukloni sliku", "Remove image")}
           >
             <X size={14} />
           </button>
@@ -93,7 +97,7 @@ export default function ImageUploadField({
           ) : (
             <Upload size={16} />
           )}
-          {uploading ? "Uploading…" : "Upload image"}
+          {uploading ? t("Učitavanje…", "Uploading…") : t("Dodaj sliku", "Upload image")}
         </button>
       </div>
 
@@ -105,12 +109,10 @@ export default function ImageUploadField({
         onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
       />
 
-      <p className="text-[10px] text-muted adm-text-muted mt-1.5">
-        Saved to bucket <span className="font-mono">sarayamenu/{restaurantId}/{placement}-filename</span>
-      </p>
+
 
       {error && (
-        <p className="text-[11px] text-red-600 mt-1 bg-red-50 px-2 py-1 rounded-lg">{error}</p>
+        <p role="alert" className="text-[11px] text-red-600 mt-1 bg-red-50 px-2 py-1 rounded-lg">{error}</p>
       )}
     </div>
   );

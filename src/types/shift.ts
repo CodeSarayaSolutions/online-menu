@@ -117,6 +117,7 @@ export type ShiftSummaryProductBreakdown = {
 };
 
 export type ShiftSummary = {
+  timezone: string;
   date: string;
   dayLabel: string;
   segment: DayShiftSegment;

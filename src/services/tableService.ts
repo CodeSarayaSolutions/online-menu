@@ -1,67 +1,32 @@
+import { performAction } from './actionService';
 import { supabase } from '@/lib/supabase';
-import type { InsertDto, Tables, UpdateDto } from '@/types/supabase';
+import type { Tables, UpdateDto } from '@/types/supabase';
 
 export type RestaurantTableRow = Tables<'restaurant_tables'>;
 
-export async function getTables(restaurantId: string): Promise<RestaurantTableRow[]> {
-  const { data, error } = await supabase
-    .from('restaurant_tables')
-    .select('*')
-    .eq('restaurant_id', restaurantId)
-    .eq('is_active', true)
-    .order('position', { ascending: true });
+async function listTables(restaurantId: string, activeOnly: boolean): Promise<RestaurantTableRow[]> {
+ const rows:RestaurantTableRow[]=[];
+ for(let offset=0;;offset+=500){
+  let query=supabase.from('restaurant_tables').select('*').eq('restaurant_id',restaurantId).order('position').order('id').range(offset,offset+499);
+  if(activeOnly)query=query.eq('is_active',true);
+  const {data,error}=await query;if(error)throw error;rows.push(...data??[]);if(!data||data.length<500)return rows;
+ }
+}
+export async function getTables(restaurantId:string){return listTables(restaurantId,true);}
+export async function getAllTables(restaurantId:string){return listTables(restaurantId,false);}
 
-  if (error) throw error;
-  return data ?? [];
+export async function createTable(restaurantId: string, label: string, capacity: number, position: number): Promise<RestaurantTableRow> {
+  return performAction('table.create', restaurantId, { label, capacity, position });
 }
 
-export async function getAllTables(restaurantId: string): Promise<RestaurantTableRow[]> {
-  const { data, error } = await supabase
-    .from('restaurant_tables')
-    .select('*')
-    .eq('restaurant_id', restaurantId)
-    .order('position', { ascending: true });
-
+export async function updateTable(id: string, updates: UpdateDto<'restaurant_tables'>): Promise<RestaurantTableRow> {
+  const { data, error } = await supabase.from('restaurant_tables').select('*').eq('id', id).single();
   if (error) throw error;
-  return data ?? [];
-}
-
-export async function createTable(
-  restaurantId: string,
-  label: string,
-  capacity: number,
-  position: number
-): Promise<RestaurantTableRow> {
-  const row: InsertDto<'restaurant_tables'> = {
-    restaurant_id: restaurantId,
-    label,
-    capacity,
-    position,
-    is_active: true,
-  };
-  const { data, error } = await supabase.from('restaurant_tables').insert(row).select().single();
-  if (error) throw error;
-  return data;
-}
-
-export async function updateTable(
-  id: string,
-  updates: UpdateDto<'restaurant_tables'>
-): Promise<RestaurantTableRow> {
-  const { data, error } = await supabase
-    .from('restaurant_tables')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
+  return performAction('table.update', data.restaurant_id, { id, label: updates.label ?? data.label, capacity: updates.capacity ?? data.capacity, position: updates.position ?? data.position });
 }
 
 export async function deleteTable(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('restaurant_tables')
-    .update({ is_active: false })
-    .eq('id', id);
+  const { data, error } = await supabase.from('restaurant_tables').select('restaurant_id').eq('id', id).single();
   if (error) throw error;
+  await performAction('table.retire', data.restaurant_id, { id });
 }

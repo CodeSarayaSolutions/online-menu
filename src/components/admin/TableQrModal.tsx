@@ -1,5 +1,6 @@
 "use client";
 
+import { useUiText } from "@/hooks/useUiText";
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Download, Printer, X } from "lucide-react";
@@ -16,6 +17,7 @@ type Props = {
 };
 
 export default function TableQrModal({ table, venueSlug, onClose }: Props) {
+  const uiText = useUiText();
   const qrRef = useRef<HTMLDivElement>(null);
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(true);
@@ -33,7 +35,7 @@ export default function TableQrModal({ table, venueSlug, onClose }: Props) {
         renderQrCode(qrRef.current, menuUrl, 240);
       } catch (e) {
         if (!cancelled) {
-          setError(e instanceof Error ? e.message : "QR kod nije učitan");
+          setError(uiText("Žao nam je, nešto nije uspjelo. Pokušajte ponovo."));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -60,15 +62,16 @@ export default function TableQrModal({ table, venueSlug, onClose }: Props) {
     const dataUrl = canvas?.toDataURL("image/png") ?? "";
     const win = window.open("", "_blank", "width=400,height=520");
     if (!win) return;
+    const escape = (value: string) => value.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;", "'":"&#39;"}[c]!));
     win.document.write(`
       <!DOCTYPE html>
       <html>
-        <head><title>${table.label} — QR</title></head>
+        <head><title>${escape(table.label)} — QR</title></head>
         <body style="font-family:system-ui,sans-serif;text-align:center;padding:32px;">
-          <h1 style="font-size:22px;margin:0 0 8px;">${table.label}</h1>
-          <p style="color:#666;font-size:12px;margin:0 0 24px;">Skenirajte za narudžbu</p>
-          <img src="${dataUrl}" width="240" height="240" alt="QR kod" />
-          <p style="font-size:10px;color:#888;margin-top:16px;word-break:break-all;">${url}</p>
+          <h1 style="font-size:22px;margin:0 0 8px;">${escape(table.label)}</h1>
+          <p style="color:#666;font-size:12px;margin:0 0 24px;">${escape(uiText("Skenirajte za narudžbu"))}</p>
+          <img src="${dataUrl}" width="240" height="240" alt="${escape(uiText("QR kod"))}" />
+          <p style="font-size:10px;color:#888;margin-top:16px;word-break:break-all;">${escape(url)}</p>
         </body>
       </html>
     `);
@@ -94,8 +97,8 @@ export default function TableQrModal({ table, venueSlug, onClose }: Props) {
       >
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-lg font-extrabold text-dark adm-text">QR kod — {table.label}</h3>
-            <p className="text-[11px] text-muted adm-text-muted mt-0.5">Link za goste na stolu</p>
+            <h3 className="text-lg font-extrabold text-dark adm-text">{uiText("QR kod —")} {table.label}</h3>
+            <p className="text-[11px] text-muted adm-text-muted mt-0.5">{uiText("Link za goste na stolu")}</p>
           </div>
           <button type="button" onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--adm-surface-2)]">
             <X size={18} />
@@ -125,7 +128,7 @@ export default function TableQrModal({ table, venueSlug, onClose }: Props) {
             disabled={loading || !!error}
             className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border adm-border text-[13px] font-bold text-dark adm-text hover:bg-[var(--adm-surface-2)] disabled:opacity-40"
           >
-            <Download size={15} /> Preuzmi
+            <Download size={15} /> {uiText("Preuzmi")}
           </button>
           <button
             type="button"
@@ -133,7 +136,7 @@ export default function TableQrModal({ table, venueSlug, onClose }: Props) {
             disabled={loading || !!error}
             className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-primary to-amber-500 text-white text-[13px] font-bold disabled:opacity-40"
           >
-            <Printer size={15} /> Printaj
+            <Printer size={15} /> {uiText("Printaj")}
           </button>
         </div>
       </motion.div>

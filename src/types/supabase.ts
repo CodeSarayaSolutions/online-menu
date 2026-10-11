@@ -10,8 +10,20 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export interface Database {
   sarayamenu: {
     Tables: {
+      guest_sessions: {
+        Row: {token_hash:string;restaurant_id:string;table_id:string;expires_at:string;created_at:string};
+        Insert: {token_hash:string;restaurant_id:string;table_id:string;expires_at:string;created_at?:string};
+        Update: {expires_at?:string};
+        Relationships: [];
+      };
       users: {
         Row: {
+          first_name: string;
+          last_name: string;
+          phone: string;
+          onboarding_required: boolean;
+          temporary_pin_expires_at: string | null;
+          credential_version: number;
           id: string;
           name: string;
           email: string;
@@ -26,6 +38,12 @@ export interface Database {
           created_at: string;
         };
         Insert: {
+          first_name?: string;
+          last_name?: string;
+          phone?: string;
+          onboarding_required?: boolean;
+          temporary_pin_expires_at?: string | null;
+          credential_version?: number;
           id?: string;
           name: string;
           email: string;
@@ -40,6 +58,12 @@ export interface Database {
           created_at?: string;
         };
         Update: {
+          first_name?: string;
+          last_name?: string;
+          phone?: string;
+          onboarding_required?: boolean;
+          temporary_pin_expires_at?: string | null;
+          credential_version?: number;
           id?: string;
           name?: string;
           email?: string;
@@ -58,6 +82,8 @@ export interface Database {
 
       sessions: {
         Row: {
+          purpose: 'full' | 'onboarding';
+          credential_version: number;
           id: string;
           user_id: string;
           token_hash: string;
@@ -65,6 +91,8 @@ export interface Database {
           created_at: string;
         };
         Insert: {
+          purpose?: 'full' | 'onboarding';
+          credential_version?: number;
           id?: string;
           user_id: string;
           token_hash: string;
@@ -72,6 +100,8 @@ export interface Database {
           created_at?: string;
         };
         Update: {
+          purpose?: 'full' | 'onboarding';
+          credential_version?: number;
           id?: string;
           user_id?: string;
           token_hash?: string;
@@ -83,6 +113,10 @@ export interface Database {
 
       restaurants: {
         Row: {
+          language: 'bs' | 'en';
+          timezone: string;
+          kitchen_enabled: boolean;
+          revision: number;
           id: string;
           name: string;
           name_bs: string | null;
@@ -101,6 +135,10 @@ export interface Database {
           updated_at: string;
         };
         Insert: {
+          language?: 'bs' | 'en';
+          timezone?: string;
+          kitchen_enabled?: boolean;
+          revision?: number;
           id: string;
           name: string;
           name_bs?: string | null;
@@ -118,6 +156,10 @@ export interface Database {
           created_at?: string;
         };
         Update: {
+          language?: 'bs' | 'en';
+          timezone?: string;
+          kitchen_enabled?: boolean;
+          revision?: number;
           id?: string;
           name?: string;
           name_bs?: string | null;
@@ -208,6 +250,7 @@ export interface Database {
 
       products: {
         Row: {
+          category_id: string | null;
           id: string;
           restaurant_id: string;
           category: string;
@@ -223,6 +266,7 @@ export interface Database {
           updated_at: string;
         };
         Insert: {
+          category_id?: string | null;
           id: string;
           restaurant_id: string;
           category: string;
@@ -237,6 +281,7 @@ export interface Database {
           station?: 'kitchen' | 'bar' | 'both';
         };
         Update: {
+          category_id?: string | null;
           id?: string;
           restaurant_id?: string;
           category?: string;
@@ -442,6 +487,13 @@ export interface Database {
 
       orders: {
         Row: {
+          table_id: string | null;
+          guest_token_hash: string | null;
+          request_key: string | null;
+          accepted_at: string | null;
+          accepted_by: string | null;
+          estimated_minutes: number | null;
+          linked_tab_id: string | null;
           id: string;
           restaurant_id: string;
           items: Json;
@@ -455,6 +507,10 @@ export interface Database {
           payment_method: string;
         };
         Insert: {
+          accepted_at?: string | null;
+          accepted_by?: string | null;
+          estimated_minutes?: number | null;
+          linked_tab_id?: string | null;
           id: string;
           restaurant_id: string;
           items?: Json;
@@ -467,6 +523,10 @@ export interface Database {
           payment_method?: string;
         };
         Update: {
+          accepted_at?: string | null;
+          accepted_by?: string | null;
+          estimated_minutes?: number | null;
+          linked_tab_id?: string | null;
           id?: string;
           restaurant_id?: string;
           items?: Json;
@@ -513,10 +573,13 @@ export interface Database {
 
       table_tabs: {
         Row: {
+          origin: 'waiter' | 'guest';
+          settled_by: string | null;
+          settlement_key: string | null;
           id: string;
           restaurant_id: string;
           table_id: string;
-          waiter_id: string;
+          waiter_id: string | null;
           status: 'open' | 'closed';
           payment_method: 'cash' | 'card' | null;
           total: number;
@@ -524,10 +587,13 @@ export interface Database {
           created_at: string;
         };
         Insert: {
+          origin?: 'waiter' | 'guest';
+          settled_by?: string | null;
+          settlement_key?: string | null;
           id?: string;
           restaurant_id: string;
           table_id: string;
-          waiter_id: string;
+          waiter_id: string | null;
           status?: 'open' | 'closed';
           payment_method?: 'cash' | 'card' | null;
           total?: number;
@@ -535,10 +601,13 @@ export interface Database {
           created_at?: string;
         };
         Update: {
+          origin?: 'waiter' | 'guest';
+          settled_by?: string | null;
+          settlement_key?: string | null;
           id?: string;
           restaurant_id?: string;
           table_id?: string;
-          waiter_id?: string;
+          waiter_id?: string | null;
           status?: 'open' | 'closed';
           payment_method?: 'cash' | 'card' | null;
           total?: number;
@@ -550,6 +619,10 @@ export interface Database {
 
       tab_items: {
         Row: {
+          bar_done_quantity: number;
+          kitchen_done_quantity: number;
+          source_order_id: string | null;
+          options: Json;
           id: string;
           tab_id: string;
           product_id: string;
@@ -563,6 +636,10 @@ export interface Database {
           created_at: string;
         };
         Insert: {
+          bar_done_quantity?: number;
+          kitchen_done_quantity?: number;
+          source_order_id?: string | null;
+          options?: Json;
           id?: string;
           tab_id: string;
           product_id: string;
@@ -576,6 +653,10 @@ export interface Database {
           created_at?: string;
         };
         Update: {
+          bar_done_quantity?: number;
+          kitchen_done_quantity?: number;
+          source_order_id?: string | null;
+          options?: Json;
           id?: string;
           tab_id?: string;
           product_id?: string;
@@ -896,6 +977,11 @@ export interface Database {
         Relationships: [];
       };
 
+      roster_snapshots: {
+        Row: { restaurant_id: string; roster_date: string; segments: Json; saved_at: string; is_closed: boolean; timezone: string };
+        Insert: { restaurant_id: string; roster_date: string; segments: Json; saved_at?: string; is_closed?: boolean; timezone?: string };
+        Update: { segments?: Json; saved_at?: string; is_closed?: boolean; timezone?: string }; Relationships: [];
+      };
       shift_daily_roster: {
         Row: {
           restaurant_id: string;
@@ -919,6 +1005,20 @@ export interface Database {
     Views: Record<string, never>;
 
     Functions: {
+      hos_import_receipt: {Args:{p_actor:string;p_venue:string;p_key:string;p_hash:string};Returns:Json};
+      hos_guest_submit: { Args: {p_hash:string;p_venue:string;p_request:string;p_items:Json;p_note:string;p_table:string};Returns:Json };
+      hos_guest_decide: { Args: {p_actor:string;p_venue:string;p_order:string;p_accept:boolean;p_minutes:number};Returns:Json };
+      hos_inventory: { Args: { p_hash: string; p_venue: string; p_options?: Json }; Returns: Json };
+      hos_support_feed: { Args: { p_actor: string; p_options?: Json }; Returns: Json };
+      hos_roster: { Args: { p_venue: string; p_date: string }; Returns: Json };
+      hos_shift_save: { Args: { p_actor: string; p_venue: string; p_action: string; p_data: Json }; Returns: Json };
+      hos_shift_summary: { Args: { p_actor: string; p_venue: string; p_date: string; p_segment: string }; Returns: Json };
+      hos_session_report: { Args: { p_hash: string; p_venue: string; p_range: string; p_from?: string | null; p_to?: string | null; p_options?: Json }; Returns: Json };
+      hos_report: { Args: { p_actor: string; p_venue: string; p_from: string; p_to: string; p_options?: Json }; Returns: Json };
+      hos_role: { Args: { p_actor: string; p_venue: string }; Returns: string | null };
+      hos_menu_save: { Args: { p_actor: string; p_venue: string; p_revision: number | null; p_patch: Json; p_request_key: string }; Returns: Json };
+      hos_record_incident: { Args: { p_id: string; p_actor: string | null; p_venue: string | null; p_code: string; p_context: Json }; Returns: undefined };
+      hos_action: { Args: { p_actor_id: string | null; p_action: string; p_venue: string; p_data?: Json }; Returns: Json };
       current_app_user_id: {
         Args: Record<string, never>;
         Returns: string;

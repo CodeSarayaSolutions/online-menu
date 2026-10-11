@@ -9,14 +9,15 @@ import clsx from "clsx";
 
 interface MenuSectionProps {
   title: string;
+  categoryId: string;
   products: Product[];
   startIndex?: number;
 }
 
 // A single category section with a beautiful heading and vertical items
-function MenuSection({ title, products, startIndex = 0 }: MenuSectionProps) {
+function MenuSection({ title, categoryId, products, startIndex = 0 }: MenuSectionProps) {
   const { categoryIcons, pageContent, componentStyles: cs } = useCmsData();
-  const { t } = useTranslation();
+  const { t, tCategory } = useTranslation();
 
   if (products.length === 0) return null;
 
@@ -25,7 +26,7 @@ function MenuSection({ title, products, startIndex = 0 }: MenuSectionProps) {
 
   return (
     <motion.div
-      id={`category-${title.toLowerCase()}`}
+      id={`category-${categoryId}`}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="mb-8 scroll-mt-16"
@@ -54,7 +55,7 @@ function MenuSection({ title, products, startIndex = 0 }: MenuSectionProps) {
               className="text-[11px] md:text-xs font-medium mt-0.5"
               style={{ color: cs.sectionSubtitleColor }}
             >
-              {products.length} item{products.length !== 1 ? "s" : ""} {t(pageContent, "itemsAvailableText")}
+              {products.length} {t(pageContent, "itemsAvailableText")}
             </p>
           </div>
           {/* Decorative dot pattern */}
@@ -107,8 +108,8 @@ export default function MenuList({
   const { categoryConfig, categoryIcons, pageContent, componentStyles: cs } = useCmsData();
   const CATEGORY_ORDER = categoryConfig
     .filter((c) => c.id !== "all" && c.id !== "popular")
-    .map((c) => c.label);
-  const { t } = useTranslation();
+    ;
+  const { t, tCategory } = useTranslation();
   const centered = cs.sectionTitleAlign === "center";
 
   if (products.length === 0) {
@@ -135,13 +136,14 @@ export default function MenuList({
       <div className="pt-2">
         {CATEGORY_ORDER.map((cat) => {
           const catProducts = products
-            .filter((p) => p.category === cat)
+            .filter((p) => p.categoryId ? p.categoryId === cat.id : (p.category === cat.id || (p.category === cat.label && categoryConfig.filter(c=>c.label===cat.label).length===1)))
             .sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
           if (catProducts.length === 0) return null;
           const section = (
             <MenuSection
-              key={cat}
-              title={cat}
+              key={cat.id}
+              categoryId={cat.id}
+              title={tCategory(cat)}
               products={catProducts}
               startIndex={runningIndex}
             />
@@ -178,7 +180,7 @@ export default function MenuList({
                 className="text-[11px] md:text-xs font-medium mt-0.5"
                 style={{ color: cs.sectionSubtitleColor }}
               >
-                {products.length} item{products.length !== 1 ? "s" : ""} {t(pageContent, "itemsFoundText")}
+                {products.length} {t(pageContent, "itemsFoundText")}
               </p>
             </div>
           </div>

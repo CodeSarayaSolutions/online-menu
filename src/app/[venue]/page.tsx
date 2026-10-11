@@ -48,7 +48,7 @@ export default function MenuPage() {
   const { venue } = useParams<{ venue: string }>();
   const venueSlug = decodeURIComponent(venue || "");
   const cmsData = useCmsData();
-  const { t, tRestaurant, tCategory, tProduct } = useTranslation();
+  const { text, t, tRestaurant, tCategory, tProduct } = useTranslation();
 
   // CMS data (preview overrides are now handled inside useCmsData)
   const restaurant = cmsData.restaurant;
@@ -76,7 +76,7 @@ export default function MenuPage() {
     }
     // Category IDs are lowercase, section IDs match category label lowercase
     const catConfig = categoryConfig.find((c) => c.id === catId);
-    const sectionId = catConfig ? `category-${catConfig.label.toLowerCase()}` : `category-${catId}`;
+    const sectionId = catConfig ? `category-${catConfig.id}` : `category-${catId}`;
     const el = document.getElementById(sectionId);
     if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -98,7 +98,7 @@ export default function MenuPage() {
         if (visible.length > 0) {
           const sectionName = visible[0].target.id.replace("category-", "");
           const matchingCat = categoryConfig.find(
-            (c) => c.label.toLowerCase() === sectionName
+            (c) => c.id === sectionName
           );
           if (matchingCat) {
             setActiveCategory(matchingCat.id);
@@ -606,12 +606,12 @@ export default function MenuPage() {
           <div className="flex items-center justify-center gap-8">
             <div className="text-center">
               <p className="text-2xl font-extrabold" style={{ color: cs.cardPriceColor }}>{pageContent.socialProofRating}</p>
-              <p className="text-[10px] font-medium" style={{ color: pageMuted }}>Rating</p>
+              <p className="text-[10px] font-medium" style={{ color: pageMuted }}>{text("Ocjena", "Rating")}</p>
             </div>
             <div className="w-px h-8" style={{ backgroundColor: pageBorder }} />
             <div className="text-center">
               <p className="text-2xl font-extrabold" style={{ color: cs.infoBarTextColor }}>{t(pageContent, "socialProofCount")}</p>
-              <p className="text-[10px] font-medium" style={{ color: pageMuted }}>Reviews</p>
+              <p className="text-[10px] font-medium" style={{ color: pageMuted }}>{text("Recenzije", "Reviews")}</p>
             </div>
           </div>
         </motion.div>
@@ -700,7 +700,7 @@ export default function MenuPage() {
           style={{ backgroundColor: pageSurface, color: pageMuted, borderBottom: `1px solid ${pageBorder}` }}
         >
           <QrCode size={13} style={{ color: accentColor }} />
-          Pregledavate meni · Skenirajte QR kod na stolu za naručivanje
+          {text("Pregledavate meni · Skenirajte QR kod na stolu za naručivanje", "Viewing the menu · Scan the table QR code to order")}
         </div>
       )}
       {/* Render sections in configured order */}
