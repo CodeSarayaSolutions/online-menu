@@ -44,7 +44,11 @@ export default function AdminLoginForm({ onSuccess, title, subtitle, initialEmai
         setSession(await authService.completeOnboarding(newPin, pin));
         setPin(""); setNewPin(""); setStep("done");
       }
-    } catch (e) { setError(t("Prijava nije uspjela. Provjerite podatke i pokušajte ponovo.", "Sign-in failed. Check your details and try again.")); }
+    } catch (e) {
+      setError(e instanceof authService.LoginRateLimitError
+        ? t("Previše pokušaja prijave. Sačekajte 15 minuta ili zatražite novi privremeni PIN od voditelja.", "Too many sign-in attempts. Wait 15 minutes or ask your manager for a new temporary PIN.")
+        : t("Prijava nije uspjela. Provjerite podatke i pokušajte ponovo.", "Sign-in failed. Check your details and try again."));
+    }
     finally { setBusy(false); }
   };
   return <form ref={form} onSubmit={next} className="space-y-5">

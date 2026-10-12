@@ -27,9 +27,13 @@ export type SessionPayload = {
 // ─── Authentication (Next.js API + session header) ───────
 
 export type LoginResult = SessionPayload | { onboarding: true };
+export class LoginRateLimitError extends Error {
+  constructor() { super('Login temporarily limited'); this.name = 'LoginRateLimitError'; }
+}
 export async function signIn(email: string, creds: { pin: string }): Promise<LoginResult> {
   const res = await fetch('/api/auth/login', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, pin: creds.pin }) });
   const body = await res.json();
+  if (res.status === 429) throw new LoginRateLimitError();
   if (!res.ok) throw new Error(body.error ?? 'Prijava nije uspjela. Pokušajte ponovo.');
   if (body.sessionToken) setAppSessionToken(body.sessionToken);
   return body as LoginResult;

@@ -83,3 +83,12 @@ The second fresh restore, `onm_rehearsal_20261011_2`, passed all 11 corrected mi
 Evidence: `rehearsal-2/migration-results.json`, `regression-results.json`, `post-migration-verification.json` and `historical-report-verification.json` inside the private backup directory. Migration hashes are recorded. Copy schemas have no browser-role schema access and were never added to the REST exposed-schema list. No live application records, credentials or schema were changed. The snapshot and both rehearsal schemas are retained; temporary SQL-upload schemas were removed transactionally.
 
 This rehearsal was followed by the completed production rollout documented above.
+
+
+## Temporary PIN lockout recovery — 12 October 2026
+
+ONM-32 incident: issuing a temporary PIN replaced credentials but left the account-wide login attempt lockout intact. The login screen also collapsed HTTP 429 into the generic incorrect-details message. Belmina had 24 attempts in one window, including attempts around two PIN resets. Support cleared only her login bucket and recorded the intervention; her latest PIN then reached the onboarding welcome screen in the live browser. Her credential was not changed by support.
+
+Migration `hos-012-pin-recovery.sql` clears the target bucket in the same authorized transaction as issuing a PIN, preserves all other buckets, revokes old sessions, and rejects missing/protected targets. The patch preserves subsequent modifications to `hos_action` and is idempotent. The login UI presents a localized wait-or-request-PIN instruction on 429 without exposing internal errors.
+
+Verification: isolated migrated production-copy `pin-recovery.sql` rollback regression passed, including cross-venue denial, lockout threshold, scoped recovery, credential versioning, session revocation, onboarding and platform reset. Migration applied live; all 10 existing unit tests passed. UI deployment verification follows in tracker.

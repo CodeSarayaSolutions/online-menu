@@ -143,7 +143,10 @@ BEGIN
  ELSIF p_action='staff.temporary-pin' THEN
   target_id=(p_data->>'userId')::uuid;
   IF role_name NOT IN ('admin','owner','manager') OR (role_name<>'admin' AND NOT EXISTS(SELECT 1 FROM sarayamenu.restaurant_access WHERE user_id=target_id AND restaurant_id=p_venue AND (role IN ('employee','bar','kitchen') OR (role_name='owner' AND role='manager')))) THEN RAISE EXCEPTION 'Forbidden' USING ERRCODE='42501'; END IF;
-  UPDATE sarayamenu.users SET pin_hash=p_data->>'pinHash',onboarding_required=true,temporary_pin_expires_at=now()+interval '7 days',credential_version=credential_version+1 WHERE id=target_id AND (platform_role<>'admin' OR role_name='admin');
+  UPDATE sarayamenu.users SET pin_hash=p_data->>'pinHash',onboarding_required=true,temporary_pin_expires_at=now()+interval '7 days',credential_version=credential_version+1 WHERE id=target_id AND (platform_role<>'admin' OR role_name='admin') RETURNING * INTO target_user;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Forbidden' USING ERRCODE='42501'; END IF;
+  -- Authorized credential recovery must also clear the old account lockout.
+  DELETE FROM sarayamenu.login_limits WHERE key_hash=encode(sha256(('login:'||lower(trim(target_user.email)))::bytea),'hex');
   DELETE FROM sarayamenu.sessions WHERE user_id=target_id;
   result=jsonb_build_object('ok',true);
  ELSIF p_action='tab.open' THEN
